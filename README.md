@@ -6,6 +6,14 @@ The AI scullion (generate recipes, grocery list, track spending etc).
 
 ---
 
+## Draft UI 
+
+![ui](draft-ui.png)
+
+Draft ui of how the finished product might look like.
+
+---
+
 To start your Phoenix server:
 
 * Run `mix setup` to install and setup dependencies
