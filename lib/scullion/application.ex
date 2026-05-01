@@ -14,6 +14,7 @@ defmodule Scullion.Application do
        repos: Application.fetch_env!(:scullion, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:scullion, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Scullion.PubSub},
+      Scullion.Accounts.RateLimiter,
       # Start a worker by calling: Scullion.Worker.start_link(arg)
       # {Scullion.Worker, arg},
       # Start to serve requests, typically the last entry

@@ -1,0 +1,28 @@
+defmodule ScullionWeb.Plugs.Auth do
+  import Plug.Conn
+  import Phoenix.Controller, only: [redirect: 2]
+  alias Scullion.Accounts
+
+  @behaviour Plug
+
+  @impl Plug
+  def init(opts), do: opts
+
+  @impl Plug
+  def call(conn, _opts) do
+    case get_session(conn, :user_id) do
+      nil ->
+        conn |> redirect(to: "/login") |> halt()
+
+      user_id ->
+        user = Accounts.get_user!(user_id)
+        assign(conn, :current_user, user)
+    end
+  rescue
+    Ecto.NoResultsError ->
+      conn
+      |> delete_session(:user_id)
+      |> redirect(to: "/login")
+      |> halt()
+  end
+end

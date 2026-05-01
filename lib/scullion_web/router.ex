@@ -14,14 +14,41 @@ defmodule ScullionWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :require_auth do
+    plug ScullionWeb.Plugs.Auth
+  end
+
+  # Public routes — no authentication required
   scope "/", ScullionWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/setup", SetupLive
+    live "/login", LoginLive
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", ScullionWeb do
-  #   pipe_through :api
-  # end
+  # Authenticated users (member + admin)
+  scope "/", ScullionWeb do
+    pipe_through [:browser, :require_auth]
+
+    live_session :authenticated,
+      on_mount: [{ScullionWeb.Live.Auth, :require_authenticated}] do
+      live "/", PlannerLive
+      live "/recipes", RecipeLive
+      live "/groceries", GroceryLive
+      live "/prep", PrepLive
+      live "/deals", DealsLive
+      live "/pantry", PantryLive
+      live "/costs", CostLive
+    end
+  end
+
+  # Admin only
+  scope "/", ScullionWeb do
+    pipe_through [:browser, :require_auth]
+
+    live_session :admin,
+      on_mount: [{ScullionWeb.Live.Auth, :require_admin}] do
+      live "/settings", SettingsLive
+    end
+  end
 end

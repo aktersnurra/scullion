@@ -685,6 +685,16 @@ Triggerable manually from admin settings UI.
 
 ---
 
+## Macros
+
+Do not introduce any macros until Phase 4 is complete. Write all 
+handler and event boilerplate by hand first. After Phase 4, propose 
+macro extractions based on observed repetition — do not design macros 
+upfront. Any macro must be extracted from at least 3 existing instances 
+of the same pattern.
+
+---
+
 ## UI Considerations
 
 - **Login**: numpad with large buttons, grouped digits (XXXX XXXX XXXX XXXX)
