@@ -7,9 +7,9 @@
 
 A self-hosted meal planning system with two interfaces: a Raspberry Pi touchscreen kiosk
 mounted in the kitchen, and a mobile-friendly web UI accessible from anywhere. It plans
-weekly dinners, generates grocery lists, scrapes store deals, tracks food costs (groceries
-and dining out), and uses an LLM to generate meal plans that account for deals, pantry
-inventory, user preferences, and batch cooking (matlådor).
+weekly dinners (and optionally lunches), generates grocery lists, scrapes store deals,
+tracks food costs (groceries and dining out), and uses an LLM to generate meal plans
+that account for deals, pantry inventory, user preferences, and batch cooking (matlådor).
 
 ---
 
@@ -52,7 +52,7 @@ Ecto CRUD with proper context boundaries.
 | **Groceries** | Multi-user real-time checklist. Granular events enable PubSub sync,        |
 |               | conflict resolution, and natural undo. The poster child for this pattern.  |
 | **Planning**  | LLM-orchestrated workflow with user tweaks. Enough commands (assign,       |
-|               | remove, swap, set servings, mark leftover) to make the decider non-trivial.|
+|               | remove, swap, set servings, pin, skip, mark leftover) to justify it.      |
 
 ### CRUD (Ecto + context boundary)
 
@@ -90,13 +90,164 @@ only call these public APIs. No Ecto queries in LiveViews. Handlers orchestrate 
 ```
 1. planner_live.ex: user taps "Generate Plan"
 2. → PlanningHandler.generate_plan(week, constraints)
-3.   → load context: pantry, deals, preferences, recipe history
+3.   → load context: pantry, deals, preferences, recipe history, pinned slots
 4.   → LLM.generate_plan(constraints_with_context)        ← IO (adapter call)
 5.   → Decider.decide(%GeneratePlan{recipes: llm_result}, state) → {:ok, events}
 6.   → EventStore.append(plan_id, events)
 7.   → PubSub.broadcast(...)
 8. ← planner_live re-renders
 ```
+
+---
+
+## Meal Planning Features
+
+### Slot Model
+
+Each day has toggleable meal slots. Users configure which days and meals to plan.
+
+```
+%SlotConfig{
+  mon: [:dinner],
+  tue: [:lunch, :dinner],
+  wed: [:lunch, :dinner],
+  thu: [:dinner],
+  fri: [:dinner],
+  sat: [],               # eating out
+  sun: [:dinner]          # Sunday dinner comes from prep session
+}
+```
+
+Default is dinner only Mon–Fri. Users toggle lunch on/off per day from the
+planner UI. Empty days are skipped by the LLM.
+
+### Pinning
+
+Any slot can be pinned before plan generation:
+
+- **Recipe pin**: "I want [specific recipe] on Wednesday dinner"
+- **Free-text pin**: "something with salmon on Thursday" — LLM resolves this
+- **Ingredient pin**: "use the chicken in the fridge" — LLM works it in
+
+Pinned slots are hard constraints. The LLM plans the remaining slots around them,
+optimising ingredient overlap with the pinned meals.
+
+### Skipping & Pausing
+
+- **Skip a meal after the fact**: tap the day, tap "didn't make this."
+  The skip is recorded as a `MealSkipped` event. Ingredients don't move to pantry.
+  If it was a batch cook, downstream meals that depended on it get flagged.
+- **Pause planning**: for holidays or travel, simply set all slots to empty for
+  those weeks. The Quantum job still runs but generates nothing. Or disable
+  the job entirely from admin settings.
+- **Partial weeks**: going away Wednesday? Toggle Wed–Fri off, plan Mon–Tue only.
+
+### Viewing History
+
+- Browse any previous week's plan from the planner UI
+- See what you actually ate vs what was planned (skipped meals visible)
+- The event store gives you full history for free
+
+---
+
+## Meal Prep Model: The Andy Cooks Algorithm
+
+Inspired by Andy Cooks' three meal prep videos. The core philosophy: **don't prep
+meals, prep components that cascade into different dishes across the week**.
+
+### Andy's Algorithm (codified)
+
+```
+1. SHOP (Saturday)
+   - One trip, one list, informed by deals and pantry
+
+2. PREP (Sunday, ~2-3 hours)
+   - Cook 2-3 base proteins (whole chicken breakdown, beef mince, marinated prawns)
+   - Cook 1-2 base carbs (rice, beans, pasta)
+   - Make 1 mother sauce or base (tomato sugo, curry paste, soffritto)
+   - Prep all vegetables (wash, chop, roast some, pickle some, keep raw)
+   - Sunday dinner comes from this prep session
+
+3. CASCADE (Mon-Thu/Fri)
+   - Each day's meal builds on or transforms the previous day's output
+   - Roast chicken → chicken salad → chicken fried rice
+   - Tomato sugo → baked eggs → lamb rigatoni
+   - Each meal feels different despite sharing a base
+   - Lunches are leftovers/assemblies, dinners are quick cooks with prepped components
+
+4. FRESH ELEMENT
+   - Each weeknight dinner adds 1 fresh element to prepped components
+   - Keeps meals from feeling like reheated leftovers
+```
+
+### How This Is Encoded
+
+This is a **prompt engineering concern, not a data model concern**. The recipe
+data model stays simple. The LLM prompt encodes the algorithm:
+
+- Recipes tagged `batch` signal "this produces more than one meal's worth"
+- Recipes tagged `quick` signal "≤30 min, good for weeknights"
+- Recipes tagged `base-recipe` signal "this is a mother sauce or foundational component"
+- The prompt tells the LLM to think in cascades: plan batch cooks early in the week,
+  transform leftovers into different meals later in the week
+- The prompt includes temporal hints: "batch-friendly recipes early, assemblies/
+  transformations later"
+- The anti-variety constraint: "prefer ingredient reuse over 5 unrelated meals"
+
+### Recipe Serialisation for LLM Prompt
+
+Recipes are serialised compactly in the prompt:
+
+```
+r42 | Roast Chicken | chicken, carrot, onion, garlic | 60m | batch
+r17 | Chicken Salad | chicken, lettuce, yogurt, lemon | 15m | quick
+r23 | Chicken Fried Rice | chicken, rice, egg, soy sauce | 20m | quick
+r91 | Tomato Sugo | tomato, garlic, basil, olive oil | 45m | batch base-recipe
+```
+
+The `id | name | ingredients | time | tags` format is token-efficient and gives
+the LLM everything it needs to reason about reuse and cascading.
+
+### Two LLM Modes
+
+1. **Pick from existing recipes**: LLM receives the recipe catalog and returns
+   recipe IDs. Used when you have a good recipe library built up.
+2. **Generate new recipes**: LLM generates full recipe data (name, ingredients,
+   instructions). Used early on or when you want fresh ideas. Generated recipes
+   get persisted to the catalog after user review.
+
+The prompt template handles both modes. The `GeneratePlan` command carries a
+`mode` flag: `:from_catalog`, `:generate_new`, or `:mixed` (pick some existing,
+generate some new).
+
+---
+
+## Recipe Catalog
+
+### Search & Filtering
+
+The recipe LiveView supports:
+
+- **Full-text search** by recipe name and ingredient names
+- **Filter by tags**: batch, quick, vegetarian, swedish, asian, etc.
+- **Filter by type**: meal, component, assembly (for UI browsing)
+- **Filter by time**: ≤30 min, ≤45 min, ≤60 min, any (using prep_time + cook_time)
+- **Filter by weeknight-friendly**: quick tag + ≤45 min total
+- **Sort by**: last used (rotation), most used (favourites), recently added, alphabetical
+- **Browse history**: see which weeks a recipe was used in
+
+### Recipe Types (for UI filtering only)
+
+```
+recipe_type: enum (meal / component / assembly)
+```
+
+- **meal**: traditional complete recipe
+- **component**: a prepped base (protein, carb, sauce, prepped veg)
+- **assembly**: combining components into a plate (minimal cooking)
+
+This is a **display/filtering concern only**. The LLM reasons about reuse from
+tags and ingredient overlap, not from recipe_type.
 
 ---
 
@@ -180,10 +331,12 @@ scullion/
 │   │   ├── planning/
 │   │   │   ├── decider.ex              # decide/2, evolve/2, initial/0 — pure, zero IO
 │   │   │   │                            #   Commands: GeneratePlan, AssignRecipe, RemoveRecipe,
-│   │   │   │                            #             SetServings, MarkLeftover
+│   │   │   │                            #             SetServings, PinSlot, UnpinSlot,
+│   │   │   │                            #             SkipMeal, MarkLeftover
 │   │   │   │                            #   Events:   PlanGenerated, RecipeAssigned, RecipeRemoved,
-│   │   │   │                            #             ServingsChanged, LeftoverMarked
-│   │   │   │                            #   State:    %PlanState{week_start, slots: %{day => slot}}
+│   │   │   │                            #             ServingsChanged, SlotPinned, SlotUnpinned,
+│   │   │   │                            #             MealSkipped, LeftoverMarked
+│   │   │   │                            #   State:    %PlanState{week_start, slot_config, slots, pins}
 │   │   │   ├── commands.ex
 │   │   │   ├── events.ex
 │   │   │   └── state.ex
@@ -209,9 +362,9 @@ scullion/
 │   │   │   └── device_token.ex         # Ecto schema
 │   │   │
 │   │   ├── recipes.ex                   # Public API: create, update, list, search, get,
-│   │   │                                #   scrape_from_url
+│   │   │                                #   scrape_from_url, filter_by_time, filter_by_tags
 │   │   ├── recipes/
-│   │   │   ├── recipe.ex               # Ecto schema
+│   │   │   ├── recipe.ex               # Ecto schema (includes recipe_type)
 │   │   │   ├── ingredient.ex           # Ecto schema
 │   │   │   ├── recipe_ingredient.ex    # Ecto join schema
 │   │   │   ├── tag.ex                  # Ecto schema
@@ -273,14 +426,26 @@ scullion/
 │   │   ├── open_router.ex              # Implements Scullion.LLM
 │   │   └── req_http.ex                 # Implements Scullion.HTTP
 │   │
+│   │── ─── PROMPT TEMPLATES ───
+│   │
+│   ├── scullion/llm/prompts/
+│   │   ├── plan_weekly.eex             # Weekly meal plan generation (encodes Andy's algorithm)
+│   │   ├── suggest_recipe.eex          # Recipe alternatives for a slot
+│   │   ├── prep_guide.eex             # Sunday meal prep instructions (cascade model)
+│   │   ├── extract_recipe.eex         # Recipe extraction from HTML
+│   │   ├── parse_receipt.eex          # Receipt image → line items
+│   │   └── parse_deals.eex           # Deal image/PDF → structured deals
+│   │
 │   │── ─── WEB LAYER ───
 │   │
 │   ├── scullion_web/
 │   │   ├── live/
 │   │   │   ├── setup_live.ex            # First-boot admin creation
 │   │   │   ├── login_live.ex            # Numpad → Accounts.authenticate
-│   │   │   ├── planner_live.ex          # → PlanningHandler + PubSub subscribe
+│   │   │   ├── planner_live.ex          # Calendar → PlanningHandler + PubSub subscribe
+│   │   │   │                            #   Slot toggles, pinning, skip, plan generation
 │   │   │   ├── recipe_live.ex           # → RecipeHandler / Recipes context
+│   │   │   │                            #   Search, filter by tags/time/type, browse history
 │   │   │   ├── grocery_live.ex          # → GroceriesHandler + PubSub subscribe
 │   │   │   ├── prep_live.ex             # → PrepHandler / Prep context
 │   │   │   ├── deals_live.ex            # → DealsHandler / Deals context
@@ -293,10 +458,7 @@ scullion/
 │   │   ├── components/                  # Reusable LiveView function components
 │   │   └── router.ex
 │   │
-│   ├── scullion/scheduler.ex           # Quantum jobs:
-│   │                                    #   Sat 08:00 → DealsHandler.scrape_all
-│   │                                    #   Sat 18:00 → PlanningHandler.generate_plan
-│   │                                    #   Sat 18:30 → PrepHandler.generate_guide
+│   ├── scullion/scheduler.ex           # Quantum jobs
 │   │
 │   └── scullion.ex                     # Application supervision tree
 │
@@ -315,7 +477,7 @@ scullion/
 │   └── scullion_web/                   # LiveView tests
 │
 ├── priv/repo/migrations/
-│   ├── 001_create_events.exs           # Append-only event log (groceries + planning)
+│   ├── 001_create_events.exs
 │   ├── 002_create_users.exs
 │   ├── 003_create_device_tokens.exs
 │   ├── 004_create_recipes.exs
@@ -417,9 +579,6 @@ end
 
 ```elixir
 defmodule Scullion.Costs do
-  alias Scullion.Costs.{Receipt, LineItem, DiningOut}
-  alias Scullion.Repo
-
   def log_receipt(attrs), do: ...
   def log_dining_out(attrs), do: ...
   def weekly_summary(week_start), do: ...
@@ -449,6 +608,114 @@ defmodule Scullion.LLM do
   @callback generate_prep_guide(plan :: map()) :: {:ok, map()} | {:error, term()}
 end
 ```
+
+---
+
+## Prompt Engineering
+
+All LLM prompts live in EEx templates under `lib/scullion/llm/prompts/`. The adapter
+renders them with context before sending to OpenRouter. Prompts are configuration,
+not code — iterate on the template, not the Elixir.
+
+### Prompt Files
+
+```
+lib/scullion/llm/prompts/
+├── plan_weekly.eex        # Weekly meal plan generation (encodes cascade algorithm)
+├── suggest_recipe.eex     # Recipe alternatives for a slot
+├── prep_guide.eex         # Sunday prep instructions (component + cascade model)
+├── extract_recipe.eex     # Recipe extraction from HTML
+├── parse_receipt.eex      # Receipt image → line items
+└── parse_deals.eex        # Deal image/PDF → structured deals
+```
+
+### Weekly Plan Prompt Strategy
+
+The plan prompt encodes Andy's cascade algorithm. Key elements:
+
+**System prompt** tells the LLM to think like a prep cook:
+- Build a small set of reusable base components
+- Plan batch cooks early in the week
+- Cascade: each later meal transforms or builds on earlier outputs
+- Prefer ingredient reuse over variety
+- Respect pinned slots as hard constraints
+- Prefer pantry items and deals
+- Respect time constraints per slot (weeknight ≤ 45 min)
+
+**User prompt** includes (rendered from EEx template):
+- Available recipes in compact format: `id | name | key_ingredients | time | tags`
+  where tags include `batch`, `quick`, `base-recipe`
+- Pinned slots: `"Wed dinner: PINNED to r42 (Steak Frites)"`
+- Current pantry inventory
+- This week's deals
+- Recently used recipes (for rotation avoidance)
+- Slot configuration (which days/meals to plan)
+- User preferences (allergies, dislikes)
+- Planning mode: `:from_catalog`, `:generate_new`, or `:mixed`
+
+**Output schema** (JSON):
+```json
+{
+  "prep_session": {
+    "proteins": ["..."],
+    "bases": ["..."],
+    "sauces": ["..."],
+    "vegetables": ["..."]
+  },
+  "days": [
+    {
+      "day": "Mon",
+      "meal": "dinner",
+      "recipe_id": "r42",
+      "servings": 6,
+      "notes": "batch cook — leftovers for Tue lunch + Wed dinner",
+      "cascade_from": null
+    },
+    {
+      "day": "Tue",
+      "meal": "lunch",
+      "recipe_id": "r17",
+      "servings": 2,
+      "notes": "uses leftover chicken from Mon",
+      "cascade_from": "Mon dinner"
+    }
+  ]
+}
+```
+
+When mode is `:generate_new`, recipe_id is null and a full `recipe` object
+is included instead (name, ingredients, instructions). Generated recipes
+are persisted to the catalog after user review.
+
+### Prep Guide Prompt Strategy
+
+Consumes the plan output and generates:
+1. **Shopping list delta**: what to buy beyond pantry
+2. **Sunday prep timeline**: ordered steps, estimated times
+3. **Component list**: what each prep step produces
+4. **Storage instructions**: how to store each component, how long it keeps
+5. **Daily assembly notes**: how to combine components each day
+6. **Cascade map**: visual "Mon's chicken → Tue's salad → Wed's fried rice"
+
+### Prompt Design Principles
+
+- Define output schema as JSON with a concrete example
+- Include all context explicitly (preferences, pantry, deals, history)
+- Carry per-slot constraints (time limits, pinned recipes)
+- Swedish for recipe/ingredient names, English for structural keys
+- Version-tracked in git — diff prompt changes like code changes
+
+## Recipe Images
+
+- **Scraped recipes**: extract hero image from source URL during scraping
+- **Generated/manual recipes**: call image generation API (DALL-E or similar)
+  to produce a food photo from the recipe title + key ingredients
+- **Storage**: images saved to VPS filesystem under priv/static/uploads/recipes/
+- **Port**: Scullion.ImageGen behaviour with adapter (keeps it swappable)
+- **Trigger**: image generated on recipe creation, stored once, never regenerated
+  unless manually requested
+
+---
 
 ---
 
@@ -483,7 +750,9 @@ DeviceToken
 
 Recipe
   - title, description, instructions (text/markdown)
-  - base_servings, prep_time_minutes, cook_time_minutes
+  - recipe_type: enum (meal / component / assembly)
+  - base_servings
+  - prep_time_minutes, cook_time_minutes
   - source_url (original website), video_url (YouTube etc.)
   - last_used_at (for rotation tracking)
   - created_by: user_id (nullable — null if LLM-generated)
@@ -498,7 +767,8 @@ RecipeIngredient (join table)
   - quantity, unit, notes ("finely diced", "optional")
 
 Tag
-  - name ("quick", "vegetarian", "batch-friendly", "swedish", "asian", etc.)
+  - name ("quick", "vegetarian", "batch", "base-recipe",
+    "batch-friendly", "swedish", "asian", etc.)
 
 Deal
   - store (ica / coop / other), store_location
@@ -534,6 +804,9 @@ PrepGuide
   - week_start (date)
   - instructions (markdown from LLM)
   - timeline (list of maps, stored as JSON)
+  - components (JSON — what the prep session produces)
+  - cascade_map (JSON — how meals flow from one to the next)
+  - storage_notes (markdown)
 ```
 
 Note: MealPlan and GroceryList state live in the event store, not in CRUD tables.
@@ -544,25 +817,28 @@ Their current state is reconstructed by folding events through the decider's `ev
 ## Design Principles
 
 - **Deciders where they earn it, CRUD everywhere else.** Two event-sourced aggregates
-  (groceries + planning) where the pattern provides real value. Everything else is
-  Ecto CRUD with clean context boundaries. Pragmatic, not purist.
+  (groceries + planning). Everything else is Ecto CRUD. Pragmatic, not purist.
 - **Functional core / imperative shell.** Deciders are pure functions with zero IO.
-  Handlers orchestrate IO (LLM calls, HTTP fetches) before/after the pure decision.
-  CRUD handlers orchestrate IO then delegate to context modules.
-- **Clean context boundaries everywhere.** Every context — event-sourced or CRUD —
-  exposes a public API module. LiveViews only call public APIs. No Ecto queries in LiveViews.
-- **Behaviours for external deps.** LLM and HTTP behind behaviours. Adapters injected
-  via config. Tests mock with Mox.
+  Handlers orchestrate IO before/after the pure decision.
+- **Clean context boundaries everywhere.** Every context exposes a public API module.
+  LiveViews only call public APIs. No Ecto queries in LiveViews.
+- **Behaviours for external deps.** LLM and HTTP behind behaviours. Tests mock with Mox.
+- **Prompts are configuration, not code.** EEx templates, version-tracked.
+- **The cascade algorithm is a prompt concern, not a data model concern.** The recipe
+  model stays simple (type + tags). The LLM reasons about reuse from ingredient overlap
+  and tags like `batch` and `base-recipe`.
 - **Port injection via config:**
   ```elixir
-  # config/config.exs
   config :scullion, :llm_client, Scullion.Adapters.OpenRouter
   config :scullion, :http_client, Scullion.Adapters.ReqHTTP
-
-  # config/test.exs
-  config :scullion, :llm_client, Scullion.Mocks.LLMMock
-  config :scullion, :http_client, Scullion.Mocks.HTTPMock
   ```
+
+## Macros
+
+Do not introduce any macros until Phase 4 is complete. Write all handler and event
+boilerplate by hand first. After Phase 4, propose macro extractions based on observed
+repetition — do not design macros upfront. Any macro must be extracted from at least
+3 existing instances of the same pattern.
 
 ---
 
@@ -587,12 +863,15 @@ Their current state is reconstructed by folding events through the decider's `ev
 - Device token generation + auth plug for kiosk
 
 ### Phase 3 — Data Model & Recipe Persistence
-- Recipes context: Recipe, Ingredient, Tag, RecipeIngredient schemas
+- Recipes context: Recipe (with recipe_type, tags), Ingredient, Tag, RecipeIngredient
 - Recipe CRUD via LiveView
-- Tags/categories
+- Tags/categories (including `batch`, `quick`, `base-recipe`)
 - External links: source_url, video_url
 - Recipe rotation tracking (last_used_at)
 - Serving size field
+- Search: full-text by name/ingredients
+- Filtering: by tags, by type, by time (≤30m, ≤45m, ≤60m), by weeknight-friendly
+- Sorting: last used, most used, recently added, alphabetical
 - Recipe scraping from URLs:
   - Fetch HTML via HTTP port
   - Parse JSON-LD / microdata via Recipes.Parser (pure functions)
@@ -600,21 +879,34 @@ Their current state is reconstructed by folding events through the decider's `ev
   - User provides URL → "scrape this" → review → persist
 
 ### Phase 4 — Weekly Planner & Grocery List
-- Planning decider: GeneratePlan, AssignRecipe, RemoveRecipe, SetServings, MarkLeftover
+- Planning decider: GeneratePlan, AssignRecipe, RemoveRecipe, SetServings,
+  PinSlot, UnpinSlot, SkipMeal, MarkLeftover
+  - Slot configuration: per-day toggles for lunch/dinner
+  - Pinning: recipe pin, free-text pin, ingredient pin
+  - Skip tracking: meals not made, with downstream cascade awareness
 - Groceries decider: BuildList, AddItem, RemoveItem, CheckItem, UncheckItem
-- Groceries.Aggregator: pure function merging recipe ingredients into grocery items
-- Calendar LiveView: week grid, tap day → recipe
+- Groceries.Aggregator: pure function merging recipe ingredients
+- Calendar LiveView: week grid with slot toggles, pin UI, skip UI
 - Grocery list LiveView: real-time sync via PubSub
 - Category-grouped display
+- Plan history: browse previous weeks
 
 ### Phase 5 — LLM Integration
 - Scullion.LLM behaviour + Scullion.Adapters.OpenRouter
-- Generate weekly plan: constraints → LLM → PlanningHandler → Decider
-- Suggest new recipe: pantry/groceries context → LLM → alternatives
-- Meal prep guide: PrepHandler → LLM → Prep context (CRUD save)
-  - Consolidated Sunday prep instructions for Mon–Fri
-  - Prep timeline, ingredient overlap optimisation
-- Matlådor: servings multiplier on plan, LLM adjusts grocery quantities
+- Prompt templates under lib/scullion/llm/prompts/
+- **Weekly plan generation** (cascade algorithm):
+  - Three modes: from_catalog, generate_new, mixed
+  - Pinned slots as hard constraints
+  - Weeknight time constraints
+  - Ingredient overlap / batch / cascade optimisation
+  - Deals and pantry as context
+  - Recipe rotation avoidance
+- **Suggest new recipe**: pantry/groceries context → alternatives
+- **Prep guide generation** (Sunday prep model):
+  - Component list + prep timeline + assembly notes
+  - Cascade map + storage instructions
+  - Handles traditional, component-based, and hybrid weeks
+- Matlådor: servings multiplier, LLM adjusts quantities
 - Structured output parsing (JSON mode)
 
 ### Phase 6 — Deals Scraping
@@ -646,7 +938,7 @@ Their current state is reconstructed by folding events through the decider's `ev
 - Pantry context: PantryItem schema, CRUD
 - Checked-off grocery item → Pantry.add_item
 - LLM uses pantry state to avoid re-buying
-- Leftover awareness: MarkLeftover command on planning decider
+- Leftover awareness: MarkLeftover + SkipMeal on planning decider
 - Nutritional estimates (LLM, rough macros)
 - Grocery list export (plain text for SMS)
 
@@ -679,19 +971,11 @@ Triggerable manually from admin settings UI.
    Everything else is CRUD. Pragmatic trade-off.
 4. **LiveView for everything** — real-time sync via PubSub. No REST/GraphQL.
 5. **OpenRouter only** — single LLM provider behind behaviour.
-6. **Handlers as imperative shell** — orchestrate IO, delegate to deciders or CRUD contexts.
+6. **Handlers as imperative shell** — orchestrate IO, delegate to deciders or CRUD.
 7. **Mullvad-style auth** — 16-digit codes, device tokens, Argon2 + rate limiting.
-8. **Behaviours for deal parsers** — new store = implement one module.
-
----
-
-## Macros
-
-Do not introduce any macros until Phase 4 is complete. Write all 
-handler and event boilerplate by hand first. After Phase 4, propose 
-macro extractions based on observed repetition — do not design macros 
-upfront. Any macro must be extracted from at least 3 existing instances 
-of the same pattern.
+8. **Cascade algorithm in prompts, not data model** — recipe model stays simple.
+   LLM reasons about reuse from tags and ingredient overlap.
+9. **No macros before Phase 4** — extract from real repetition.
 
 ---
 
@@ -699,6 +983,9 @@ of the same pattern.
 
 - **Login**: numpad with large buttons, grouped digits (XXXX XXXX XXXX XXXX)
 - **Kiosk (10.1", 1280×800)**: weekly calendar home, large tap targets, kitchen-safe
+- **Planner**: slot toggles (lunch/dinner per day), pin button per slot,
+  skip button, plan history navigation
+- **Recipes**: search bar, tag filters, time filters, sort options
 - **Mobile**: responsive LiveView, grocery list + receipt upload primary use cases
 - **No native app** — browser only, add to homescreen
 
@@ -706,7 +993,12 @@ of the same pattern.
 
 ## Reference Material
 
-- **Meal prep**: Andy's "What a Chef Eats in a Week" https://youtu.be/visxjkAQpTU
+- **Meal prep (component model)**: Andy Cooks "My Chef's Guide to Week Night Meal Prepping"
+  https://youtu.be/visxjkAQpTU
+- **Meal prep (pantry staples + mother recipes)**: Andy Cooks "Don't Meal Prep, Do This Instead"
+  https://youtu.be/2NzVcRRGwuU
+- **Meal prep (full week plan + cascade)**: Andy Cooks "Don't Meal Prep, Prep Like A Chef"
+  https://youtu.be/0Ec1H-7mgZw
 - **Auth**: Mullvad VPN account system https://mullvad.net
 - **Nerves kiosk**: https://github.com/nerves-web-kiosk/kiosk_system_rpi5
 - **ICA offers**: https://www.ica.se/erbjudanden/{store-slug}-{store-id}/

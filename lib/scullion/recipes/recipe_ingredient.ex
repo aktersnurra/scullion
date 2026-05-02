@@ -1,12 +1,19 @@
 defmodule Scullion.Recipes.RecipeIngredient do
   use Ecto.Schema
+  import Ecto.Changeset
 
   schema "recipe_ingredients" do
-    field :recipe_id, :integer
-    field :ingredient_id, :integer
+    belongs_to :recipe, Scullion.Recipes.Recipe
+    belongs_to :ingredient, Scullion.Recipes.Ingredient
     field :quantity, :decimal
     field :unit, :string
     field :notes, :string
     timestamps()
+  end
+
+  def changeset(ri, attrs) do
+    ri
+    |> cast(attrs, [:recipe_id, :ingredient_id, :quantity, :unit, :notes])
+    |> validate_required([:recipe_id, :ingredient_id])
   end
 end

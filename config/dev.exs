@@ -64,6 +64,8 @@ config :scullion, ScullionWeb.Endpoint,
     ]
   ]
 
+config :scullion, :image_gen_client, Scullion.Adapters.StubImageGen
+
 # Enable dev routes for dashboard and mailbox
 config :scullion, dev_routes: true
 

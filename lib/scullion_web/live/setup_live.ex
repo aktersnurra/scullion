@@ -62,8 +62,10 @@ defmodule ScullionWeb.SetupLive do
     """
   end
 
-  defp format_code(<<a::binary-size(4), b::binary-size(4), c::binary-size(4), d::binary-size(4)>>),
-    do: "#{a} #{b} #{c} #{d}"
+  defp format_code(
+         <<a::binary-size(4), b::binary-size(4), c::binary-size(4), d::binary-size(4)>>
+       ),
+       do: "#{a} #{b} #{c} #{d}"
 
   defp format_code(code), do: code
 end

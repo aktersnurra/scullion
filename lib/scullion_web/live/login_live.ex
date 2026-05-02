@@ -1,7 +1,7 @@
 defmodule ScullionWeb.LoginLive do
   use ScullionWeb, :live_view
   alias Scullion.Accounts
-  alias Scullion.Accounts.RateLimiter
+  alias Scullion.Accounts.{LoginToken, RateLimiter}
 
   def mount(_params, session, socket) do
     if session["user_id"] do
@@ -34,7 +34,11 @@ defmodule ScullionWeb.LoginLive do
         {:error, :locked, retry_after} = RateLimiter.check(ip)
 
         {:noreply,
-         assign(socket, error: "Too many attempts. Try again in #{retry_after}s", digits: [], locked: true)}
+         assign(socket,
+           error: "Too many attempts. Try again in #{retry_after}s",
+           digits: [],
+           locked: true
+         )}
 
       true ->
         code = Enum.join(digits)
@@ -42,7 +46,8 @@ defmodule ScullionWeb.LoginLive do
         case Accounts.authenticate(code) do
           {:ok, user} ->
             RateLimiter.record_success(ip)
-            {:noreply, socket |> Phoenix.LiveView.put_session(:user_id, user.id) |> push_navigate(to: "/")}
+            token = LoginToken.create(user.id)
+            {:noreply, push_navigate(socket, to: "/login/session?t=#{token}")}
 
           {:error, :invalid_code} ->
             RateLimiter.record_failure(ip)
@@ -65,7 +70,7 @@ defmodule ScullionWeb.LoginLive do
             <div class="flex gap-1">
               <%= for d <- group do %>
                 <span class="w-6 text-center text-white">
-                  <%= if d == :empty, do: "·", else: "●" %>
+                  {if d == :empty, do: "·", else: "●"}
                 </span>
               <% end %>
             </div>

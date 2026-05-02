@@ -65,6 +65,7 @@ defmodule Scullion.MixProject do
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},
       {:argon2_elixir, "~> 3.2"},
+      {:floki, "~> 0.37"},
       {:mox, "~> 1.2", only: :test}
     ]
   end

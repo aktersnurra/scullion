@@ -24,6 +24,7 @@ defmodule ScullionWeb.Router do
 
     live "/setup", SetupLive
     live "/login", LoginLive
+    get "/login/session", SessionController, :confirm
   end
 
   # Authenticated users (member + admin)
