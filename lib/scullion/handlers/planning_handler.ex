@@ -1,5 +1,5 @@
 defmodule Scullion.Handlers.PlanningHandler do
-  alias Scullion.{EventStore, Planning.Decider, Planning.Commands, Recipes, SpendGuard}
+  alias Scullion.{Deals, EventStore, Planning.Decider, Planning.Commands, Recipes, SpendGuard}
   alias Phoenix.PubSub
 
   @pubsub Scullion.PubSub
@@ -89,7 +89,9 @@ defmodule Scullion.Handlers.PlanningHandler do
       slot_keys: slot_keys,
       pins: state.pins,
       pantry: [],
-      deals: [],
+      deals: Enum.map(Deals.list_current(), fn d ->
+        "#{d.product_name}#{if d.price, do: " #{d.price}kr", else: ""}"
+      end),
       recent_recipes: [],
       week_start: week_start,
       mode: mode

@@ -1,20 +1,30 @@
 defmodule Scullion.Handlers.DealsHandler do
+  alias Scullion.{Deals, Deals.StoreConfig, Repo}
+
   @http Application.compile_env(:scullion, :http_client)
 
+  @spec scrape_all() :: :ok
   def scrape_all do
-    Scullion.Deals.StoreConfig
-    |> Scullion.Repo.all()
+    StoreConfig
+    |> Repo.all()
     |> Enum.filter(& &1.scrape_enabled)
     |> Enum.each(&scrape_store/1)
+
+    :ok
+  end
+
+  @spec scrape_url(String.t(), atom()) :: {:ok, integer()} | {:error, term()}
+  def scrape_url(url, chain) do
+    parser = parser_for(chain)
+
+    with {:ok, html} <- @http.fetch(url),
+         {:ok, deals} <- parser.parse(html) do
+      Deals.upsert_deals(deals)
+    end
   end
 
   defp scrape_store(store_config) do
-    parser = parser_for(store_config.chain)
-
-    with {:ok, html} <- @http.fetch(store_config.url),
-         {:ok, deals} <- parser.parse(html) do
-      Scullion.Deals.upsert_deals(deals)
-    end
+    scrape_url(store_config.url, store_config.chain)
   end
 
   defp parser_for(:ica), do: Scullion.Deals.Parsers.ICA

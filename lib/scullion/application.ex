@@ -16,8 +16,7 @@ defmodule Scullion.Application do
       {Phoenix.PubSub, name: Scullion.PubSub},
       Scullion.Accounts.RateLimiter,
       Scullion.Accounts.LoginToken,
-      # Start a worker by calling: Scullion.Worker.start_link(arg)
-      # {Scullion.Worker, arg},
+      Scullion.Scheduler,
       # Start to serve requests, typically the last entry
       ScullionWeb.Endpoint
     ]

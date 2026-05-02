@@ -1,10 +1,37 @@
 defmodule Scullion.Deals do
+  alias Scullion.{Repo, Deals.Deal}
+  import Ecto.Query
+
   @spec upsert_deals([map()]) :: {:ok, integer()} | {:error, term()}
-  def upsert_deals(_deals), do: {:error, :not_implemented}
+  def upsert_deals(deals) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
-  @spec list_current() :: [term()]
-  def list_current, do: []
+    rows =
+      Enum.map(deals, fn d ->
+        d
+        |> Map.put_new(:source, :scraped)
+        |> Map.merge(%{inserted_at: now, updated_at: now})
+      end)
 
-  @spec clear_expired() :: :ok | {:error, term()}
-  def clear_expired, do: {:error, :not_implemented}
+    {count, _} =
+      Repo.insert_all(Deal, rows,
+        on_conflict: :nothing,
+        conflict_target: [:store, :product_name]
+      )
+
+    {:ok, count}
+  end
+
+  @spec list_current() :: [Deal.t()]
+  def list_current do
+    today = Date.utc_today()
+    Repo.all(from d in Deal, where: is_nil(d.valid_until) or d.valid_until >= ^today)
+  end
+
+  @spec clear_expired() :: :ok
+  def clear_expired do
+    today = Date.utc_today()
+    Repo.delete_all(from d in Deal, where: not is_nil(d.valid_until) and d.valid_until < ^today)
+    :ok
+  end
 end

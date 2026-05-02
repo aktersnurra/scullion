@@ -55,6 +55,19 @@ config :phoenix, :json_library, Jason
 config :scullion, :llm_client, Scullion.Adapters.OpenRouter
 config :scullion, :http_client, Scullion.Adapters.ReqHTTP
 
+config :scullion, Scullion.Scheduler,
+  jobs: [
+    {"0 8 * * 6", {Scullion.Handlers.DealsHandler, :scrape_all, []}},
+    {"0 18 * * 6",
+     fn ->
+       Scullion.Handlers.PlanningHandler.generate_plan("plan:current", Date.utc_today())
+     end},
+    {"30 18 * * 6",
+     fn ->
+       Scullion.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today())
+     end}
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
