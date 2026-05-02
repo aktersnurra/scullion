@@ -32,3 +32,5 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :scullion, :image_gen_client, Scullion.Adapters.StubImageGen
+config :scullion, :http_client, Scullion.MockHTTP
+config :scullion, :llm_client, Scullion.MockLLM

@@ -67,9 +67,11 @@ defmodule Scullion.Recipes do
     term = "%#{query}%"
 
     from(r in Recipe,
-      left_join: ri in RecipeIngredient, on: ri.recipe_id == r.id,
-      left_join: i in Ingredient, on: i.id == ri.ingredient_id,
-      where: ilike(r.title, ^term) or ilike(i.name, ^term),
+      left_join: ri in RecipeIngredient,
+      on: ri.recipe_id == r.id,
+      left_join: i in Ingredient,
+      on: i.id == ri.ingredient_id,
+      where: like(r.title, ^term) or like(i.name, ^term),
       distinct: true
     )
     |> Repo.all()
@@ -170,7 +172,14 @@ defmodule Scullion.Recipes do
   end
 
   defp maybe_generate_image(recipe, image_url) do
-    Task.start(fn -> Scullion.Handlers.RecipeHandler.generate_image(recipe, image_url) end)
+    # Preload associations synchronously (caller has DB connection)
+    loaded = Repo.preload(recipe, recipe_ingredients: :ingredient)
+    caller = self()
+
+    Task.start(fn ->
+      Ecto.Adapters.SQL.Sandbox.allow(Repo, caller, self())
+      Scullion.Handlers.RecipeHandler.generate_image(loaded, image_url)
+    end)
   end
 
   # ── Query filters ──────────────────────────────────────────────────────────
@@ -181,8 +190,10 @@ defmodule Scullion.Recipes do
   defp filter_tags(query, tag_names) do
     Enum.reduce(tag_names, query, fn name, q ->
       from r in q,
-        join: rt in "recipe_tags", on: rt.recipe_id == r.id,
-        join: t in Tag, on: t.id == rt.tag_id and t.name == ^name
+        join: rt in "recipe_tags",
+        on: rt.recipe_id == r.id,
+        join: t in Tag,
+        on: t.id == rt.tag_id and t.name == ^name
     end)
   end
 
@@ -195,7 +206,7 @@ defmodule Scullion.Recipes do
 
   defp filter_max_minutes(query, max) when is_integer(max) do
     from r in query,
-      where: (coalesce(r.prep_time_minutes, 0) + coalesce(r.cook_time_minutes, 0)) <= ^max
+      where: coalesce(r.prep_time_minutes, 0) + coalesce(r.cook_time_minutes, 0) <= ^max
   end
 
   defp filter_weeknight(query, true) do

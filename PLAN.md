@@ -1,462 +1,765 @@
-# Phase 3 — Data Model & Recipe Persistence
+# Phase 5 — LLM Integration
 
 ## Overview
 
-Implement the full Recipes context: migrations, Ecto schemas, CRUD context, HTML parser
-(pure), RecipeHandler (scrape + LLM fallback + image generation), ImageGen port + stub
-adapter, and the recipe CRUD LiveView with search, filtering, and sorting.
+Wire up the OpenRouter adapter and implement two LLM-powered flows:
 
-Phase 3 is self-contained. It touches Recipes, one new port (ImageGen), one new adapter
-stub, RecipeHandler, and one new LiveView. It does not touch Planning, Groceries, or any
-other context.
+1. **Weekly plan generation** — `PlanningHandler.generate_plan/3` calls OpenRouter,
+   parses structured JSON output, fires the existing `GeneratePlan` command.
+2. **Prep guide generation** — `PrepHandler.generate_guide/2` calls OpenRouter,
+   persists structured guide via the `Prep` context.
+
+Also in Phase 5: **SpendGuard** — gate + log every LLM call using OpenRouter's real
+`cost` field. No guessing, no token math. Every LLM call is logged.
+
+Everything else from the SPEC (suggest_recipe, lunchbox batch servings, receipt/deals
+parsing) is later phases.
+
+The Mox mocks (`Scullion.MockLLM`) and port injection config are already in place.
+The `Scullion.Adapters.OpenRouter` stub exists. `PrepGuide` schema and `prep_guides`
+migration exist.
 
 ---
 
-## New dependency
+## What already exists
+
+**Stubs (need implementation):**
+- `lib/scullion/adapters/open_router.ex` — all callbacks return `{:error, :not_implemented}`
+- `lib/scullion/adapters/req_http.ex` — returns `{:error, :not_implemented}`
+- `lib/scullion_web/live/planner_live.ex` — "Generate Plan" button is disabled
+
+**Missing (need creation):**
+- `lib/scullion/llm.ex` — behaviour module (referenced by adapter but doesn't exist yet)
+- `lib/scullion/http.ex` — behaviour module (same)
+- `lib/scullion/llm/prompts.ex` — rendering module
+- `priv/llm/prompts/plan_weekly.eex` — prompt template
+- `priv/llm/prompts/prep_guide.eex` — prompt template
+- `lib/scullion/handlers/planning_handler.ex` — `generate_plan/3` (currently only manual commands)
+- `lib/scullion/handlers/prep_handler.ex` — new handler
+- `lib/scullion/prep.ex` — public API (only schema exists)
+- `lib/scullion/spend_guard.ex` — budget gate
+- `lib/scullion/llm/cost.ex` — cost extraction from OpenRouter response
+
+**Config already wired:**
+- `config :scullion, :llm_client, Scullion.Adapters.OpenRouter` (dev/prod)
+- `config :scullion, :llm_client, Scullion.MockLLM` (test)
+- `config :scullion, :http_client, Scullion.MockHTTP` (test)
+
+---
+
+## Port behaviours
+
+### `lib/scullion/llm.ex` (new)
 
 ```elixir
-{:floki, "~> 0.37"}
+defmodule Scullion.LLM do
+  @callback generate_plan(constraints :: map()) :: {:ok, map(), usage :: map()} | {:error, term()}
+  @callback suggest_recipes(context :: map()) :: {:ok, [map()], usage :: map()} | {:error, term()}
+  @callback extract_recipe_from_html(html :: String.t()) :: {:ok, map(), usage :: map()} | {:error, term()}
+  @callback parse_receipt_image(image :: binary()) :: {:ok, [map()], usage :: map()} | {:error, term()}
+  @callback parse_deals_image(image :: binary()) :: {:ok, [map()], usage :: map()} | {:error, term()}
+  @callback generate_prep_guide(plan :: map()) :: {:ok, map(), usage :: map()} | {:error, term()}
+end
 ```
 
-Floki is a pure-Elixir HTML parser used by `Recipes.Parser` to extract JSON-LD/microdata
-from recipe pages. No other new deps.
+All callbacks return `{:ok, result, usage}` — usage is a map with at minimum `%{cost_usd: float}`.
+This shape is uniform across all adapters including the mock.
 
----
+### `lib/scullion/http.ex` (new)
 
-## New migrations (4 files)
-
-### priv/repo/migrations/20260502000004_create_recipes.exs
-
-```sql
-CREATE TABLE recipes (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  title TEXT NOT NULL,
-  description TEXT,
-  instructions TEXT,
-  recipe_type TEXT NOT NULL DEFAULT 'meal',  -- meal / component / assembly
-  base_servings INTEGER,
-  prep_time_minutes INTEGER,
-  cook_time_minutes INTEGER,
-  source_url TEXT,
-  video_url TEXT,
-  image_path TEXT,
-  last_used_at TEXT,
-  created_by INTEGER,
-  inserted_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-```
-
-### priv/repo/migrations/20260502000005_create_ingredients.exs
-
-```sql
-CREATE TABLE ingredients (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  category TEXT,
-  default_unit TEXT,
-  inserted_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE UNIQUE INDEX idx_ingredients_name ON ingredients(name);
-```
-
-### priv/repo/migrations/20260502000006_create_recipe_ingredients.exs
-
-```sql
-CREATE TABLE recipe_ingredients (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-  ingredient_id INTEGER NOT NULL REFERENCES ingredients(id),
-  quantity DECIMAL,
-  unit TEXT,
-  notes TEXT,
-  inserted_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE INDEX idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id);
-```
-
-### priv/repo/migrations/20260502000007_create_tags.exs
-
-```sql
-CREATE TABLE tags (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  inserted_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-CREATE UNIQUE INDEX idx_tags_name ON tags(name);
-
-CREATE TABLE recipe_tags (
-  recipe_id INTEGER NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
-  tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (recipe_id, tag_id)
-);
+```elixir
+defmodule Scullion.HTTP do
+  @callback fetch(url :: String.t()) :: {:ok, String.t()} | {:error, term()}
+end
 ```
 
 ---
 
-## Files to create (new)
+## OpenRouter adapter
 
-### lib/scullion/image_gen.ex
+### `lib/scullion/adapters/open_router.ex` (replace stub)
 
-New port behaviour. Kept separate from LLM since the provider may differ.
+Two callbacks implemented in Phase 5: `generate_plan/1` and `generate_prep_guide/1`.
+The other four remain `{:error, :not_implemented}`.
 
+OpenRouter returns `usage.cost` directly in every response — no token math needed.
+
+**Shared internals:**
 ```elixir
-defmodule Scullion.ImageGen do
-  @callback generate_food_image(title :: String.t(), ingredients :: [String.t()])
-            :: {:ok, binary()} | {:error, term()}
+@api_url "https://openrouter.ai/api/v1/chat/completions"
+
+defp api_key, do: Application.fetch_env!(:scullion, :openrouter_api_key)
+defp model, do: Application.get_env(:scullion, :openrouter_model, "anthropic/claude-3-5-haiku")
+
+defp chat(system_prompt, user_prompt) do
+  body = %{
+    model: model(),
+    response_format: %{type: "json_object"},
+    messages: [
+      %{role: "system", content: system_prompt},
+      %{role: "user", content: user_prompt}
+    ]
+  }
+
+  case Req.post(@api_url,
+         json: body,
+         headers: [
+           {"Authorization", "Bearer #{api_key()}"},
+           {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+           {"X-Title", "Scullion"}
+         ]
+       ) do
+    {:ok, %{status: 200, body: body}} ->
+      content = get_in(body, ["choices", Access.at(0), "message", "content"])
+      usage = extract_usage(body)
+      with {:ok, parsed} <- Jason.decode(content) do
+        {:ok, parsed, usage}
+      end
+
+    {:ok, %{status: 402}} ->
+      {:error, :provider_budget_exceeded}
+
+    {:ok, %{status: 429}} ->
+      {:error, :rate_limited}
+
+    {:ok, %{status: status, body: body}} ->
+      {:error, {:openrouter_error, status, body}}
+
+    {:error, reason} ->
+      {:error, {:http_error, reason}}
+  end
+end
+
+defp extract_usage(%{"usage" => usage}) do
+  %{
+    prompt_tokens: usage["prompt_tokens"],
+    completion_tokens: usage["completion_tokens"],
+    cost_usd: usage["cost"] || 0.0
+  }
+end
+defp extract_usage(_), do: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: 0.0}
+```
+
+**`generate_plan/1`:**
+```elixir
+def generate_plan(constraints) do
+  {system, user} = Scullion.LLM.Prompts.plan_weekly(constraints)
+  with {:ok, json, usage} <- chat(system, user) do
+    {:ok, json, usage}
+  end
 end
 ```
 
-### lib/scullion/adapters/stub_image_gen.ex
-
-Stub adapter for dev/test — returns a fixed placeholder PNG binary (1×1 transparent PNG).
-Wired in dev and test config. The real OpenRouter/DALL-E adapter comes in Phase 5.
-
+**`generate_prep_guide/1`:**
 ```elixir
-config :scullion, :image_gen_client, Scullion.Adapters.StubImageGen
-```
-
-### lib/scullion/recipes/recipe_tag.ex (new join schema)
-
-```elixir
-schema "recipe_tags" do
-  belongs_to :recipe, Recipe
-  belongs_to :tag, Tag
+def generate_prep_guide(plan) do
+  {system, user} = Scullion.LLM.Prompts.prep_guide(plan)
+  with {:ok, json, usage} <- chat(system, user) do
+    {:ok, json, usage}
+  end
 end
 ```
-
-No timestamps — pure join table.
 
 ---
 
-## Files to modify
+## SpendGuard
 
-### lib/scullion/recipes/recipe.ex
+### `lib/scullion/spend_guard.ex` (new)
 
-Replace stub schema with full implementation.
+Gates before calls using a monthly budget. Logs after calls using real cost from OpenRouter.
 
 ```elixir
-schema "recipes" do
-  field :title, :string
-  field :description, :string
-  field :instructions, :string
-  field :recipe_type, Ecto.Enum, values: [:meal, :component, :assembly], default: :meal
-  field :base_servings, :integer
-  field :prep_time_minutes, :integer
-  field :cook_time_minutes, :integer
-  field :source_url, :string
-  field :video_url, :string
-  field :image_path, :string
-  field :last_used_at, :utc_datetime
-  field :created_by, :integer
+defmodule Scullion.SpendGuard do
+  @monthly_limit_usd 20.0
 
-  has_many :recipe_ingredients, RecipeIngredient
-  many_to_many :tags, Tag, join_through: RecipeTag, on_replace: :delete
+  def allow?(feature, estimated_tokens \\ 50_000) do
+    with :ok <- budget_ok?(estimated_tokens),
+         :ok <- cooldown_ok?(feature) do
+      :ok
+    end
+  end
 
-  timestamps()
+  def log_usage(feature, usage) do
+    Scullion.Costs.log_llm_usage(%{
+      feature: to_string(feature),
+      prompt_tokens: usage.prompt_tokens,
+      completion_tokens: usage.completion_tokens,
+      cost_usd: usage.cost_usd
+    })
+  end
+
+  defp budget_ok?(estimated_tokens) do
+    spent = Scullion.Costs.llm_spend_this_month()
+    # Rough estimate: $4.176 / 1M tokens (haiku pricing), used only for pre-call gate
+    estimated_cost = estimated_tokens * 4.176 / 1_000_000
+    if spent + estimated_cost > @monthly_limit_usd do
+      {:error, :budget_exceeded}
+    else
+      :ok
+    end
+  end
+
+  # Prevent hammering: same feature can't run more than once per minute
+  defp cooldown_ok?(feature) do
+    last = Scullion.Costs.last_llm_call(feature)
+    if last && DateTime.diff(DateTime.utc_now(), last.inserted_at, :second) < 60 do
+      {:error, :cooldown}
+    else
+      :ok
+    end
+  end
 end
-
-def changeset(recipe, attrs)          # create/update: title required, types validated
-def tag_changeset(recipe, tags)       # replace associated tags
 ```
 
-### lib/scullion/recipes/ingredient.ex
+---
 
-Replace stub with full implementation.
+## LLM Usage logging
+
+### Migration `priv/repo/migrations/015_create_llm_usage.exs` (new)
+
+```sql
+CREATE TABLE llm_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  feature TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL DEFAULT 0,
+  completion_tokens INTEGER NOT NULL DEFAULT 0,
+  cost_usd REAL NOT NULL DEFAULT 0.0,
+  inserted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+### `lib/scullion/costs/llm_usage.ex` (new Ecto schema)
 
 ```elixir
-schema "ingredients" do
-  field :name, :string
-  field :category, :string
-  field :default_unit, :string
+defmodule Scullion.Costs.LLMUsage do
+  use Ecto.Schema
 
-  has_many :recipe_ingredients, RecipeIngredient
-  timestamps()
+  schema "llm_usage" do
+    field :feature, :string
+    field :prompt_tokens, :integer
+    field :completion_tokens, :integer
+    field :cost_usd, :float
+    timestamps(updated_at: false)
+  end
 end
-
-def changeset(ingredient, attrs)      # name required, unique_constraint on name
 ```
 
-### lib/scullion/recipes/recipe_ingredient.ex
+### `lib/scullion/costs.ex` (new — or extend if it exists)
 
-Replace stub with associations.
+Costs context is Phase 7, but SpendGuard needs two queries now. Create a minimal
+`Costs` module in Phase 5 with only what SpendGuard needs:
 
 ```elixir
-schema "recipe_ingredients" do
-  belongs_to :recipe, Recipe
-  belongs_to :ingredient, Ingredient
-  field :quantity, :decimal
-  field :unit, :string
-  field :notes, :string
-  timestamps()
+defmodule Scullion.Costs do
+  alias Scullion.{Repo, Costs.LLMUsage}
+  import Ecto.Query
+
+  def log_llm_usage(attrs) do
+    %LLMUsage{} |> LLMUsage.changeset(attrs) |> Repo.insert()
+  end
+
+  def llm_spend_this_month do
+    month_start = Date.beginning_of_month(Date.utc_today())
+    Repo.one(
+      from u in LLMUsage,
+        where: u.inserted_at >= ^NaiveDateTime.new!(month_start, ~T[00:00:00]),
+        select: coalesce(sum(u.cost_usd), 0.0)
+    )
+  end
+
+  def last_llm_call(feature) do
+    Repo.one(
+      from u in LLMUsage,
+        where: u.feature == ^to_string(feature),
+        order_by: [desc: u.inserted_at],
+        limit: 1
+    )
+  end
 end
-
-def changeset(ri, attrs)
 ```
 
-### lib/scullion/recipes/tag.ex
+Phase 7 will expand this module with receipt/dining-out functions. No conflict.
 
-Replace stub with full implementation.
+---
 
-```elixir
-schema "tags" do
-  field :name, :string
-  many_to_many :recipes, Recipe, join_through: RecipeTag
-  timestamps()
-end
+## Handler integration (SpendGuard wrapping LLM calls)
 
-def changeset(tag, attrs)   # name required, unique_constraint on name
-```
-
-### lib/scullion/recipes/parser.ex
-
-Replace stub with full JSON-LD + microdata extraction. Pure — no IO.
+### `lib/scullion/handlers/planning_handler.ex` — `generate_plan/3`
 
 ```elixir
-def parse_html(html :: String.t()) :: {:ok, map()} | {:error, :not_found}
-```
-
-Strategy:
-1. Use Floki to find `<script type="application/ld+json">` — try all, pick first with
-   `@type` of `"Recipe"`. Decode JSON, map LD fields to recipe attrs.
-2. If no JSON-LD: look for microdata (`itemtype="http://schema.org/Recipe"`). Extract
-   `itemprop` values.
-3. If neither: `{:error, :not_found}` → caller falls back to LLM.
-
-Returned map keys (all optional except `:title`):
-```elixir
-%{
-  title: String.t(),
-  description: String.t(),
-  instructions: String.t(),           # joined if list
-  prep_time_minutes: integer(),       # parse ISO 8601 duration PT15M → 15
-  cook_time_minutes: integer(),
-  base_servings: integer(),
-  ingredients: [%{name: String.t(), quantity: String.t(), unit: String.t()}],
-  image_url: String.t()               # first image URL from the page, if any
-}
-```
-
-### lib/scullion/recipes.ex
-
-Replace stubs with full implementation.
-
-```elixir
-# Public API
-def create(attrs)                     # insert recipe + upsert ingredients + tags, trigger image gen
-def update(recipe, attrs)             # update recipe fields and tag associations
-def get!(id)                          # Repo.get! with :tags, :recipe_ingredients preloaded
-def list(opts \\ [])                  # see filtering/sorting below
-def search(query)                     # full-text by title + ingredient names (SQL LIKE)
-def record_used(recipe_id)            # set last_used_at = utc_now
-def scrape_from_url(url)              # delegate to RecipeHandler.scrape_and_create/1
-```
-
-**`list/1` opts:**
-- `tags: ["batch", "quick"]` — recipes that have ALL listed tags
-- `type: :meal | :component | :assembly`
-- `max_minutes: integer()` — filter by (prep_time_minutes + cook_time_minutes) ≤ N
-- `weeknight_friendly: true` — equivalent to `tags: ["quick"], max_minutes: 45`
-- `sort: :last_used | :alphabetical | :recently_added` — default `:recently_added`
-
-**`create/1`** implementation notes:
-- Upsert ingredients by name (`Repo.insert(..., on_conflict: :nothing, conflict_target: :name)`)
-- Look up or create tag records by name
-- After successful recipe insert, call image generation asynchronously via `Task.start/1`:
-  - If `attrs[:image_url]` is present (from scraping): download and save it
-  - Else: call `@image_gen.generate_food_image(title, ingredient_names)` → save binary
-  - Store as `priv/static/uploads/recipes/#{recipe.id}.jpg`
-  - Update recipe `image_path` field
-
-### lib/scullion/handlers/recipe_handler.ex
-
-Expand stub to full implementation.
-
-```elixir
-@http Application.compile_env(:scullion, :http_client)
 @llm Application.compile_env(:scullion, :llm_client)
-@image_gen Application.compile_env(:scullion, :image_gen_client)
 
-def scrape_and_create(url)
-# 1. @http.fetch(url) → html
-# 2. Parser.parse_html(html) → {:ok, attrs} | {:error, :not_found}
-# 3. on :not_found → @llm.extract_recipe_from_html(html)
-# 4. Set source_url from url
-# 5. Recipes.create(attrs)
-# Returns {:ok, recipe} | {:error, reason}
+def generate_plan(plan_id, week_start, opts \\ []) do
+  mode = Keyword.get(opts, :mode, :from_catalog)
 
-def generate_image(recipe)
-# Called from Recipes.create async task
-# Determines: download source image OR call @image_gen
-# Saves file, updates recipe.image_path
-# Returns :ok | {:error, reason}
+  with :ok <- SpendGuard.allow?(:generate_plan),
+       {:ok, state} <- EventStore.load(plan_id, Decider) do
+    context = build_plan_context(state, week_start, mode)
+
+    with {:ok, llm_result, usage} <- @llm.generate_plan(context),
+         :ok <- SpendGuard.log_usage(:generate_plan, usage),
+         {:ok, slots} <- parse_llm_slots(llm_result, mode),
+         command = %Commands.GeneratePlan{week_start: week_start, slots: slots},
+         {:ok, events} <- Decider.decide(command, state),
+         :ok <- EventStore.append(plan_id, events) do
+      PubSub.broadcast(@pubsub, @topic, {:events, events})
+      {:ok, events}
+    end
+  end
+end
 ```
 
-Image save path: `Path.join([:code.priv_dir(:scullion), "static", "uploads", "recipes",
-"#{recipe.id}.jpg"])`. Directory created if absent.
+`build_plan_context/3` produces a compact map per FEAT_PROMPT_ENGINEERING.md:
+- Recipes as summaries: `id | title | top-3-ingredients | time | tags` — no instructions
+- Pantry: `[]` (Phase 8)
+- Deals: `[]` (Phase 6)
+- Recent recipes: `[]` (tracking not wired yet)
+- Pins: from `state.pins`
+- Mode: `:from_catalog`
 
-### lib/scullion_web/live/recipe_live.ex
+`parse_llm_slots/2` converts the JSON `"days"` array into
+`%{"slot_key" => %{recipe_id: integer, servings: integer}}`.
+For `:from_catalog` mode, `recipe_id` must be an integer from the catalog —
+if the LLM returns an unknown ID, skip that slot and log a warning.
 
-Replace stub with full CRUD + search LiveView.
+### `lib/scullion/handlers/prep_handler.ex` (new)
 
-**State:**
 ```elixir
-%{
-  recipes: [Recipe.t()],
-  search: String.t(),
-  filter_tags: [String.t()],
-  filter_type: :all | :meal | :component | :assembly,
-  filter_max_min: :any | 30 | 45 | 60,
-  sort: :recently_added | :last_used | :alphabetical,
-  scrape_url: String.t(),
-  scrape_state: :idle | :loading | :reviewing,
-  scrape_result: map() | nil,
-  form: Phoenix.HTML.Form.t() | nil,
-  selected: Recipe.t() | nil,
-  error: String.t() | nil
+defmodule Scullion.Handlers.PrepHandler do
+  alias Scullion.{Handlers.PlanningHandler, Prep, Recipes, SpendGuard}
+
+  @llm Application.compile_env(:scullion, :llm_client)
+
+  def generate_guide(plan_id, week_start) do
+    with :ok <- SpendGuard.allow?(:generate_prep_guide),
+         {:ok, plan_state} <- PlanningHandler.load_plan(plan_id) do
+      plan_for_prompt = build_plan_for_prompt(plan_state, week_start)
+
+      with {:ok, guide_data, usage} <- @llm.generate_prep_guide(plan_for_prompt),
+           :ok <- SpendGuard.log_usage(:generate_prep_guide, usage) do
+        attrs = Map.put(guide_data, "week_start", week_start)
+        Prep.save_guide(attrs)
+      end
+    end
+  end
+
+  defp build_plan_for_prompt(plan_state, week_start) do
+    days =
+      Enum.map(plan_state.slots, fn {slot_key, slot} ->
+        recipe = if slot.recipe_id, do: Recipes.get!(slot.recipe_id), else: nil
+        %{slot_key: slot_key, recipe_title: recipe && recipe.title, servings: slot.servings}
+      end)
+
+    %{week_start: week_start, days: days}
+  end
+end
+```
+
+---
+
+## Prompt rendering
+
+### `lib/scullion/llm/prompts.ex` (new)
+
+Pure module — renders EEx templates, returns `{system, user}` tuples.
+Applies the token-minimising strategy from FEAT_PROMPT_ENGINEERING.md:
+recipes as compact one-liners, no prose, IDs for output.
+
+```elixir
+defmodule Scullion.LLM.Prompts do
+  @prompts_dir Path.join(:code.priv_dir(:scullion), "llm/prompts")
+
+  def plan_weekly(constraints) do
+    system = plan_weekly_system()
+    user = render("plan_weekly.eex", constraints)
+    {system, user}
+  end
+
+  def prep_guide(plan) do
+    system = prep_guide_system()
+    user = render("prep_guide.eex", plan)
+    {system, user}
+  end
+
+  defp plan_weekly_system do
+    """
+    You are a meal planner. Think like a prep cook.
+    Goal: assign recipes to meal slots for the week.
+    Principles:
+    - Batch cook early in the week; cascade leftovers into later meals
+    - Prefer ingredient reuse over variety
+    - Respect pinned slots as hard constraints
+    - Prefer pantry items and deals when available
+    - Weeknight slots need recipes ≤45 min total time
+    Respond with a JSON object only. No prose.
+    """
+  end
+
+  defp prep_guide_system do
+    """
+    You are a sous chef. Generate a Sunday prep session guide for the week's meals.
+    Respond with a JSON object only. No prose.
+    """
+  end
+
+  defp render(template, assigns) do
+    path = Path.join(@prompts_dir, template)
+    EEx.eval_file(path, assigns: Map.to_list(assigns))
+  end
+end
+```
+
+Templates live under `priv/llm/prompts/` — runtime data, not compiled Elixir.
+
+---
+
+## Prompt templates
+
+### `priv/llm/prompts/plan_weekly.eex`
+
+Compact format per FEAT_PROMPT_ENGINEERING.md — no recipe instructions, no prose.
+
+```
+RECIPES (id | name | key ingredients | time | tags):
+<%= for r <- @recipes do %>
+<%= r.id %> | <%= r.title %> | <%= Enum.map_join(Enum.take(r.key_ingredients, 3), ", ", & &1) %> | <%= r.total_time_minutes %>m | <%= Enum.join(r.tags, " ") %>
+<% end %>
+
+SLOTS TO PLAN:
+<%= Enum.join(@slot_keys, " ") %>
+
+PINNED (hard constraints):
+<%= for {slot_key, pin} <- @pins do %><%= slot_key %>: <%= pin.type %> <%= Map.get(pin, :recipe_id, Map.get(pin, :text, "")) %>
+<% end %>
+
+PANTRY: <%= if Enum.empty?(@pantry), do: "none", else: Enum.join(@pantry, ", ") %>
+
+DEALS: <%= if Enum.empty?(@deals), do: "none", else: Enum.join(@deals, ", ") %>
+
+RECENTLY USED (avoid repeating): <%= if Enum.empty?(@recent_recipes), do: "none", else: Enum.join(@recent_recipes, ", ") %>
+
+Return JSON only:
+{
+  "days": [
+    {"slot_key": "mon_dinner", "recipe_id": 42, "servings": 4, "notes": "batch — leftovers for tue_lunch", "cascade_from": null}
+  ],
+  "prep_session": {"proteins": [], "bases": [], "sauces": [], "vegetables": []}
+}
+recipe_id must be an integer ID from the RECIPES list above.
+```
+
+### `priv/llm/prompts/prep_guide.eex`
+
+```
+WEEK'S PLAN:
+<%= for slot <- @days do %>
+<%= slot.slot_key %>: <%= slot.recipe_title || "empty" %> (×<%= slot.servings %>)
+<% end %>
+
+Return JSON only:
+{
+  "prep_session": {"proteins": ["..."], "bases": ["..."], "sauces": ["..."], "vegetables": ["..."]},
+  "timeline": [
+    {"step": 1, "task": "Preheat oven to 200°C", "duration_min": 5, "component": null}
+  ],
+  "cascade_map": {"mon_dinner": "Roast Chicken", "tue_lunch": "uses Mon chicken → Chicken Salad"},
+  "storage_notes": "Chicken: fridge 3 days.",
+  "daily_assembly": {"mon_dinner": "Plate chicken + veg", "tue_lunch": "Shred chicken, toss with dressing"}
 }
 ```
 
-**Events:**
-- `"search"` — update search string, reload list
-- `"filter_tag"` — toggle a tag in filter_tags, reload
-- `"filter_type"` — set recipe type filter, reload
-- `"filter_time"` — set max_minutes filter, reload
-- `"sort"` — change sort order, reload
-- `"new_recipe"` — show blank form
-- `"save_recipe"` — call Recipes.create or Recipes.update
-- `"select_recipe"` — show detail view
-- `"edit_recipe"` — show edit form for selected
-- `"delete_recipe"` — call Recipes.delete (soft: set deleted_at or hard delete)
-- `"scrape_url_change"` — update scrape_url
-- `"scrape_submit"` — call Recipes.scrape_from_url asynchronously
-- `"confirm_scraped"` — user reviews parsed attrs, calls Recipes.create
-- `"discard_scraped"` — reset scrape state
-
-**List loading**: `Recipes.list(search: @search, tags: @filter_tags, type: @filter_type, max_minutes: @filter_max_min, sort: @sort)` — called on every filter/sort change.
-
-The LiveView does not contain Ecto queries. All list/search calls go through `Recipes`.
-
 ---
 
-## Test files to create
+## Prep context
 
-### test/scullion/recipes/parser_test.exs
+### `lib/scullion/prep/prep_guide.ex` (expand schema)
 
-Pure unit tests — no DB, no mocks.
+Add new fields:
 
-```
-describe "parse_html/1 (JSON-LD)"
-  test "extracts title, ingredients, times from JSON-LD"
-  test "joins instruction list into text"
-  test "parses ISO 8601 duration PT1H30M → 90 minutes"
-  test "returns :not_found when no Recipe type in ld+json"
-
-describe "parse_html/1 (microdata)"
-  test "extracts title from itemprop=name"
-  test "extracts ingredient list"
-
-describe "parse_html/1 (neither)"
-  test "returns {:error, :not_found}"
+```elixir
+schema "prep_guides" do
+  field :week_start, :date
+  field :instructions, :string
+  field :timeline, {:array, :map}
+  field :cascade_map, :map
+  field :storage_notes, :string
+  field :daily_assembly, :map
+  field :prep_session, :map
+  timestamps()
+end
 ```
 
-Use inline HTML fixtures — no file IO needed.
+### `lib/scullion/prep.ex` (new)
 
-### test/scullion/recipes_test.exs
+```elixir
+defmodule Scullion.Prep do
+  alias Scullion.{Repo, Prep.PrepGuide}
+  import Ecto.Query
 
-```
-describe "create/1"
-  test "inserts recipe with tags and ingredients"
-  test "upserts ingredients (no duplicate names)"
-  test "returns error for missing title"
+  def save_guide(attrs) do
+    %PrepGuide{}
+    |> PrepGuide.changeset(attrs)
+    |> Repo.insert(
+         on_conflict: {:replace, [:timeline, :cascade_map, :storage_notes, :daily_assembly, :prep_session]},
+         conflict_target: [:week_start]
+       )
+  end
 
-describe "list/1"
-  test "filters by tag"
-  test "filters by type"
-  test "filters by max_minutes"
-  test "sorts by alphabetical"
-  test "weeknight_friendly filter"
-
-describe "search/1"
-  test "matches by title"
-  test "matches by ingredient name"
-  test "returns empty list for no match"
-
-describe "update/2"
-  test "updates fields and replaces tags"
-
-describe "record_used/1"
-  test "sets last_used_at"
-```
-
-Image generation calls must be mocked: configure `Scullion.Adapters.StubImageGen` in
-test and verify `image_path` is set without actual file writes (or use a temp dir).
-
-### test/scullion/handlers/recipe_handler_test.exs
-
-Uses Mox for `Scullion.HTTP` and `Scullion.LLM`.
-
-```
-describe "scrape_and_create/1"
-  test "uses Parser result when JSON-LD found" (stub HTTP → html with ld+json, Parser succeeds)
-  test "falls back to LLM when Parser returns not_found" (stub HTTP + stub LLM)
-  test "propagates HTTP error"
+  def get_guide_for_week(week_start) do
+    Repo.one(from g in PrepGuide, where: g.week_start == ^week_start)
+  end
+end
 ```
 
 ---
 
-## Mox setup additions
+## Migrations
 
-Add to `test/support/mocks.ex` (or create if absent):
-
-```elixir
-Mox.defmock(Scullion.MockImageGen, for: Scullion.ImageGen)
-```
-
-Add to `test/support/fixtures.ex` (or inline):
+### `priv/repo/migrations/015_create_llm_usage.exs` (new)
 
 ```elixir
-def stub_image_gen(_title, _ingredients), do: {:ok, <<137, 80, 78, 71, ...>>}  # 1x1 PNG
+defmodule Scullion.Repo.Migrations.CreateLLMUsage do
+  use Ecto.Migration
+
+  def change do
+    create table(:llm_usage) do
+      add :feature, :string, null: false
+      add :prompt_tokens, :integer, default: 0
+      add :completion_tokens, :integer, default: 0
+      add :cost_usd, :float, default: 0.0
+      timestamps(updated_at: false)
+    end
+  end
+end
 ```
 
-Wire in `test.exs`:
+### `priv/repo/migrations/016_expand_prep_guides.exs` (new)
+
 ```elixir
-config :scullion, :image_gen_client, Scullion.Adapters.StubImageGen
+defmodule Scullion.Repo.Migrations.ExpandPrepGuides do
+  use Ecto.Migration
+
+  def change do
+    alter table(:prep_guides) do
+      add :cascade_map, :text
+      add :storage_notes, :text
+      add :daily_assembly, :text
+      add :prep_session, :text
+    end
+  end
+end
 ```
+
+---
+
+## LiveView changes
+
+### `lib/scullion_web/live/planner_live.ex` (enable generate button)
+
+```elixir
+def handle_event("generate_plan", _params, socket) do
+  %{plan_id: plan_id, week_start: week_start} = socket.assigns
+  case PlanningHandler.generate_plan(plan_id, week_start) do
+    {:ok, _events} -> {:noreply, socket}
+    {:error, :budget_exceeded} -> {:noreply, put_flash(socket, :error, "Monthly LLM budget reached")}
+    {:error, :cooldown} -> {:noreply, put_flash(socket, :error, "Please wait a moment before generating again")}
+    {:error, _} -> {:noreply, put_flash(socket, :error, "Plan generation failed")}
+  end
+end
+```
+
+Replace disabled button:
+```heex
+<button phx-click="generate_plan" class="px-3 py-1 bg-indigo-600 text-white rounded text-sm">
+  Generate Plan
+</button>
+```
+
+### `lib/scullion_web/live/prep_live.ex` (read first, then add generate button)
+
+Add `handle_event("generate_guide", ...)` calling `PrepHandler.generate_guide/2`,
+with same error handling pattern as above.
+
+---
+
+## Runtime config
+
+### `config/runtime.exs`
+
+```elixir
+if config_env() == :prod do
+  config :scullion, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
+  config :scullion, :openrouter_model,
+    System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+end
+```
+
+### `config/dev.exs`
+
+```elixir
+config :scullion, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
+config :scullion, :openrouter_model, System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+```
+
+---
+
+## Tests
+
+All LLM tests use `Scullion.MockLLM` (Mox). Mock returns `{:ok, result, usage}` tuples.
+
+### `test/scullion/handlers/planning_handler_test.exs` (extend)
+
+```elixir
+test "generate_plan calls LLM, logs usage, persists PlanGenerated" do
+  MockLLM
+  |> expect(:generate_plan, fn _ctx ->
+    {:ok,
+     %{"days" => [%{"slot_key" => "mon_dinner", "recipe_id" => nil, "servings" => 4,
+                    "cascade_from" => nil, "notes" => ""}],
+       "prep_session" => %{}},
+     %{prompt_tokens: 1000, completion_tokens: 200, cost_usd: 0.001}}
+  end)
+
+  assert {:ok, _events} = PlanningHandler.generate_plan(plan_id(), week_start(), [])
+  {:ok, state} = PlanningHandler.load_plan(plan_id())
+  assert map_size(state.slots) == 1
+
+  # usage was logged
+  assert Scullion.Costs.llm_spend_this_month() > 0.0
+end
+
+test "generate_plan returns budget_exceeded when over limit" do
+  # insert a fake usage row that exhausts the budget
+  Scullion.Costs.log_llm_usage(%{feature: "generate_plan", prompt_tokens: 0,
+                                  completion_tokens: 0, cost_usd: 20.0})
+  assert {:error, :budget_exceeded} = PlanningHandler.generate_plan(plan_id(), week_start(), [])
+end
+
+test "generate_plan returns error when LLM fails" do
+  MockLLM |> expect(:generate_plan, fn _ -> {:error, :timeout} end)
+  assert {:error, :timeout} = PlanningHandler.generate_plan(plan_id(), week_start(), [])
+end
+
+test "generate_plan broadcasts PlanGenerated" do
+  MockLLM
+  |> expect(:generate_plan, fn _ ->
+    {:ok, %{"days" => [], "prep_session" => %{}},
+     %{prompt_tokens: 0, completion_tokens: 0, cost_usd: 0.0}}
+  end)
+  PlanningHandler.generate_plan(plan_id(), week_start(), [])
+  assert_receive {:events, [%Scullion.Planning.Events.PlanGenerated{}]}
+end
+```
+
+### `test/scullion/handlers/prep_handler_test.exs` (new)
+
+```elixir
+test "generate_guide calls LLM and persists prep guide" do
+  MockLLM
+  |> expect(:generate_prep_guide, fn _plan ->
+    {:ok,
+     %{"timeline" => [%{"step" => 1, "task" => "Preheat oven", "duration_min" => 5}],
+       "cascade_map" => %{"mon_dinner" => "Roast Chicken"},
+       "storage_notes" => "Chicken: 3 days",
+       "daily_assembly" => %{},
+       "prep_session" => %{"proteins" => ["chicken"]}},
+     %{prompt_tokens: 500, completion_tokens: 100, cost_usd: 0.0005}}
+  end)
+
+  assert {:ok, guide} = PrepHandler.generate_guide(plan_id(), week_start())
+  assert guide.week_start == week_start()
+  assert length(guide.timeline) == 1
+end
+
+test "generate_guide returns error when LLM fails" do
+  MockLLM |> expect(:generate_prep_guide, fn _ -> {:error, :timeout} end)
+  assert {:error, :timeout} = PrepHandler.generate_guide(plan_id(), week_start())
+end
+```
+
+### `test/scullion/spend_guard_test.exs` (new, `async: false`)
+
+```elixir
+test "allow? returns :ok when under budget" do
+  assert :ok = SpendGuard.allow?(:generate_plan)
+end
+
+test "allow? returns {:error, :budget_exceeded} when over monthly limit" do
+  Scullion.Costs.log_llm_usage(%{feature: "x", prompt_tokens: 0,
+                                  completion_tokens: 0, cost_usd: 20.0})
+  assert {:error, :budget_exceeded} = SpendGuard.allow?(:generate_plan)
+end
+
+test "allow? returns {:error, :cooldown} when called twice within 60s" do
+  Scullion.Costs.log_llm_usage(%{feature: "generate_plan", prompt_tokens: 0,
+                                  completion_tokens: 0, cost_usd: 0.01})
+  assert {:error, :cooldown} = SpendGuard.allow?(:generate_plan)
+end
+```
+
+### `test/scullion/adapters/open_router_test.exs` (new — integration only)
+
+```elixir
+@moduletag :integration
+
+test "generate_plan parses real OpenRouter response" do
+  constraints = %{recipes: [], slot_keys: ["mon_dinner"], pins: %{}, pantry: [],
+                  deals: [], recent_recipes: []}
+  assert {:ok, result, usage} = Scullion.Adapters.OpenRouter.generate_plan(constraints)
+  assert Map.has_key?(result, "days")
+  assert is_float(usage.cost_usd)
+end
+```
+
+Run with: `mix test --include integration`
 
 ---
 
 ## Implementation order
 
-1. `mix.exs` — add `{:floki, "~> 0.37"}`; `mix deps.get`
-2. Migrations 004–007 — write, `mix ecto.migrate`
-3. `image_gen.ex` — port behaviour
-4. `adapters/stub_image_gen.ex` — stub adapter (returns 1×1 PNG binary)
-5. `config/dev.exs` + `config/test.exs` — wire `image_gen_client` to stub
-6. `recipes/recipe_tag.ex` — join schema
-7. `recipes/tag.ex` — full schema + changeset
-8. `recipes/ingredient.ex` — full schema + changeset
-9. `recipes/recipe_ingredient.ex` — full schema + changeset
-10. `recipes/recipe.ex` — full schema + changesets + associations
-11. `recipes/parser.ex` — JSON-LD and microdata extraction with Floki
-12. `recipes.ex` — full CRUD implementation
-13. `handlers/recipe_handler.ex` — expand to full scrape + image gen flow
-14. `recipe_live.ex` — CRUD + search + scrape LiveView
-15. Tests: `parser_test.exs`, `recipes_test.exs`, `recipe_handler_test.exs`
-16. `mix compile --warnings-as-errors && mix test`
+1. `lib/scullion/llm.ex` — behaviour (unblocks compile)
+2. `lib/scullion/http.ex` — behaviour
+3. `priv/repo/migrations/015_create_llm_usage.exs`
+4. `priv/repo/migrations/016_expand_prep_guides.exs`
+5. `lib/scullion/costs/llm_usage.ex` — Ecto schema
+6. `lib/scullion/costs.ex` — minimal Costs API (3 functions for SpendGuard)
+7. `lib/scullion/spend_guard.ex`
+8. `priv/llm/prompts/plan_weekly.eex`
+9. `priv/llm/prompts/prep_guide.eex`
+10. `lib/scullion/llm/prompts.ex`
+11. `lib/scullion/adapters/open_router.ex` — implement `generate_plan/1` + `generate_prep_guide/1`
+12. `lib/scullion/prep/prep_guide.ex` — expand schema
+13. `lib/scullion/prep.ex` — `save_guide/1` + `get_guide_for_week/1`
+14. `lib/scullion/handlers/planning_handler.ex` — add `generate_plan/3`
+15. `lib/scullion/handlers/prep_handler.ex` — new handler
+16. `lib/scullion_web/live/planner_live.ex` — enable generate button + error flash
+17. `lib/scullion_web/live/prep_live.ex` — add generate guide button
+18. `config/dev.exs` + `config/runtime.exs` — OpenRouter key config
+19. Tests: `planning_handler_test.exs` additions, `prep_handler_test.exs`,
+    `spend_guard_test.exs`, `open_router_test.exs`
+20. `mix ecto.migrate && mix compile --warnings-as-errors && mix test`
 
 ---
 
-## Unknowns / decisions deferred
+## Constraints & decisions
 
-- **Recipe deletion**: hard delete for now (no `deleted_at`). Easy to change later.
-- **Image storage format**: save as JPEG regardless of source. Source URL images are
-  fetched and stored as-is. Generated images assumed JPEG from the API.
-- **Image uploads from UI**: not in Phase 3. Manual recipe creation via LiveView form
-  only sets text fields — image generated from title+ingredients automatically.
-- **`Recipes.delete/1`**: implement as `Repo.delete/1`. No soft-delete at this stage.
-- **ImageGen adapter (real)**: deferred to Phase 5 alongside the OpenRouter LLM adapter.
-  Both require OpenRouter config which is also Phase 5.
+- **LLM callback return shape is `{:ok, result, usage}`** across all callbacks and mocks.
+  This is a breaking change from the stub (was `{:ok, result}`) — the mock must be updated too.
+- **OpenRouter returns `cost` directly.** No token price math needed. `extract_usage/1`
+  reads `usage["cost"]` from the response body.
+- **SpendGuard monthly limit is `$20.00`** (hardcoded). An env-configurable limit is Phase 8+.
+- **Cooldown is 60 seconds** between calls for the same feature — prevents UI double-taps.
+- **`Costs` module is minimal in Phase 5.** Only three functions needed by SpendGuard.
+  Phase 7 adds receipt/dining-out. No conflict.
+- **`generate_plan` mode is `:from_catalog` only.** `:generate_new` and `:mixed` deferred.
+- **Pantry and deals context is empty.** Phase 8 and 6 respectively — pass `[]`.
+- **`last_used_at` not tracked yet.** `recent_recipes` is empty for now.
+- **JSON mode `response_format: json_object`** required. Some models don't support it —
+  system prompt instructs "Respond with JSON only" as belt-and-suspenders.
+- **Model configurable via env.** Default `anthropic/claude-3-5-haiku`.
+- **Integration tests skip by default.** Tagged `@tag :integration`.
+- **Prompts in `priv/llm/prompts/`.** Runtime data, not compiled. `EEx.eval_file/2` at runtime.
+- **Token-minimal prompts.** Recipes as compact one-liners (id|name|ingredients|time|tags),
+  no instructions, no prose. Deals and pantry as flat keyword lists. IDs in output, not names.
+  Per FEAT_PROMPT_ENGINEERING.md.
+- **No macros.** Evaluate repetition after Phase 5 completion.

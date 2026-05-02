@@ -24,6 +24,10 @@ config :scullion, ScullionWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
+  config :scullion, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
+  config :scullion, :openrouter_model,
+    System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+
   database_path =
     System.get_env("DATABASE_PATH") ||
       raise """

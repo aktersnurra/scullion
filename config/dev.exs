@@ -65,6 +65,8 @@ config :scullion, ScullionWeb.Endpoint,
   ]
 
 config :scullion, :image_gen_client, Scullion.Adapters.StubImageGen
+config :scullion, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
+config :scullion, :openrouter_model, System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
 
 # Enable dev routes for dashboard and mailbox
 config :scullion, dev_routes: true

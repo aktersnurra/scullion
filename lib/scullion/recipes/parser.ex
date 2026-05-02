@@ -16,7 +16,7 @@ defmodule Scullion.Recipes.Parser do
     doc
     |> Floki.find("script[type='application/ld+json']")
     |> Enum.find_value(:error, fn node ->
-      text = Floki.text(node)
+      text = script_text(node)
 
       case Jason.decode(text) do
         {:ok, data} -> find_recipe_in_ld(data)
@@ -57,7 +57,8 @@ defmodule Scullion.Recipes.Parser do
     |> reject_nils()
   end
 
-  defp extract_ld_instructions(%{"recipeInstructions" => instructions}) when is_list(instructions) do
+  defp extract_ld_instructions(%{"recipeInstructions" => instructions})
+       when is_list(instructions) do
     instructions
     |> Enum.map(fn
       %{"text" => text} -> text
@@ -80,7 +81,9 @@ defmodule Scullion.Recipes.Parser do
     end
   end
 
-  defp extract_ld_servings(%{"recipeYield" => [first | _]}), do: extract_ld_servings(%{"recipeYield" => first})
+  defp extract_ld_servings(%{"recipeYield" => [first | _]}),
+    do: extract_ld_servings(%{"recipeYield" => first})
+
   defp extract_ld_servings(_), do: nil
 
   defp extract_ld_ingredients(%{"recipeIngredient" => list}) when is_list(list) do
@@ -114,8 +117,10 @@ defmodule Scullion.Recipes.Parser do
             title: itemprop_text(doc, node, "name"),
             description: itemprop_text(doc, node, "description"),
             instructions: itemprop_text(doc, node, "recipeInstructions"),
-            prep_time_minutes: itemprop_attr(doc, node, "prepTime", "content") |> parse_duration(),
-            cook_time_minutes: itemprop_attr(doc, node, "cookTime", "content") |> parse_duration(),
+            prep_time_minutes:
+              itemprop_attr(doc, node, "prepTime", "content") |> parse_duration(),
+            cook_time_minutes:
+              itemprop_attr(doc, node, "cookTime", "content") |> parse_duration(),
             base_servings: itemprop_text(doc, node, "recipeYield") |> parse_integer(),
             ingredients: extract_microdata_ingredients(doc, node),
             image_url: itemprop_attr(doc, node, "image", "src")
@@ -181,4 +186,8 @@ defmodule Scullion.Recipes.Parser do
   defp reject_nils(map) do
     Map.reject(map, fn {_, v} -> is_nil(v) end)
   end
+
+  # Extract raw text content from a <script> node — Floki.text/1 strips it
+  defp script_text({_tag, _attrs, [text | _]}) when is_binary(text), do: text
+  defp script_text(_), do: ""
 end
