@@ -19,6 +19,10 @@ config :scullion, ScullionWeb.Endpoint,
     ]
   ]
 
+config :scullion, :http_client, Scullion.Adapters.ReqHTTP
+config :scullion, :llm_client, Scullion.Adapters.OpenRouter
+config :scullion, :image_gen_client, Scullion.Adapters.OpenRouter
+
 # Do not print debug messages in production
 config :logger, level: :info
 

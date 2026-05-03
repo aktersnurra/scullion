@@ -64,11 +64,13 @@ config :scullion, ScullionWeb.Endpoint,
     ]
   ]
 
+config :scullion, :http_client, Scullion.Adapters.ReqHTTP
+config :scullion, :llm_client, Scullion.Adapters.OpenRouter
 config :scullion, :image_gen_client, Scullion.Adapters.OpenRouter
 config :scullion, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
-config :scullion, :openrouter_model, System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
-config :scullion, :openrouter_vision_model, System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-flash-1.5")
-config :scullion, :openrouter_image_model, System.get_env("OPENROUTER_IMAGE_MODEL", "black-forest-labs/flux-schnell")
+config :scullion, :openrouter_model, System.get_env("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash")
+config :scullion, :openrouter_vision_model, System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
+config :scullion, :openrouter_image_model, System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image")
 
 # Enable dev routes for dashboard and mailbox
 config :scullion, dev_routes: true

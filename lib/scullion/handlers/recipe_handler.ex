@@ -43,12 +43,7 @@ defmodule Scullion.Handlers.RecipeHandler do
   end
 
   defp fetch_or_generate(recipe, _image_url) do
-    ingredient_names =
-      (recipe.recipe_ingredients || [])
-      |> Enum.map(& &1.ingredient.name)
-      |> Enum.take(5)
-
-    @image_gen.generate_food_image(recipe.title, ingredient_names)
+    @image_gen.generate_food_image(recipe.title, recipe.instructions)
   end
 
   defp image_path(id), do: Path.join(@uploads_dir, "#{id}.jpg")

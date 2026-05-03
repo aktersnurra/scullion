@@ -6,6 +6,7 @@ defmodule Scullion.Recipes.Recipe do
     field :title, :string
     field :description, :string
     field :instructions, :string
+    field :steps, :string
     field :recipe_type, Ecto.Enum, values: [:meal, :component, :assembly], default: :meal
     field :base_servings, :integer
     field :prep_time_minutes, :integer
@@ -30,6 +31,7 @@ defmodule Scullion.Recipes.Recipe do
       :title,
       :description,
       :instructions,
+      :steps,
       :recipe_type,
       :base_servings,
       :prep_time_minutes,
@@ -43,6 +45,11 @@ defmodule Scullion.Recipes.Recipe do
     |> validate_required([:title])
     |> validate_inclusion(:recipe_type, [:meal, :component, :assembly])
   end
+
+  def decode_steps(%__MODULE__{steps: nil}), do: []
+  def decode_steps(%__MODULE__{steps: json}), do: Jason.decode!(json)
+
+  def encode_steps(steps) when is_list(steps), do: Jason.encode!(steps)
 
   def tag_changeset(recipe, tags) do
     recipe

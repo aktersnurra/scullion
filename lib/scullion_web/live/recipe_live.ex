@@ -8,7 +8,8 @@ defmodule ScullionWeb.RecipeLive do
 
   def mount(_params, _session, socket) do
     {:ok,
-     assign(socket,
+     socket
+     |> assign(
        recipes: Recipes.list(),
        search: "",
        filter_tags: [],
@@ -18,12 +19,19 @@ defmodule ScullionWeb.RecipeLive do
        scrape_url: "",
        scrape_state: :idle,
        scrape_result: nil,
+       image_extract_state: :idle,
+       extracted_attrs: nil,
        selected: nil,
        form: nil,
        error: nil,
        sorts: @sorts,
        types: @types,
        time_filters: @time_filters
+     )
+     |> allow_upload(:recipe_images,
+       accept: ~w(.jpg .jpeg .png .webp),
+       max_entries: 10,
+       max_file_size: 10_000_000
      )}
   end
 
@@ -56,17 +64,26 @@ defmodule ScullionWeb.RecipeLive do
   end
 
   def handle_event("new_recipe", _, socket) do
-    {:noreply, assign(socket, form: blank_form(), selected: nil, error: nil)}
+    {:noreply, assign(socket, form: blank_form(), extracted_attrs: nil, selected: nil, error: nil)}
   end
 
   def handle_event("save_recipe", %{"recipe" => params}, socket) do
-    attrs = parse_recipe_params(params)
+    form_attrs = parse_recipe_params(params)
+
+    attrs =
+      case socket.assigns.extracted_attrs do
+        nil -> form_attrs
+        extracted ->
+          require Logger
+          Logger.debug("save_recipe extracted ingredients: #{inspect(extracted[:ingredients])}")
+          Map.merge(extracted, form_attrs)
+      end
 
     case socket.assigns.selected do
       nil ->
         case Recipes.create(attrs) do
           {:ok, _recipe} ->
-            {:noreply, socket |> assign(form: nil, error: nil) |> reload_recipes()}
+            {:noreply, socket |> assign(form: nil, extracted_attrs: nil, error: nil) |> reload_recipes()}
 
           {:error, changeset} ->
             {:noreply, assign(socket, error: error_message(changeset))}
@@ -75,7 +92,7 @@ defmodule ScullionWeb.RecipeLive do
       recipe ->
         case Recipes.update(recipe, attrs) do
           {:ok, _recipe} ->
-            {:noreply, socket |> assign(form: nil, selected: nil, error: nil) |> reload_recipes()}
+            {:noreply, socket |> assign(form: nil, extracted_attrs: nil, selected: nil, error: nil) |> reload_recipes()}
 
           {:error, changeset} ->
             {:noreply, assign(socket, error: error_message(changeset))}
@@ -104,15 +121,11 @@ defmodule ScullionWeb.RecipeLive do
   end
 
   def handle_event("close", _, socket) do
-    {:noreply, assign(socket, selected: nil, form: nil, error: nil)}
+    {:noreply, assign(socket, selected: nil, form: nil, extracted_attrs: nil, error: nil)}
   end
 
-  def handle_event("scrape_url_change", %{"url" => url}, socket) do
-    {:noreply, assign(socket, scrape_url: url)}
-  end
-
-  def handle_event("scrape_submit", _, socket) do
-    url = String.trim(socket.assigns.scrape_url)
+  def handle_event("scrape_submit", %{"url" => url}, socket) do
+    url = String.trim(url)
 
     if url == "" do
       {:noreply, assign(socket, error: "Enter a URL")}
@@ -141,6 +154,49 @@ defmodule ScullionWeb.RecipeLive do
     {:noreply, assign(socket, scrape_state: :idle, scrape_result: nil, error: nil)}
   end
 
+  def handle_event("extract_from_images", _, socket) do
+    entries = socket.assigns.uploads.recipe_images.entries
+
+    if entries == [] do
+      {:noreply, assign(socket, error: "Select at least one image")}
+    else
+      binaries =
+        consume_uploaded_entries(socket, :recipe_images, fn %{path: path}, _entry ->
+          {:ok, File.read!(path)}
+        end)
+
+      send(self(), {:extract_images, binaries})
+      {:noreply, assign(socket, image_extract_state: :loading, error: nil)}
+    end
+  end
+
+  def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :recipe_images, ref)}
+  end
+
+  def handle_info({:extract_images, binaries}, socket) do
+    case Recipes.extract_from_images(binaries) do
+      {:ok, attrs} ->
+        form = %{
+          title: attrs[:title] || "",
+          recipe_type: "meal",
+          prep_time_minutes: attrs[:prep_time_minutes],
+          cook_time_minutes: attrs[:cook_time_minutes],
+          base_servings: attrs[:base_servings],
+          tags: (attrs[:tags] || []) |> Enum.join(", "),
+          source_url: attrs[:source_url] || "",
+          instructions: attrs[:instructions] || ""
+        }
+
+        {:noreply, assign(socket, image_extract_state: :idle, form: form, extracted_attrs: attrs, selected: nil, error: nil)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, image_extract_state: :idle, error: extract_error(reason))}
+    end
+  end
+
   def handle_info({:scrape, url}, socket) do
     case Recipes.scrape_from_url(url) do
       {:ok, recipe} ->
@@ -150,8 +206,7 @@ defmodule ScullionWeb.RecipeLive do
          |> assign(selected: recipe)}
 
       {:error, reason} ->
-        {:noreply,
-         assign(socket, scrape_state: :idle, error: "Scrape failed: #{inspect(reason)}")}
+        {:noreply, assign(socket, scrape_state: :idle, error: scrape_error(reason))}
     end
   end
 
@@ -240,23 +295,56 @@ defmodule ScullionWeb.RecipeLive do
           </div>
         </div>
 
-        <%!-- Scrape bar --%>
-        <div class="mb-6 flex gap-2">
-          <input
-            type="text"
-            phx-change="scrape_url_change"
-            name="url"
-            value={@scrape_url}
-            placeholder="Paste recipe URL to import…"
-            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-          <button
-            phx-click="scrape_submit"
-            disabled={@scrape_state == :loading}
-            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm disabled:opacity-40"
-          >
-            {if @scrape_state == :loading, do: "Importing…", else: "Import"}
-          </button>
+        <%!-- Import bar --%>
+        <div class="mb-6 space-y-2">
+          <form class="flex gap-2" phx-submit="scrape_submit">
+            <input
+              type="text"
+              name="url"
+              value={@scrape_url}
+              placeholder="Paste recipe URL to import…"
+              class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="submit"
+              disabled={@scrape_state == :loading}
+              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm disabled:opacity-40"
+            >
+              {if @scrape_state == :loading, do: "Importing…", else: "Import"}
+            </button>
+          </form>
+
+          <form phx-submit="extract_from_images" phx-change="validate">
+            <div class="flex gap-2 items-start">
+              <div class="flex-1">
+                <div class="border border-dashed border-gray-300 rounded-xl px-4 py-3 bg-white text-sm text-gray-400 hover:border-gray-400 transition-colors">
+                  <label class="cursor-pointer flex items-center gap-2">
+                    <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
+                    <.icon name="hero-camera" class="w-4 h-4 shrink-0" />
+                    <span>
+                      {if @uploads.recipe_images.entries == [],
+                        do: "Upload recipe photos (up to 10)…",
+                        else: "#{length(@uploads.recipe_images.entries)} photo(s) selected"}
+                    </span>
+                  </label>
+                </div>
+                <%= for entry <- @uploads.recipe_images.entries do %>
+                  <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <span class="flex-1 truncate">{entry.client_name}</span>
+                    <button type="button" phx-click="cancel_upload" phx-value-ref={entry.ref}
+                            class="text-gray-400 hover:text-red-500">✕</button>
+                  </div>
+                <% end %>
+              </div>
+              <button
+                type="submit"
+                disabled={@image_extract_state == :loading or @uploads.recipe_images.entries == []}
+                class="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-xl text-sm disabled:opacity-40 shrink-0"
+              >
+                {if @image_extract_state == :loading, do: "Extracting…", else: "Extract"}
+              </button>
+            </div>
+          </form>
         </div>
 
         <%= if @error do %>
@@ -396,7 +484,47 @@ defmodule ScullionWeb.RecipeLive do
                     <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag.name}</span>
                   <% end %>
                 </div>
-                <%= if @selected.instructions do %>
+                <%= if @selected.recipe_ingredients != [] do %>
+                  <div class="mt-2 pt-2 border-t border-gray-100">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ingredients</p>
+                    <ul class="space-y-1">
+                      <%= for ri <- @selected.recipe_ingredients do %>
+                        <li class="flex items-baseline gap-1.5 text-xs text-gray-700">
+                          <%= if ri.quantity do %>
+                            <span class="text-gray-400 shrink-0">{ri.quantity} {ri.unit}</span>
+                          <% end %>
+                          <span>{ri.ingredient.name}</span>
+                        </li>
+                      <% end %>
+                    </ul>
+                  </div>
+                <% end %>
+                <%= for {phase, steps} <- grouped_steps(@selected) do %>
+                  <div class="mt-2 pt-2 border-t border-gray-100">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{phase}</p>
+                    <ol class="space-y-2">
+                      <%= for step <- steps do %>
+                        <li class="flex gap-2 text-xs">
+                          <span class="text-gray-300 shrink-0 w-4 text-right">{step["order"]}.</span>
+                          <div class="flex-1">
+                            <span class="text-gray-700">{step["action"]}</span>
+                            <%= if step["duration_minutes"] do %>
+                              <span class="ml-1 text-gray-400">({step["duration_minutes"]}m)</span>
+                            <% end %>
+                            <%= if step["ingredients"] && step["ingredients"] != [] do %>
+                              <div class="flex flex-wrap gap-1 mt-1">
+                                <%= for ing <- step["ingredients"] do %>
+                                  <span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded text-xs">{ing}</span>
+                                <% end %>
+                              </div>
+                            <% end %>
+                          </div>
+                        </li>
+                      <% end %>
+                    </ol>
+                  </div>
+                <% end %>
+                <%= if @selected.steps == nil && @selected.instructions do %>
                   <div class="mt-2 pt-2 border-t border-gray-100">
                     <p class="text-xs text-gray-400 mb-1">Instructions</p>
                     <p class="whitespace-pre-wrap text-xs text-gray-600">{@selected.instructions}</p>
@@ -504,12 +632,43 @@ defmodule ScullionWeb.RecipeLive do
 
   defp parse_sort(s), do: String.to_existing_atom(s)
 
+  defp grouped_steps(recipe) do
+    case recipe.steps do
+      nil -> []
+      json ->
+        Jason.decode!(json)
+        |> Enum.sort_by(& &1["order"])
+        |> Enum.chunk_by(& &1["phase"])
+        |> Enum.map(fn steps -> {hd(steps)["phase"], steps} end)
+    end
+  end
+
   defp total_time(recipe) do
     prep = recipe.prep_time_minutes || 0
     cook = recipe.cook_time_minutes || 0
     total = prep + cook
     if total > 0, do: "#{total} min", else: "—"
   end
+
+  defp extract_error(:provider_budget_exceeded), do: "Monthly LLM budget reached"
+  defp extract_error(:rate_limited), do: "Too many requests — try again in a moment"
+  defp extract_error({:openrouter_error, status, _}), do: "Extraction failed (API error #{status})"
+  defp extract_error(_), do: "Could not extract recipe from the images"
+
+  defp scrape_error({:http_error, status}) when is_integer(status),
+    do: "Could not fetch page (HTTP #{status})"
+
+  defp scrape_error({:req_error, _}),
+    do: "Could not reach the URL — check your connection or the address"
+
+  defp scrape_error(:not_implemented),
+    do: "This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead"
+
+  defp scrape_error({:openrouter_error, status, _}),
+    do: "Recipe extraction failed (API error #{status})"
+
+  defp scrape_error(_),
+    do: "Could not extract a recipe from this page"
 
   defp error_message(changeset) do
     changeset.errors

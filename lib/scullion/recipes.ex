@@ -96,6 +96,13 @@ defmodule Scullion.Recipes do
     Scullion.Handlers.RecipeHandler.scrape_and_create(url)
   end
 
+  @llm Application.compile_env(:scullion, :llm_client)
+
+  @spec extract_from_images([binary()]) :: {:ok, map()} | {:error, term()}
+  def extract_from_images(binaries) do
+    @llm.parse_recipe_images(binaries)
+  end
+
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp insert_recipe(attrs) do
@@ -172,12 +179,9 @@ defmodule Scullion.Recipes do
   end
 
   defp maybe_generate_image(recipe, image_url) do
-    # Preload associations synchronously (caller has DB connection)
     loaded = Repo.preload(recipe, recipe_ingredients: :ingredient)
-    caller = self()
 
     Task.start(fn ->
-      Ecto.Adapters.SQL.Sandbox.allow(Repo, caller, self())
       Scullion.Handlers.RecipeHandler.generate_image(loaded, image_url)
     end)
   end
