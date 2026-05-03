@@ -1,0 +1,22 @@
+Extract all line items from this receipt image.
+
+Return a JSON object with this exact structure:
+{
+  "store_name": "string or null",
+  "line_items": [
+    {
+      "product_name": "string",
+      "quantity": 1,
+      "unit_price": 9.90,
+      "total_price": 9.90
+    }
+  ]
+}
+
+Rules:
+- Include every item on the receipt, one object per line
+- Use null for quantity or unit_price if not shown on the receipt
+- total_price is the amount actually charged for that line (after any discounts)
+- All amounts as decimal numbers in SEK
+- product_name in the original language on the receipt
+- Return only the JSON object, no prose

@@ -20,7 +20,8 @@ defmodule ScullionWeb.GroceryLive do
        week_start: week_start,
        list_id: list_id,
        grocery_state: grocery_state,
-       user_id: user_id
+       user_id: user_id,
+       export_text: nil
      )}
   end
 
@@ -39,6 +40,13 @@ defmodule ScullionWeb.GroceryLive do
     {:noreply, socket}
   end
 
+  def handle_event("export_list", _params, socket) do
+    case GroceriesHandler.export_list(socket.assigns.list_id) do
+      {:ok, text} -> {:noreply, assign(socket, export_text: text)}
+      _ -> {:noreply, socket}
+    end
+  end
+
   def handle_event("add_item", %{"name" => name, "quantity" => qty, "unit" => unit}, socket) do
     quantity = if qty == "", do: nil, else: Decimal.new(qty)
     unit = if unit == "", do: nil, else: unit
@@ -55,73 +63,70 @@ defmodule ScullionWeb.GroceryLive do
     assigns = assign(assigns, items: sorted_items(assigns.grocery_state.items))
 
     ~H"""
-    <div class="max-w-lg mx-auto p-4">
-      <h1 class="text-xl font-semibold mb-1">Grocery List</h1>
-      <div class="text-sm text-gray-500 mb-4">Week of <%= Date.to_iso8601(@week_start) %></div>
+    <div class="max-w-lg mx-auto p-6">
+      <div class="flex items-center justify-between mb-1">
+        <h1 class="text-xl font-semibold text-gray-900">Groceries</h1>
+        <button phx-click="export_list" class="text-xs text-gray-400 hover:text-gray-600">
+          Export for SMS
+        </button>
+      </div>
+      <div class="text-sm text-gray-400 mb-5">
+        Week of <%= Calendar.strftime(@week_start, "%B %-d") %>
+      </div>
 
-      <%= if @items == [] do %>
-        <div class="text-gray-400 text-sm py-8 text-center">
-          No items — assign recipes in the planner and tap Build Grocery List.
-        </div>
-      <% else %>
-        <ul class="divide-y">
-          <%= for item <- @items do %>
-            <li class={["flex items-center gap-3 py-3", item.checked && "opacity-50"]}>
-              <button
-                phx-click={if item.checked, do: "uncheck_item", else: "check_item"}
-                phx-value-item_id={item.id}
-                class="flex-shrink-0"
-              >
-                <div class={[
-                  "w-5 h-5 rounded border-2 flex items-center justify-center",
-                  item.checked && "bg-green-500 border-green-500 text-white",
-                  !item.checked && "border-gray-300"
-                ]}>
-                  <%= if item.checked, do: "✓" %>
-                </div>
-              </button>
-              <span class={["flex-1 text-sm", item.checked && "line-through"]}>
-                <%= item.name %>
-              </span>
-              <span class="text-xs text-gray-400">
-                <%= format_quantity(item.quantity, item.unit) %>
-              </span>
-              <button
-                phx-click="remove_item"
-                phx-value-item_id={item.id}
-                class="text-gray-300 hover:text-red-400 text-xs"
-              >
-                ✕
-              </button>
-            </li>
-          <% end %>
-        </ul>
+      <%= if @export_text do %>
+        <textarea readonly class="mb-4 w-full border border-gray-200 rounded-xl p-3 text-sm font-mono h-28 bg-gray-50"><%= @export_text %></textarea>
       <% end %>
 
-      <form phx-submit="add_item" class="mt-6 flex flex-col gap-2">
-        <div class="text-sm font-medium text-gray-600">Add item</div>
-        <input
-          type="text"
-          name="name"
-          placeholder="Name"
-          required
-          class="border rounded px-3 py-2 text-sm w-full"
-        />
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5">
+        <%= if @items == [] do %>
+          <div class="text-gray-400 text-sm py-12 text-center px-6">
+            No items — assign recipes in the planner and tap Grocery List.
+          </div>
+        <% else %>
+          <ul class="divide-y divide-gray-50">
+            <%= for item <- @items do %>
+              <li class={["flex items-center gap-3 px-4 py-3", item.checked && "opacity-60"]}>
+                <button
+                  phx-click={if item.checked, do: "uncheck_item", else: "check_item"}
+                  phx-value-item_id={item.id}
+                  class="flex-shrink-0"
+                >
+                  <div class={[
+                    "w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                    item.checked && "bg-green-500 border-green-500 text-white",
+                    !item.checked && "border-gray-300"
+                  ]}>
+                    <%= if item.checked, do: "✓" %>
+                  </div>
+                </button>
+                <span class={["flex-1 text-sm text-gray-800", item.checked && "line-through text-gray-400"]}>
+                  <%= item.name %>
+                </span>
+                <span class="text-xs text-gray-400 min-w-12 text-right">
+                  <%= format_quantity(item.quantity, item.unit) %>
+                </span>
+                <button phx-click="remove_item" phx-value-item_id={item.id}
+                        class="text-gray-200 hover:text-red-400 text-sm leading-none pl-1">
+                  ✕
+                </button>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+
+      <form phx-submit="add_item" class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+        <div class="text-sm font-medium text-gray-600">+ Add item</div>
+        <input type="text" name="name" placeholder="Item name" required
+               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
         <div class="flex gap-2">
-          <input
-            type="text"
-            name="quantity"
-            placeholder="Qty"
-            class="border rounded px-3 py-2 text-sm w-24"
-          />
-          <input
-            type="text"
-            name="unit"
-            placeholder="Unit"
-            class="border rounded px-3 py-2 text-sm flex-1"
-          />
+          <input type="text" name="quantity" placeholder="Qty"
+                 class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-green-500" />
+          <input type="text" name="unit" placeholder="Unit"
+                 class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-green-500" />
         </div>
-        <button type="submit" class="bg-blue-600 text-white rounded py-2 text-sm">
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-medium">
           Add
         </button>
       </form>

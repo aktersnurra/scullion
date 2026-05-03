@@ -1,5 +1,5 @@
 defmodule Scullion.Handlers.GroceriesHandler do
-  alias Scullion.{EventStore, Groceries.Decider, Groceries.Commands, Groceries.Aggregator}
+  alias Scullion.{EventStore, Groceries.Decider, Groceries.Commands, Groceries.Aggregator, Pantry}
   alias Phoenix.PubSub
 
   @pubsub Scullion.PubSub
@@ -29,11 +29,34 @@ defmodule Scullion.Handlers.GroceriesHandler do
   end
 
   def check_item(list_id, item_id, user_id) do
-    run(list_id, %Commands.CheckItem{item_id: item_id, checked_by: user_id})
+    with {:ok, state} <- EventStore.load(list_id, Decider),
+         {:ok, events} <- Decider.decide(%Commands.CheckItem{item_id: item_id, checked_by: user_id}, state),
+         :ok <- EventStore.append(list_id, events) do
+      PubSub.broadcast(@pubsub, @topic, {:events, events})
+      item = Map.get(state.items, item_id)
+      if item, do: Pantry.add_item(%{name: item.name, quantity: item.quantity, unit: item.unit})
+      {:ok, events}
+    end
   end
 
   def uncheck_item(list_id, item_id, user_id) do
     run(list_id, %Commands.UncheckItem{item_id: item_id, unchecked_by: user_id})
+  end
+
+  def export_list(list_id) do
+    with {:ok, state} <- EventStore.load(list_id, Decider) do
+      lines =
+        state.items
+        |> Map.values()
+        |> Enum.reject(& &1.checked)
+        |> Enum.sort_by(& &1.name)
+        |> Enum.map(fn item ->
+          qty = if item.quantity, do: "#{item.quantity} #{item.unit} ", else: ""
+          "- #{qty}#{item.name}"
+        end)
+
+      {:ok, Enum.join(lines, "\n")}
+    end
   end
 
   defp run(list_id, command) do

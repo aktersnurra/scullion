@@ -5,4 +5,5 @@ defmodule Scullion.LLM do
   @callback parse_receipt_image(image :: binary()) :: {:ok, [map()], map()} | {:error, term()}
   @callback parse_deals_image(image :: binary()) :: {:ok, [map()], map()} | {:error, term()}
   @callback generate_prep_guide(plan :: map()) :: {:ok, map(), map()} | {:error, term()}
+  @callback estimate_nutrition(recipe :: map()) :: {:ok, map(), map()} | {:error, term()}
 end

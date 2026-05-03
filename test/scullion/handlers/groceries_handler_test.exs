@@ -47,6 +47,16 @@ defmodule Scullion.Handlers.GroceriesHandlerTest do
     assert {:error, :item_not_found} = GroceriesHandler.check_item(list_id(), "no-such-id", 1)
   end
 
+  test "check_item adds item to pantry" do
+    GroceriesHandler.add_item(list_id(), "Pasta", Decimal.new("500"), "g", 1)
+    {:ok, state} = GroceriesHandler.load_list(list_id())
+    item_id = state.items |> Map.keys() |> List.first()
+
+    GroceriesHandler.check_item(list_id(), item_id, 1)
+    pantry = Scullion.Pantry.list_inventory()
+    assert Enum.any?(pantry, &(&1.name == "Pasta"))
+  end
+
   test "build_list aggregates recipe ingredients and broadcasts" do
     {:ok, recipe} =
       Recipes.create(%{

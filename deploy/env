@@ -1,0 +1,23 @@
+# /etc/scullion/env
+# Copy this file to /etc/scullion/env on the server and fill in the values.
+# Permissions: chmod 600 /etc/scullion/env; chown scullion:scullion /etc/scullion/env
+
+PHX_SERVER=true
+PHX_HOST=scullion.example.com
+PORT=4000
+
+# Generate with: mix phx.gen.secret
+SECRET_KEY_BASE=
+
+# Absolute path to the SQLite database file
+DATABASE_PATH=/var/lib/scullion/scullion.db
+POOL_SIZE=5
+
+# OpenRouter API key — used for all LLM and image gen features
+OPENROUTER_API_KEY=
+# Text generation (weekly plan, prep guide, nutrition)
+OPENROUTER_MODEL=anthropic/claude-3-5-haiku
+# Vision / image-to-text (receipt parsing)
+OPENROUTER_VISION_MODEL=google/gemini-flash-1.5
+# Text-to-image (recipe food photos)
+OPENROUTER_IMAGE_MODEL=black-forest-labs/flux-schnell

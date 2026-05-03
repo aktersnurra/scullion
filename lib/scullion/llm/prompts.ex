@@ -29,6 +29,21 @@ defmodule Scullion.LLM.Prompts do
     {system, user}
   end
 
+  def estimate_nutrition do
+    system = File.read!(Path.join(@prompts_dir, "estimate_nutrition.eex"))
+    {system, ""}
+  end
+
+  def parse_receipt do
+    system = """
+    You are a receipt parser. Extract line items from receipt images precisely.
+    Respond with a JSON object only. No prose.
+    """
+
+    user = File.read!(Path.join(@prompts_dir, "parse_receipt.eex"))
+    {system, user}
+  end
+
   defp render(template, assigns) do
     path = Path.join(@prompts_dir, template)
     EEx.eval_file(path, assigns: Map.to_list(assigns))

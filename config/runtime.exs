@@ -27,6 +27,10 @@ if config_env() == :prod do
   config :scullion, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
   config :scullion, :openrouter_model,
     System.get_env("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+  config :scullion, :openrouter_vision_model,
+    System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-flash-1.5")
+  config :scullion, :openrouter_image_model,
+    System.get_env("OPENROUTER_IMAGE_MODEL", "black-forest-labs/flux-schnell")
 
   database_path =
     System.get_env("DATABASE_PATH") ||

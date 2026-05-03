@@ -23,6 +23,22 @@ defmodule ScullionWeb.LoginLive do
     {:noreply, assign(socket, digits: Enum.drop(socket.assigns.digits, -1), error: nil)}
   end
 
+  def handle_event("keydown", %{"key" => key}, socket) do
+    cond do
+      key in ~w(0 1 2 3 4 5 6 7 8 9) ->
+        handle_event("digit", %{"value" => key}, socket)
+
+      key in ~w(Backspace Delete) ->
+        handle_event("backspace", %{}, socket)
+
+      key == "Enter" ->
+        handle_event("submit", %{}, socket)
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event("submit", _, socket) do
     %{digits: digits, ip: ip} = socket.assigns
 
@@ -58,64 +74,70 @@ defmodule ScullionWeb.LoginLive do
     end
   end
 
+  attr :value, :string, required: true
+  attr :locked, :boolean, required: true
+  defp numpad_button(assigns) do
+    ~H"""
+    <button id={"digit-#{@value}"}
+            phx-click={JS.push("digit", value: %{value: @value})}
+            disabled={@locked}
+            class="bg-white border border-gray-200 text-gray-800 text-xl font-semibold py-4 rounded-xl hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 shadow-sm">
+      {@value}
+    </button>
+    """
+  end
+
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen flex items-center justify-center bg-gray-900">
+    <div class="min-h-screen flex items-center justify-center bg-gray-50" phx-window-keydown="keydown">
       <div class="w-full max-w-xs">
-        <h1 class="text-white text-2xl font-bold text-center mb-8">Scullion</h1>
+        <div class="text-center mb-8">
+          <div class="inline-flex items-center gap-1 text-2xl font-bold text-gray-900">
+            <span class="text-green-600">S</span>cullion
+          </div>
+          <p class="text-sm text-gray-400 mt-1">Enter your 16-digit code</p>
+        </div>
 
         <%!-- Code display --%>
-        <div class="flex justify-center gap-3 mb-8 font-mono text-2xl">
-          <%= for group <- digit_groups(@digits) do %>
-            <div class="flex gap-1">
-              <%= for d <- group do %>
-                <span class="w-6 text-center text-white">
-                  {if d == :empty, do: "·", else: "●"}
-                </span>
-              <% end %>
-            </div>
-          <% end %>
+        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-5 mb-4">
+          <div class="flex justify-center items-center gap-3 font-mono">
+            <%= for group <- digit_groups(@digits) do %>
+              <div class="flex gap-1.5">
+                <%= for d <- group do %>
+                  <span class={["text-lg leading-none", d == :empty && "text-gray-200", d != :empty && "text-gray-800"]}>
+                    {if d == :empty, do: "·", else: "●"}
+                  </span>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
         </div>
 
         <%= if @error do %>
-          <p class="text-red-400 text-center text-sm mb-4">{@error}</p>
+          <p class="text-red-500 text-center text-sm mb-3 bg-red-50 rounded-xl py-2 px-3">{@error}</p>
         <% end %>
 
         <%!-- Numpad --%>
-        <div class="grid grid-cols-3 gap-3">
-          <%= for n <- [1, 2, 3, 4, 5, 6, 7, 8, 9] do %>
-            <button
-              phx-click="digit"
-              phx-value-value={Integer.to_string(n)}
-              disabled={@locked}
-              class="bg-gray-700 text-white text-2xl font-bold py-4 rounded-lg hover:bg-gray-600 active:bg-gray-500 disabled:opacity-40"
-            >
-              {n}
-            </button>
-          <% end %>
+        <div class="grid grid-cols-3 gap-2">
+          <.numpad_button value="1" locked={@locked} />
+          <.numpad_button value="2" locked={@locked} />
+          <.numpad_button value="3" locked={@locked} />
+          <.numpad_button value="4" locked={@locked} />
+          <.numpad_button value="5" locked={@locked} />
+          <.numpad_button value="6" locked={@locked} />
+          <.numpad_button value="7" locked={@locked} />
+          <.numpad_button value="8" locked={@locked} />
+          <.numpad_button value="9" locked={@locked} />
 
-          <button
-            phx-click="backspace"
-            disabled={@locked}
-            class="bg-gray-700 text-white text-xl py-4 rounded-lg hover:bg-gray-600 active:bg-gray-500 disabled:opacity-40"
-          >
+          <button phx-click="backspace" disabled={@locked}
+                  class="bg-white border border-gray-200 text-gray-500 text-lg py-4 rounded-xl hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 shadow-sm">
             ⌫
           </button>
 
-          <button
-            phx-click="digit"
-            phx-value-value="0"
-            disabled={@locked}
-            class="bg-gray-700 text-white text-2xl font-bold py-4 rounded-lg hover:bg-gray-600 active:bg-gray-500 disabled:opacity-40"
-          >
-            0
-          </button>
+          <.numpad_button value="0" locked={@locked} />
 
-          <button
-            phx-click="submit"
-            disabled={@locked or length(@digits) < 16}
-            class="bg-blue-600 text-white text-xl py-4 rounded-lg hover:bg-blue-500 active:bg-blue-400 disabled:opacity-40"
-          >
+          <button phx-click="submit" disabled={@locked or length(@digits) < 16}
+                  class="bg-green-600 hover:bg-green-700 text-white text-lg py-4 rounded-xl disabled:opacity-40 shadow-sm font-medium">
             ↵
           </button>
         </div>

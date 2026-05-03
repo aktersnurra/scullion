@@ -1,5 +1,5 @@
 defmodule Scullion.Costs do
-  alias Scullion.{Repo, Costs.LLMUsage}
+  alias Scullion.{Repo, Costs.LLMUsage, Costs.Receipt, Costs.LineItem, Costs.DiningOut}
   import Ecto.Query
 
   def log_llm_usage(attrs) do
@@ -26,18 +26,105 @@ defmodule Scullion.Costs do
     )
   end
 
-  @spec log_receipt(map()) :: {:ok, term()} | {:error, term()}
-  def log_receipt(_attrs), do: {:error, :not_implemented}
+  @spec log_receipt(map()) :: {:ok, Receipt.t()} | {:error, term()}
+  def log_receipt(attrs) do
+    line_items = Map.get(attrs, :line_items, [])
+    attrs = Map.delete(attrs, :line_items)
 
-  @spec log_dining_out(map()) :: {:ok, term()} | {:error, term()}
-  def log_dining_out(_attrs), do: {:error, :not_implemented}
+    Repo.transaction(fn ->
+      case %Receipt{} |> Receipt.changeset(attrs) |> Repo.insert() do
+        {:ok, receipt} ->
+          Enum.each(line_items, fn item ->
+            %LineItem{}
+            |> LineItem.changeset(Map.put(item, :receipt_id, receipt.id))
+            |> Repo.insert!()
+          end)
 
-  @spec weekly_summary(Date.t()) :: {:ok, map()} | {:error, term()}
-  def weekly_summary(_week_start), do: {:error, :not_implemented}
+          receipt
 
-  @spec monthly_summary(integer(), integer()) :: {:ok, map()} | {:error, term()}
-  def monthly_summary(_year, _month), do: {:error, :not_implemented}
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
 
-  @spec cost_per_meal(map()) :: {:ok, map()} | {:error, term()}
-  def cost_per_meal(_period), do: {:error, :not_implemented}
+  @spec log_dining_out(map()) :: {:ok, DiningOut.t()} | {:error, term()}
+  def log_dining_out(attrs) do
+    %DiningOut{} |> DiningOut.changeset(attrs) |> Repo.insert()
+  end
+
+  @spec weekly_summary(Date.t()) :: {:ok, map()}
+  def weekly_summary(week_start) do
+    week_end = Date.add(week_start, 6)
+
+    grocery =
+      Repo.one(
+        from r in Receipt,
+          where: r.date >= ^week_start and r.date <= ^week_end,
+          select: coalesce(sum(r.total_amount), 0)
+      )
+
+    dining =
+      Repo.one(
+        from d in DiningOut,
+          where: d.date >= ^week_start and d.date <= ^week_end,
+          select: coalesce(sum(d.total_amount), 0)
+      )
+
+    grocery = grocery || Decimal.new(0)
+    dining = dining || Decimal.new(0)
+
+    {:ok, %{grocery_total: grocery, dining_total: dining, total: Decimal.add(grocery, dining)}}
+  end
+
+  @spec monthly_summary(integer(), integer()) :: {:ok, map()}
+  def monthly_summary(year, month) do
+    {:ok, month_start} = Date.new(year, month, 1)
+    month_end = Date.end_of_month(month_start)
+
+    grocery =
+      Repo.one(
+        from r in Receipt,
+          where: r.date >= ^month_start and r.date <= ^month_end,
+          select: coalesce(sum(r.total_amount), 0)
+      ) || Decimal.new(0)
+
+    receipt_count =
+      Repo.one(
+        from r in Receipt,
+          where: r.date >= ^month_start and r.date <= ^month_end,
+          select: count(r.id)
+      )
+
+    dining =
+      Repo.one(
+        from d in DiningOut,
+          where: d.date >= ^month_start and d.date <= ^month_end,
+          select: coalesce(sum(d.total_amount), 0)
+      ) || Decimal.new(0)
+
+    dining_count =
+      Repo.one(
+        from d in DiningOut,
+          where: d.date >= ^month_start and d.date <= ^month_end,
+          select: count(d.id)
+      )
+
+    {:ok,
+     %{
+       grocery_total: grocery,
+       dining_total: dining,
+       total: Decimal.add(grocery, dining),
+       receipt_count: receipt_count,
+       dining_count: dining_count
+     }}
+  end
+
+  @spec cost_per_meal(map()) :: {:ok, Decimal.t()} | {:error, term()}
+  def cost_per_meal(%{week_start: week_start, meal_count: meal_count}) when meal_count > 0 do
+    {:ok, %{grocery_total: total}} = weekly_summary(week_start)
+    {:ok, Decimal.div(total, meal_count)}
+  end
+
+  def cost_per_meal(_), do: {:error, :invalid_period}
 end
