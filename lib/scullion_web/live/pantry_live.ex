@@ -29,68 +29,62 @@ defmodule ScullionWeb.PantryLive do
 
   def render(assigns) do
     ~H"""
-    <div class="max-w-2xl mx-auto p-6">
-      <h1 class="text-xl font-semibold text-gray-900 mb-5">Pantry</h1>
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/pantry"}>
+    <.page max_width={:md}>
+      <.card padded={false}>
+        <header class="px-6 pt-6 pb-3">
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Pantry</h1>
+        </header>
 
-      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5">
         <%= if @items == [] do %>
-          <p class="text-gray-400 text-sm py-12 text-center">Nothing in pantry</p>
+          <div class="px-6 py-8 border-t border-[color:var(--hairline)]"><.empty message="Nothing in pantry yet" /></div>
         <% else %>
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-left text-xs text-gray-400 border-b border-gray-50">
-                <th class="px-4 py-3 font-medium">Item</th>
-                <th class="px-4 py-3 font-medium">Qty</th>
-                <th class="px-4 py-3 font-medium">Category</th>
-                <th class="px-4 py-3 font-medium">Expires</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-50">
-              <%= for item <- @items do %>
-                <tr class={expiry_class(item.expires_at)}>
-                  <td class="px-4 py-3 font-medium text-gray-800"><%= item.name %></td>
-                  <td class="px-4 py-3 text-gray-500"><%= format_qty(item.quantity, item.unit) %></td>
-                  <td class="px-4 py-3 text-gray-400"><%= item.category %></td>
-                  <td class="px-4 py-3 text-gray-400"><%= format_date(item.expires_at) %></td>
-                  <td class="px-4 py-3 text-right">
-                    <%= if @current_user && @current_user.role in [:member, :admin] do %>
-                      <button phx-click="remove_item" phx-value-id={item.id}
-                              class="text-gray-200 hover:text-red-400 text-sm">✕</button>
-                    <% end %>
-                  </td>
-                </tr>
+          <ul class="px-6 pt-2 border-t border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
+            <li :for={item <- @items} class={["flex items-center gap-3 py-3", expiring_soon?(item.expires_at) && "text-[color:var(--danger)]"]}>
+              <div class="flex-1 min-w-0">
+                <p class="font-medium" style="font-size: var(--t-body);">{item.name}</p>
+                <p :if={item.category || item.expires_at} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                  <span :if={item.category}>{item.category}</span>
+                  <span :if={item.category && item.expires_at}> · </span>
+                  <span :if={item.expires_at}>expires {format_date(item.expires_at)}</span>
+                </p>
+              </div>
+              <span class="shrink-0 text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
+                {format_qty(item.quantity, item.unit)}
+              </span>
+              <%= if @current_user && @current_user.role in [:member, :admin] do %>
+                <button phx-click="remove_item" phx-value-id={item.id}
+                        class="size-9 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]" aria-label="Remove">
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
               <% end %>
-            </tbody>
-          </table>
+            </li>
+          </ul>
         <% end %>
-      </div>
 
-      <%= if @current_user && @current_user.role in [:member, :admin] do %>
-        <form phx-submit="add_item" class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
-          <div class="text-sm font-medium text-gray-600">+ Add to pantry</div>
-          <div class="flex gap-2">
-            <input type="text" name="name" placeholder="Item name" required
-                   class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-green-500" />
-            <input type="text" name="quantity" placeholder="Qty"
-                   class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-green-500" />
-            <input type="text" name="unit" placeholder="Unit"
-                   class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-          <div class="flex gap-2">
-            <input type="text" name="category" placeholder="Category (e.g. dairy)"
-                   class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-green-500" />
-            <input type="date" name="expires_at"
-                   class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-          </div>
-          <button type="submit" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">
-            Add
-          </button>
-        </form>
-      <% end %>
-    </div>
+        <%= if @current_user && @current_user.role in [:member, :admin] do %>
+          <form phx-submit="add_item" class="px-6 py-5 mt-2 border-t border-[color:var(--hairline)] space-y-4">
+            <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Add to pantry</h2>
+            <.field name="name" label="Item" placeholder="e.g. Pasta" required />
+            <div class="grid grid-cols-2 gap-3">
+              <.field name="quantity" label="Quantity" placeholder="500" />
+              <.field name="unit" label="Unit" placeholder="g" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <.field name="category" label="Category" placeholder="dairy" />
+              <.field name="expires_at" label="Expires" type="date" />
+            </div>
+            <.button type="submit" variant={:primary} size={:lg} full>Add</.button>
+          </form>
+        <% end %>
+      </.card>
+    </.page>
+    </Layouts.app>
     """
   end
+
+  defp expiring_soon?(nil), do: false
+  defp expiring_soon?(d), do: Date.diff(d, Date.utc_today()) <= 3
 
   defp parse_decimal(""), do: nil
   defp parse_decimal(nil), do: nil
@@ -117,9 +111,4 @@ defmodule ScullionWeb.PantryLive do
   defp format_date(nil), do: ""
   defp format_date(d), do: Date.to_iso8601(d)
 
-  defp expiry_class(nil), do: ""
-
-  defp expiry_class(expires_at) do
-    if Date.diff(expires_at, Date.utc_today()) <= 3, do: "text-red-600", else: ""
-  end
 end

@@ -6,7 +6,7 @@ defmodule ScullionWeb.SetupLiveTest do
   describe "GET /setup" do
     test "renders form when no admin exists", %{conn: conn} do
       {:ok, _lv, html} = live(conn, "/setup")
-      assert html =~ "First Boot Setup"
+      assert html =~ "Welcome to Scullion"
       assert html =~ "Create admin account"
     end
 
@@ -20,7 +20,7 @@ defmodule ScullionWeb.SetupLiveTest do
     test "creates admin and shows code", %{conn: conn} do
       {:ok, lv, _html} = live(conn, "/setup")
       html = lv |> form("form", name: "Gustaf") |> render_submit()
-      assert html =~ "Save this code"
+      assert html =~ "Save this 16-digit code"
       assert html =~ "Go to login"
     end
 

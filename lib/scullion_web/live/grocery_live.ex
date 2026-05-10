@@ -18,6 +18,7 @@ defmodule ScullionWeb.GroceryLive do
     {:ok,
      assign(socket,
        week_start: week_start,
+       week_number: week_number(week_start),
        list_id: list_id,
        grocery_state: grocery_state,
        user_id: user_id,
@@ -25,13 +26,15 @@ defmodule ScullionWeb.GroceryLive do
      )}
   end
 
-  def handle_event("check_item", %{"item_id" => id}, socket) do
-    GroceriesHandler.check_item(socket.assigns.list_id, id, socket.assigns.user_id)
-    {:noreply, socket}
-  end
+  def handle_event("toggle_item", %{"item_id" => id}, socket) do
+    item = Map.get(socket.assigns.grocery_state.items, id)
 
-  def handle_event("uncheck_item", %{"item_id" => id}, socket) do
-    GroceriesHandler.uncheck_item(socket.assigns.list_id, id, socket.assigns.user_id)
+    if item && item.checked do
+      GroceriesHandler.uncheck_item(socket.assigns.list_id, id, socket.assigns.user_id)
+    else
+      GroceriesHandler.check_item(socket.assigns.list_id, id, socket.assigns.user_id)
+    end
+
     {:noreply, socket}
   end
 
@@ -47,10 +50,21 @@ defmodule ScullionWeb.GroceryLive do
     end
   end
 
-  def handle_event("add_item", %{"name" => name, "quantity" => qty, "unit" => unit}, socket) do
-    quantity = if qty == "", do: nil, else: Decimal.new(qty)
-    unit = if unit == "", do: nil, else: unit
-    GroceriesHandler.add_item(socket.assigns.list_id, name, quantity, unit, socket.assigns.user_id)
+  def handle_event("clear_export", _params, socket) do
+    {:noreply, assign(socket, export_text: nil)}
+  end
+
+  def handle_event("add_item", %{"name" => name} = params, socket) do
+    name = String.trim(name)
+
+    if name != "" do
+      qty = Map.get(params, "quantity", "")
+      unit = Map.get(params, "unit", "")
+      quantity = if qty == "", do: nil, else: parse_qty(qty)
+      unit = if unit == "", do: nil, else: unit
+      GroceriesHandler.add_item(socket.assigns.list_id, name, quantity, unit, socket.assigns.user_id)
+    end
+
     {:noreply, socket}
   end
 
@@ -60,94 +74,184 @@ defmodule ScullionWeb.GroceryLive do
   end
 
   def render(assigns) do
-    assigns = assign(assigns, items: sorted_items(assigns.grocery_state.items))
+    items = sorted_items(assigns.grocery_state.items)
+    {unchecked, checked} = Enum.split_with(items, &(!&1.checked))
+    assigns = assign(assigns, unchecked: unchecked, checked: checked, total: length(items), unchecked_count: length(unchecked))
 
     ~H"""
-    <div class="max-w-lg mx-auto p-6">
-      <div class="flex items-center justify-between mb-1">
-        <h1 class="text-xl font-semibold text-gray-900">Groceries</h1>
-        <button phx-click="export_list" class="text-xs text-gray-400 hover:text-gray-600">
-          Export for SMS
-        </button>
-      </div>
-      <div class="text-sm text-gray-400 mb-5">
-        Week of <%= Calendar.strftime(@week_start, "%B %-d") %>
-      </div>
-
-      <%= if @export_text do %>
-        <textarea readonly class="mb-4 w-full border border-gray-200 rounded-xl p-3 text-sm font-mono h-28 bg-gray-50"><%= @export_text %></textarea>
-      <% end %>
-
-      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5">
-        <%= if @items == [] do %>
-          <div class="text-gray-400 text-sm py-12 text-center px-6">
-            No items — assign recipes in the planner and tap Grocery List.
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/groceries"}>
+    <.page max_width={:md}>
+      <.card padded={false}>
+        <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
+          <div>
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Groceries</h1>
+            <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+              {@unchecked_count} unchecked · Week {@week_number}
+            </p>
           </div>
-        <% else %>
-          <ul class="divide-y divide-gray-50">
-            <%= for item <- @items do %>
-              <li class={["flex items-center gap-3 px-4 py-3", item.checked && "opacity-60"]}>
-                <button
-                  phx-click={if item.checked, do: "uncheck_item", else: "check_item"}
-                  phx-value-item_id={item.id}
-                  class="flex-shrink-0"
-                >
-                  <div class={[
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold",
-                    item.checked && "bg-green-500 border-green-500 text-white",
-                    !item.checked && "border-gray-300"
-                  ]}>
-                    <%= if item.checked, do: "✓" %>
-                  </div>
-                </button>
-                <span class={["flex-1 text-sm text-gray-800", item.checked && "line-through text-gray-400"]}>
-                  <%= item.name %>
-                </span>
-                <span class="text-xs text-gray-400 min-w-12 text-right">
-                  <%= format_quantity(item.quantity, item.unit) %>
-                </span>
-                <button phx-click="remove_item" phx-value-item_id={item.id}
-                        class="text-gray-200 hover:text-red-400 text-sm leading-none pl-1">
-                  ✕
-                </button>
-              </li>
-            <% end %>
-          </ul>
-        <% end %>
-      </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+              style="font-size: var(--t-meta);"
+            >
+              <.icon name="hero-funnel" class="size-4" /> Group by category
+              <.icon name="hero-chevron-down" class="size-3.5" />
+            </button>
+            <button
+              type="button"
+              phx-click="export_list"
+              aria-label="More"
+              class="size-9 inline-flex items-center justify-center rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+            >
+              <.icon name="hero-ellipsis-horizontal" class="size-4" />
+            </button>
+          </div>
+        </header>
 
-      <form phx-submit="add_item" class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
-        <div class="text-sm font-medium text-gray-600">+ Add item</div>
-        <input type="text" name="name" placeholder="Item name" required
-               class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-        <div class="flex gap-2">
-          <input type="text" name="quantity" placeholder="Qty"
-                 class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-green-500" />
-          <input type="text" name="unit" placeholder="Unit"
-                 class="border border-gray-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-green-500" />
+        <div :if={@export_text} class="mx-6 mb-4 border border-[color:var(--border)] rounded-[var(--r-lg)] p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">
+              Export
+            </span>
+            <.icon_button icon="hero-x-mark" label="Close" phx-click="clear_export" />
+          </div>
+          <textarea
+            readonly
+            class="w-full bg-transparent text-[var(--text)] font-mono resize-none focus:outline-none"
+            style="font-size: var(--t-meta);"
+            rows="6"
+          ><%= @export_text %></textarea>
         </div>
-        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-medium">
-          Add
-        </button>
-      </form>
-    </div>
+
+        <div class="px-6 pb-3">
+          <%= if @total == 0 do %>
+            <.empty message="No items yet" />
+          <% else %>
+            <ul class="divide-y divide-[color:var(--hairline)]">
+              <.grocery_row :for={item <- @unchecked} item={item} />
+            </ul>
+
+            <%= if @checked != [] do %>
+              <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mt-6 mb-1" style="font-size: var(--t-micro); font-weight: 600;">
+                Done · {length(@checked)}
+              </h2>
+              <ul class="divide-y divide-[color:var(--hairline)]">
+                <.grocery_row :for={item <- @checked} item={item} />
+              </ul>
+            <% end %>
+          <% end %>
+
+          <form phx-submit="add_item" class="mt-2 pt-3 border-t border-[color:var(--hairline)] flex items-center gap-3">
+            <.icon name="hero-plus" class="size-5 text-[color:var(--accent)] shrink-0" />
+            <input
+              type="text"
+              name="name"
+              placeholder="Add item…"
+              required
+              class="flex-1 h-10 bg-transparent border-0 text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none"
+              style="font-size: var(--t-body);"
+            />
+            <input
+              type="text"
+              name="quantity"
+              placeholder="Qty"
+              inputmode="decimal"
+              class="w-16 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] tabular-nums text-right focus:outline-none"
+              style="font-size: var(--t-meta);"
+            />
+            <input
+              type="text"
+              name="unit"
+              placeholder="Unit"
+              class="w-12 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] focus:outline-none"
+              style="font-size: var(--t-meta);"
+            />
+          </form>
+        </div>
+      </.card>
+    </.page>
+    </Layouts.app>
+    """
+  end
+
+  attr :item, :map, required: true
+
+  defp grocery_row(assigns) do
+    ~H"""
+    <li class={[
+      "flex items-center gap-4 py-3 transition-opacity",
+      @item.checked && "opacity-50"
+    ]}>
+      <.checkbox checked={@item.checked} phx-click="toggle_item" phx-value-item_id={@item.id} />
+      <button
+        type="button"
+        phx-click="toggle_item"
+        phx-value-item_id={@item.id}
+        class="flex-1 min-w-0 text-left"
+      >
+        <span
+          class={[
+            "text-[var(--text)] truncate",
+            @item.checked && "line-through"
+          ]}
+          style="font-size: var(--t-body);"
+        >
+          {@item.name}
+        </span>
+      </button>
+      <span
+        :if={qty_label(@item) != ""}
+        class="shrink-0 text-[color:var(--muted)] tabular-nums"
+        style="font-size: var(--t-meta);"
+      >
+        {qty_label(@item)}
+      </span>
+      <button
+        type="button"
+        phx-click="remove_item"
+        phx-value-item_id={@item.id}
+        aria-label="Remove"
+        class="size-9 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]"
+      >
+        <.icon name="hero-x-mark" class="size-4" />
+      </button>
+    </li>
     """
   end
 
   defp sorted_items(items) do
     items
     |> Map.values()
-    |> Enum.sort_by(fn i -> {i.checked, i.name} end)
+    |> Enum.sort_by(fn i -> {i.checked, String.downcase(i.name)} end)
   end
 
-  defp format_quantity(nil, nil), do: ""
-  defp format_quantity(nil, unit), do: unit
-  defp format_quantity(qty, nil), do: Decimal.to_string(qty)
-  defp format_quantity(qty, unit), do: "#{Decimal.to_string(qty)} #{unit}"
+  defp qty_label(%{quantity: nil, unit: nil}), do: ""
+  defp qty_label(%{quantity: nil, unit: unit}), do: unit
+  defp qty_label(%{quantity: qty, unit: nil}), do: format_decimal(qty)
+  defp qty_label(%{quantity: qty, unit: unit}), do: "#{format_decimal(qty)} #{unit}"
+
+  defp format_decimal(%Decimal{} = d) do
+    if Decimal.integer?(d), do: Decimal.to_string(Decimal.normalize(d)), else: Decimal.to_string(d)
+  end
+
+  defp format_decimal(other), do: to_string(other)
+
+  defp parse_qty(s) do
+    case Decimal.parse(s) do
+      {d, _} -> d
+      :error -> nil
+    end
+  end
 
   defp week_start(date) do
     dow = Date.day_of_week(date)
     Date.add(date, -(dow - 1))
+  end
+
+  defp week_number(date) do
+    {_y, w} = :calendar.iso_week_number({date.year, date.month, date.day})
+    w
   end
 
   defp grocery_id(week_start), do: "grocery_list:#{Date.to_iso8601(week_start)}"

@@ -1,6 +1,23 @@
 defmodule Scullion.LLM.Prompts do
   @prompts_dir Path.join(:code.priv_dir(:scullion), "llm/prompts")
 
+  def suggest_slot_recipe(context) do
+    system = """
+    You are a meal planner suggesting one recipe for a single dinner slot.
+    Goal: pick the best fit from the candidate recipes given week context.
+    Principles:
+    - Reuse ingredients from neighboring meals
+    - Prefer pantry items and current deals
+    - Avoid recipes already cooked this week
+    - Match the day's available time and energy
+    You MUST pick a recipe_id from the provided candidate list.
+    Respond ONLY with JSON: {"recipe_id": <int>, "reasoning": "<one short sentence>"}.
+    """
+
+    user = render("suggest_slot_recipe.eex", context)
+    {system, user}
+  end
+
   def plan_weekly(constraints) do
     system = """
     You are a meal planner. Think like a prep cook.

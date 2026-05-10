@@ -20,6 +20,28 @@ defmodule Scullion.Adapters.OpenRouter do
   def suggest_recipes(_context), do: {:error, :not_implemented}
 
   @impl Scullion.LLM
+  def suggest_slot_recipe(context) do
+    {system, user} = Scullion.LLM.Prompts.suggest_slot_recipe(context)
+
+    case chat(system, user) do
+      {:ok, %{"recipe_id" => rid} = data, usage} when is_integer(rid) ->
+        candidate_ids = MapSet.new(context.candidate_recipe_ids || [])
+
+        if MapSet.member?(candidate_ids, rid) do
+          {:ok, %{recipe_id: rid, reasoning: data["reasoning"] || ""}, usage}
+        else
+          {:error, :hallucinated_recipe}
+        end
+
+      {:ok, _other, _usage} ->
+        {:error, :invalid_response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @impl Scullion.LLM
   def extract_recipe_from_html(html) do
     {system, user} = Scullion.LLM.Prompts.extract_recipe(html)
 

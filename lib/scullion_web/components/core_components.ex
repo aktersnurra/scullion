@@ -80,43 +80,6 @@ defmodule ScullionWeb.CoreComponents do
   end
 
   @doc """
-  Renders a button with navigation support.
-
-  ## Examples
-
-      <.button>Send!</.button>
-      <.button phx-click="go" variant="primary">Send!</.button>
-      <.button navigate={~p"/"}>Home</.button>
-  """
-  attr :rest, :global, include: ~w(href navigate patch method download name value disabled)
-  attr :class, :any
-  attr :variant, :string, values: ~w(primary)
-  slot :inner_block, required: true
-
-  def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
-
-    assigns =
-      assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
-      end)
-
-    if rest[:href] || rest[:navigate] || rest[:patch] do
-      ~H"""
-      <.link class={@class} {@rest}>
-        {render_slot(@inner_block)}
-      </.link>
-      """
-    else
-      ~H"""
-      <button class={@class} {@rest}>
-        {render_slot(@inner_block)}
-      </button>
-      """
-    end
-  end
-
-  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
@@ -306,29 +269,6 @@ defmodule ScullionWeb.CoreComponents do
   end
 
   @doc """
-  Renders a header with title.
-  """
-  slot :inner_block, required: true
-  slot :subtitle
-  slot :actions
-
-  def header(assigns) do
-    ~H"""
-    <header class={[@actions != [] && "flex items-center justify-between gap-6", "pb-4"]}>
-      <div>
-        <h1 class="text-lg font-semibold leading-8">
-          {render_slot(@inner_block)}
-        </h1>
-        <p :if={@subtitle != []} class="text-sm text-base-content/70">
-          {render_slot(@subtitle)}
-        </p>
-      </div>
-      <div class="flex-none">{render_slot(@actions)}</div>
-    </header>
-    """
-  end
-
-  @doc """
   Renders a table with generic styling.
 
   ## Examples
@@ -494,5 +434,436 @@ defmodule ScullionWeb.CoreComponents do
   """
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
+  end
+
+  # ----------------------------------------------------------------------
+  # Design system primitives — see SPEC_FEAT_ui-redesign.md
+  # ----------------------------------------------------------------------
+
+  @doc ~S"""
+  Page container.
+
+      <.page><.page_header title="Week" /></.page>
+  """
+  attr :max_width, :atom, values: [:sm, :md, :lg, :xl], default: :lg
+  slot :inner_block, required: true
+
+  def page(assigns) do
+    ~H"""
+    <div class={["mx-auto w-full", page_max_class(@max_width)]}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  defp page_max_class(:sm), do: "max-w-md"
+  defp page_max_class(:md), do: "max-w-2xl"
+  defp page_max_class(:lg), do: "max-w-4xl"
+  defp page_max_class(:xl), do: "max-w-6xl"
+
+  @doc ~S"""
+  Page header with display title, optional subtitle, and right-aligned actions slot.
+
+      <.page_header title="Week" subtitle="Apr 27 — May 3, 2026">
+        <:actions><.button>Generate plan</.button></:actions>
+      </.page_header>
+  """
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :centered, :boolean, default: false
+  slot :actions
+
+  def page_header(assigns) do
+    ~H"""
+    <div class={[
+      "flex items-center gap-4 mb-6",
+      @centered && "justify-center text-center",
+      !@centered && "justify-between"
+    ]}>
+      <div>
+        <h1 class="font-semibold tracking-tight text-[var(--text)]" style="font-size: var(--t-h1); line-height: 1.2;">
+          {@title}
+        </h1>
+        <p :if={@subtitle} class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+          {@subtitle}
+        </p>
+      </div>
+      <div :if={@actions != []} class="flex items-center gap-2 shrink-0">
+        {render_slot(@actions)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc ~S"""
+  Card surface — white, rounded-2xl, soft shadow + 1px border.
+  Default container for screens in the draft-ui design.
+
+      <.card>…</.card>
+      <.card padded={false}>…</.card>
+  """
+  attr :padded, :boolean, default: true
+  attr :class, :string, default: nil
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def card(assigns) do
+    ~H"""
+    <div
+      class={[
+        "bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)]",
+        "shadow-[var(--shadow-card)]",
+        @padded && "p-5 md:p-6",
+        @class
+      ]}
+      style="--shadow-card: 0 1px 2px rgba(17,24,39,0.04), 0 1px 3px rgba(17,24,39,0.05);"
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc ~S"""
+  Section block with optional micro-label title.
+
+      <.section title="Produce">…</.section>
+  """
+  attr :title, :string, default: nil
+  slot :inner_block, required: true
+
+  def section(assigns) do
+    ~H"""
+    <section class="mb-6">
+      <h2
+        :if={@title}
+        class="mb-3 text-[color:var(--text)]"
+        style="font-size: var(--t-h2); font-weight: 600;"
+      >
+        {@title}
+      </h2>
+      {render_slot(@inner_block)}
+    </section>
+    """
+  end
+
+  @doc ~S"""
+  Flat list row.
+
+      <.row>
+        <:leading><img … /></:leading>
+        Roast chicken
+        <:trailing><.chip>6 servings</.chip></:trailing>
+      </.row>
+  """
+  attr :clickable, :boolean, default: false
+  attr :rest, :global, include: ~w(phx-click phx-value-id href)
+  slot :leading
+  slot :trailing
+  slot :inner_block, required: true
+
+  def row(assigns) do
+    ~H"""
+    <div
+      class={[
+        "flex items-center gap-3 px-4 min-h-[var(--tap-min)] py-3 border-b border-[color:var(--hairline)] last:border-b-0",
+        @clickable && "cursor-pointer hover:bg-[color:var(--accent-soft)]/40 -mx-4 rounded-[var(--r-md)]"
+      ]}
+      {@rest}
+    >
+      <div :if={@leading != []} class="shrink-0">{render_slot(@leading)}</div>
+      <div class="flex-1 min-w-0 text-[var(--text)]" style="font-size: var(--t-body);">
+        {render_slot(@inner_block)}
+      </div>
+      <div :if={@trailing != []} class="shrink-0">{render_slot(@trailing)}</div>
+    </div>
+    """
+  end
+
+  @doc ~S"""
+  Button. Variant: :primary (default), :ghost, :danger. Size: :md, :lg.
+
+      <.button>Save</.button>
+      <.button variant={:ghost} size={:lg} phx-click="cancel">Cancel</.button>
+  """
+  attr :variant, :atom, values: [:primary, :secondary, :ghost, :danger], default: :primary
+  attr :size, :atom, values: [:md, :lg, :xl], default: :md
+  attr :type, :string, default: "button"
+  attr :full, :boolean, default: false
+  attr :rest, :global, include: ~w(phx-click phx-value-id href disabled form name value phx-disable-with)
+  slot :inner_block, required: true
+
+  def button(assigns) do
+    ~H"""
+    <button
+      type={@type}
+      class={[
+        "inline-flex items-center justify-center gap-2 font-semibold rounded-[var(--r-lg)] transition-colors disabled:opacity-40 disabled:pointer-events-none",
+        button_size_class(@size),
+        button_variant_class(@variant),
+        @full && "w-full"
+      ]}
+      {@rest}
+    >
+      {render_slot(@inner_block)}
+    </button>
+    """
+  end
+
+  defp button_size_class(:md), do: "h-11 px-5 text-[length:var(--t-body)]"
+  defp button_size_class(:lg), do: "h-12 px-6 text-[length:var(--t-body)]"
+  defp button_size_class(:xl), do: "h-14 px-7 text-[length:var(--t-h2)]"
+
+  defp button_variant_class(:primary),
+    do: "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] shadow-[0_1px_2px_rgba(17,24,39,0.06)]"
+
+  defp button_variant_class(:secondary),
+    do: "bg-[var(--surface)] text-[var(--text)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]"
+
+  defp button_variant_class(:ghost),
+    do: "bg-transparent text-[color:var(--muted)] hover:text-[var(--text)]"
+
+  defp button_variant_class(:danger),
+    do: "bg-transparent text-[color:var(--danger)] hover:bg-red-50"
+
+  @doc ~S"""
+  Square 44px icon button.
+
+      <.icon_button icon="hero-x-mark" label="Close" phx-click="close" />
+  """
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :rest, :global, include: ~w(phx-click phx-value-id href)
+
+  def icon_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class="inline-flex items-center justify-center size-11 rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--border)] hover:text-[var(--text)]"
+      {@rest}
+    >
+      <.icon name={@icon} class="size-5" />
+      <span class="sr-only">{@label}</span>
+    </button>
+    """
+  end
+
+  @doc ~S"""
+  Underline-style text input.
+
+      <.field name="name" label="Name" value={@name} />
+  """
+  attr :id, :string, default: nil
+  attr :name, :string, required: true
+  attr :value, :string, default: ""
+  attr :type, :string, default: "text"
+  attr :label, :string, default: nil
+  attr :placeholder, :string, default: nil
+  attr :errors, :list, default: []
+  attr :rest, :global, include: ~w(required disabled autocomplete inputmode pattern)
+
+  def field(assigns) do
+    assigns = assign_new(assigns, :id, fn -> assigns.name end)
+
+    ~H"""
+    <label for={@id} class="block">
+      <span
+        :if={@label}
+        class="block mb-1.5 text-[color:var(--muted)]"
+        style="font-size: var(--t-meta); font-weight: 500;"
+      >
+        {@label}
+      </span>
+      <input
+        id={@id}
+        name={@name}
+        type={@type}
+        value={@value}
+        placeholder={@placeholder}
+        class={[
+          "w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none transition-colors",
+          @errors == [] && "border-[color:var(--border)] focus:border-[color:var(--accent)]",
+          @errors != [] && "border-[color:var(--danger)]"
+        ]}
+        style="font-size: var(--t-body);"
+        {@rest}
+      />
+      <p :for={err <- @errors} class="mt-1 text-[color:var(--danger)]" style="font-size: var(--t-meta);">
+        {err}
+      </p>
+    </label>
+    """
+  end
+
+  @doc ~S"""
+  Square 24px checkbox. Use as a button (not a real form input).
+
+      <.checkbox checked={item.checked} phx-click="toggle" phx-value-id={item.id} />
+  """
+  attr :checked, :boolean, default: false
+  attr :rest, :global, include: ~w(phx-click phx-value-id phx-value-item_id)
+
+  def checkbox(assigns) do
+    ~H"""
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={to_string(@checked)}
+      class={[
+        "inline-flex items-center justify-center size-6 rounded-[var(--r-sm)] border-2 transition-colors",
+        @checked && "bg-[color:var(--accent)] border-[color:var(--accent)] text-white",
+        !@checked && "bg-transparent border-[color:var(--subtle)] hover:border-[color:var(--accent)]"
+      ]}
+      {@rest}
+    >
+      <.icon :if={@checked} name="hero-check-mini" class="size-4" />
+    </button>
+    """
+  end
+
+  @doc ~S"""
+  Pill chip. Tone: :neutral (default), :accent, :muted.
+
+      <.chip tone={:accent}>Today</.chip>
+  """
+  attr :tone, :atom, values: [:neutral, :accent, :muted, :warn], default: :accent
+  attr :icon, :string, default: nil
+  slot :inner_block, required: true
+
+  def chip(assigns) do
+    ~H"""
+    <span
+      class={[
+        "inline-flex items-center gap-1.5 px-2.5 h-7 rounded-[var(--r-pill)]",
+        chip_tone_class(@tone)
+      ]}
+      style="font-size: var(--t-meta); font-weight: 500;"
+    >
+      <.icon :if={@icon} name={@icon} class="size-3.5" />
+      {render_slot(@inner_block)}
+    </span>
+    """
+  end
+
+  defp chip_tone_class(:neutral), do: "bg-[color:var(--hairline)] text-[var(--text)]"
+  defp chip_tone_class(:accent), do: "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]"
+  defp chip_tone_class(:warn), do: "bg-[color:var(--warn-soft)] text-[#9a4a13]"
+  defp chip_tone_class(:muted), do: "bg-transparent text-[color:var(--muted)]"
+
+  @doc ~S"""
+  Tab strip with underline-on-active (Ingredients · Instructions · Notes).
+  Pure stateless render — caller wires up phx-click and `active`.
+
+      <.tabs items={[%{id: "ing", label: "Ingredients"}, ...]} active="ing" event="set_tab" />
+  """
+  attr :items, :list, required: true
+  attr :active, :string, required: true
+  attr :event, :string, default: "set_tab"
+  attr :param, :string, default: "tab"
+
+  def tabs(assigns) do
+    ~H"""
+    <div class="flex items-center gap-1 border-b border-[color:var(--border)]">
+      <button
+        :for={item <- @items}
+        type="button"
+        phx-click={@event}
+        phx-value-tab={item.id}
+        class={[
+          "h-11 px-4 -mb-px border-b-2 transition-colors",
+          item.id == @active && "text-[var(--text)] border-[color:var(--accent)]",
+          item.id != @active && "text-[color:var(--muted)] border-transparent hover:text-[var(--text)]"
+        ]}
+        style="font-size: var(--t-body); font-weight: 500;"
+      >
+        {item.label}
+      </button>
+    </div>
+    """
+  end
+
+  @doc ~S"""
+  Photo + title + meta tile, used in recipe grids and weekly planner.
+
+      <.tile image={@recipe.image_url} title={@recipe.title}>
+        <:meta><.icon name="hero-clock" class="size-4" /> 30 min</:meta>
+      </.tile>
+  """
+  attr :image, :string, default: nil
+  attr :title, :string, required: true
+  attr :rest, :global, include: ~w(phx-click phx-value-id href)
+  slot :meta
+  slot :overlay
+
+  def tile(assigns) do
+    ~H"""
+    <button
+      type="button"
+      class="group block w-full text-left"
+      {@rest}
+    >
+      <div class="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--r-xl)] bg-[color:var(--hairline)]">
+        <img
+          :if={@image}
+          src={@image}
+          alt=""
+          class="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
+        />
+        <div :if={!@image} class="h-full w-full flex items-center justify-center text-[color:var(--subtle)]">
+          <.icon name="hero-photo" class="size-8" />
+        </div>
+        <div :if={@overlay != []} class="absolute inset-0">{render_slot(@overlay)}</div>
+      </div>
+      <div class="mt-3">
+        <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-body);">{@title}</p>
+        <div :if={@meta != []} class="mt-1 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+          {render_slot(@meta)}
+        </div>
+      </div>
+    </button>
+    """
+  end
+
+  @doc ~S"""
+  Empty-state line.
+
+      <.empty message="No items" />
+  """
+  attr :message, :string, required: true
+
+  def empty(assigns) do
+    ~H"""
+    <p class="text-center py-8 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+      {@message}
+    </p>
+    """
+  end
+
+  @doc ~S"""
+  Right-side slide-over drawer.
+
+      <.drawer id="swap" show={@open} on_close={JS.push("close")}>…</.drawer>
+  """
+  attr :id, :string, required: true
+  attr :show, :boolean, default: false
+  attr :on_close, JS, default: %JS{}
+  slot :inner_block, required: true
+
+  def drawer(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={["fixed inset-0 z-50", !@show && "hidden"]}
+      aria-hidden={to_string(!@show)}
+    >
+      <div class="absolute inset-0 bg-black/30" phx-click={@on_close}></div>
+      <aside class="absolute right-0 top-0 h-full w-full max-w-[420px] bg-[var(--surface)] shadow-xl overflow-y-auto">
+        <div class="flex justify-end p-2 border-b border-[color:var(--border)]">
+          <.icon_button icon="hero-x-mark" label="Close" phx-click={@on_close} />
+        </div>
+        <div class="p-4">{render_slot(@inner_block)}</div>
+      </aside>
+    </div>
+    """
   end
 end

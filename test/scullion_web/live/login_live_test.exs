@@ -27,7 +27,7 @@ defmodule ScullionWeb.LoginLiveTest do
       render_click(lv, "digit", %{"value" => "1"})
       render_click(lv, "digit", %{"value" => "2"})
       html = render_click(lv, "digit", %{"value" => "3"})
-      assert length(Regex.scan(~r/●/, html)) == 3
+      assert length(Regex.scan(~r/data-digit-filled/, html)) == 3
     end
 
     test "backspace removes last digit", %{conn: conn} do
@@ -35,7 +35,7 @@ defmodule ScullionWeb.LoginLiveTest do
       render_click(lv, "digit", %{"value" => "1"})
       render_click(lv, "digit", %{"value" => "2"})
       html = render_click(lv, "backspace", %{})
-      assert length(Regex.scan(~r/●/, html)) == 1
+      assert length(Regex.scan(~r/data-digit-filled/, html)) == 1
     end
 
     test "does not exceed 16 digits", %{conn: conn} do
@@ -46,7 +46,7 @@ defmodule ScullionWeb.LoginLiveTest do
       end
 
       html = render(lv)
-      assert length(Regex.scan(~r/●/, html)) == 16
+      assert length(Regex.scan(~r/data-digit-filled/, html)) == 16
     end
   end
 

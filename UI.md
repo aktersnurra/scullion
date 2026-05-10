@@ -4,34 +4,42 @@
 
 **Principles**
 
-* High contrast, low color
+* Light theme, high contrast, low color
 * Typography does most of the work
 * Big targets (kiosk-first)
 * No cards unless necessary
-* No shadows, almost no borders
+* No shadows, hairline borders only
 
-**Palette**
+**Palette** (CSS vars, see `assets/css/app.css`)
 
-* Background: `#0f1115`
-* Surface: `#151821`
-* Text: `#e8eaf0`
-* Muted: `#9aa3b2`
-* Accent: `#b7ff6a` (only for “active / checked / today”)
+* Background: `#fafafa` (`--bg`)
+* Surface: `#ffffff` (`--surface`)
+* Text: `#111827` (`--text`)
+* Muted: `#6b7280` (`--muted`)
+* Subtle: `#9ca3af` (`--subtle`)
+* Border: `#f3f4f6` (`--border`)
+* Accent: `#16a34a` green-600 (`--accent`) — checked / today / primary CTA
+* Accent soft: `#dcfce7` (`--accent-soft`) — chips, hover fills
+* Danger: `#dc2626` (`--danger`) — destructive only
+
+Dark mode is out of scope for the MVP.
 
 **Typography**
 
 * System font stack
-* Large scale:
+* Scale (`--t-*`):
 
-  * 32px → headers (kiosk)
-  * 20px → primary actions
-  * 16px → normal
-  * 14px → metadata
+  * 32px → page hero (`--t-display`)
+  * 24px → section title (`--t-h1`)
+  * 18px → row title / large CTA (`--t-h2`)
+  * 16px → body (`--t-body`)
+  * 14px → metadata (`--t-meta`)
+  * 12px uppercase → micro labels (`--t-micro`)
 
 **Spacing**
 
-* 8px grid
-* Generous padding (kiosk finger-first)
+* 8px grid (allowed: 4, 8, 12, 16, 20, 24, 32, 48)
+* Tap targets: 44px min, primary CTAs 48–56px
 
 ---
 
@@ -45,8 +53,9 @@ Just:
 [ Week ] [ Groceries ] [ Prep ] [ Pantry ] [ Costs ] [ Settings ]
 ```
 
-* Top horizontal strip (kiosk)
-* Bottom sticky (mobile)
+* Top horizontal strip 56px (kiosk / desktop)
+* Fixed bottom strip with icon + label (mobile)
+* Active item: green text + green underline (top) / green icon (bottom)
 
 ---
 
@@ -284,42 +293,20 @@ Enter code
 
 # 🧩 Component primitives
 
-You really only need ~6:
+Live in `lib/scullion_web/components/core_components.ex`. Use these
+instead of inlining Tailwind.
 
-### 1. Row
-
-```
-[label.................value]
-```
-
-### 2. Section
-
-```
-Title
-------
-content
-```
-
-### 3. Button
-
-* Text only or subtle outline
-* No gradients
-
-### 4. Input (rare)
-
-* Underline style, not boxed
-
-### 5. List
-
-* Flat, no cards
-
-### 6. Drawer (important)
-
-Used for:
-
-* recipe details
-* editing
-* swap flows
+* `<.page>` — outer container, max-width
+* `<.page_header title=… subtitle=…>` with `:actions` slot
+* `<.section title=…>` — micro-label + content, no card
+* `<.row>` — flat list row, slots: `:leading`, `:trailing`
+* `<.button variant={:primary | :ghost | :danger} size={:md | :lg}>`
+* `<.icon_button icon=… label=…>` — square 44px
+* `<.field name=… label=…>` — underline input
+* `<.checkbox checked=…>` — square 24px, green when checked
+* `<.chip tone={:neutral | :accent | :muted}>` — pill
+* `<.empty message=…>` — single muted line
+* `<.drawer id=… show=… on_close=…>` — right-side slide-over
 
 ---
 
@@ -350,8 +337,4 @@ Used for:
 
 ---
 
-If you want next step, I can:
-
-* turn this into **actual Phoenix LiveView components**
-* or design the **planner + grocery LiveViews in code (HEEx + Tailwind)**
 

@@ -5,21 +5,17 @@ defmodule ScullionWeb.PlannerLive do
   alias Phoenix.PubSub
 
   @days ~w[mon tue wed thu fri sat sun]
-  @meals ~w[dinner lunch]
 
   def mount(_params, _session, socket) do
     today = Date.utc_today()
     week_start = week_start(today)
     plan_id = plan_id(week_start)
-    list_id = grocery_id(week_start)
 
     if connected?(socket) do
       PubSub.subscribe(Scullion.PubSub, "plan")
-      PubSub.subscribe(Scullion.PubSub, "grocery_list")
     end
 
     {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
-    {:ok, grocery_state} = GroceriesHandler.load_list(list_id)
     recipes = Recipes.list(sort: :alphabetical)
 
     {:ok,
@@ -27,33 +23,10 @@ defmodule ScullionWeb.PlannerLive do
        today: today,
        week_start: week_start,
        plan_id: plan_id,
-       list_id: list_id,
        plan_state: plan_state,
-       grocery_state: grocery_state,
        recipes: recipes,
-       view: :today,
-       show_lunch: false,
        slot_action: nil
      )}
-  end
-
-  def handle_event("switch_view", %{"view" => view}, socket) do
-    {:noreply, assign(socket, view: String.to_existing_atom(view))}
-  end
-
-  def handle_event("check_item", %{"item_id" => id}, socket) do
-    GroceriesHandler.check_item(socket.assigns.list_id, id, socket.assigns.current_user.id)
-    {:noreply, socket}
-  end
-
-  def handle_event("uncheck_item", %{"item_id" => id}, socket) do
-    GroceriesHandler.uncheck_item(socket.assigns.list_id, id, socket.assigns.current_user.id)
-    {:noreply, socket}
-  end
-
-  def handle_event("add_grocery_item", %{"name" => name}, socket) do
-    GroceriesHandler.add_item(socket.assigns.list_id, name, nil, nil, socket.assigns.current_user.id)
-    {:noreply, socket}
   end
 
   def handle_event("prev_week", _params, socket) do
@@ -66,478 +39,381 @@ defmodule ScullionWeb.PlannerLive do
     {:noreply, load_week(socket, week_start)}
   end
 
-  def handle_event("toggle_lunch", _params, socket) do
-    {:noreply, update(socket, :show_lunch, &(!&1))}
+  def handle_event("open_slot", %{"slot_key" => sk}, socket) do
+    slot = Map.get(socket.assigns.plan_state.slots, sk)
+
+    initial = %{
+      slot_key: sk,
+      search: "",
+      suggestions: [],
+      loading_suggestions: true,
+      selected_recipe_id: slot && slot.recipe_id,
+      servings: (slot && slot.servings) || 4,
+      leftover_days: MapSet.new(),
+      skipped: (slot && slot.skipped) || false
+    }
+
+    parent = self()
+    plan_id = socket.assigns.plan_id
+
+    Task.start(fn ->
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5) do
+        {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
+        _ -> send(parent, {:suggestions_loaded, sk, []})
+      end
+    end)
+
+    {:noreply, assign(socket, slot_action: initial)}
   end
 
-  def handle_event("slot_action", %{"slot_key" => sk, "action" => action}, socket) do
-    {:noreply, assign(socket, slot_action: %{slot_key: sk, action: action})}
+  def handle_event("close_slot", _params, socket), do: {:noreply, assign(socket, slot_action: nil)}
+
+  def handle_event("search_slot_recipes", %{"q" => q}, socket) do
+    {:noreply, update_slot(socket, fn s -> %{s | search: q} end)}
   end
 
-  def handle_event("close_slot_action", _params, socket) do
-    {:noreply, assign(socket, slot_action: nil)}
+  def handle_event("pick_recipe", %{"id" => rid}, socket) do
+    rid = String.to_integer(rid)
+    recipe = Enum.find(socket.assigns.recipes, &(&1.id == rid))
+
+    {:noreply,
+     update_slot(socket, fn s ->
+       %{s | selected_recipe_id: rid, servings: s.servings || (recipe && recipe.base_servings) || 4}
+     end)}
   end
 
-  def handle_event("assign_recipe", %{"slot_key" => sk, "recipe_id" => rid, "servings" => sv}, socket) do
-    recipe_id = String.to_integer(rid)
-    servings = String.to_integer(sv)
-    PlanningHandler.assign_recipe(socket.assigns.plan_id, sk, recipe_id, servings)
-    {:noreply, assign(socket, slot_action: nil)}
+  def handle_event("inc_servings", _, socket) do
+    {:noreply, update_slot(socket, fn s -> %{s | servings: min((s.servings || 1) + 1, 12)} end)}
   end
 
-  def handle_event("remove_recipe", %{"slot_key" => sk}, socket) do
-    PlanningHandler.remove_recipe(socket.assigns.plan_id, sk)
-    {:noreply, assign(socket, slot_action: nil)}
+  def handle_event("dec_servings", _, socket) do
+    {:noreply, update_slot(socket, fn s -> %{s | servings: max((s.servings || 1) - 1, 1)} end)}
   end
 
-  def handle_event("set_servings", %{"slot_key" => sk, "servings" => sv}, socket) do
-    PlanningHandler.set_servings(socket.assigns.plan_id, sk, String.to_integer(sv))
-    {:noreply, socket}
+  def handle_event("toggle_leftover_day", %{"day" => d}, socket) do
+    {:noreply,
+     update_slot(socket, fn s ->
+       new =
+         if MapSet.member?(s.leftover_days, d),
+           do: MapSet.delete(s.leftover_days, d),
+           else: MapSet.put(s.leftover_days, d)
+
+       %{s | leftover_days: new}
+     end)}
   end
 
-  def handle_event("skip_meal", %{"slot_key" => sk}, socket) do
-    PlanningHandler.skip_meal(socket.assigns.plan_id, sk)
-    {:noreply, assign(socket, slot_action: nil)}
+  def handle_event("toggle_skipped", _, socket) do
+    {:noreply, update_slot(socket, fn s -> %{s | skipped: !s.skipped} end)}
   end
 
-  def handle_event("mark_leftover", %{"slot_key" => sk}, socket) do
-    PlanningHandler.mark_leftover(socket.assigns.plan_id, sk)
-    {:noreply, assign(socket, slot_action: nil)}
-  end
+  def handle_event("save_slot", _, socket) do
+    s = socket.assigns.slot_action
+    plan_id = socket.assigns.plan_id
 
-  def handle_event("pin_slot", %{"slot_key" => sk, "recipe_id" => rid}, socket) do
-    pin = %{type: :recipe, recipe_id: String.to_integer(rid)}
-    PlanningHandler.pin_slot(socket.assigns.plan_id, sk, pin)
-    {:noreply, assign(socket, slot_action: nil)}
-  end
+    cond do
+      s.skipped ->
+        # Skip requires the slot to exist; if there's nothing assigned, just close.
+        slot = Map.get(socket.assigns.plan_state.slots, s.slot_key)
+        if slot, do: PlanningHandler.skip_meal(plan_id, s.slot_key)
+        {:noreply, assign(socket, slot_action: nil)}
 
-  def handle_event("unpin_slot", %{"slot_key" => sk}, socket) do
-    PlanningHandler.unpin_slot(socket.assigns.plan_id, sk)
-    {:noreply, socket}
-  end
+      s.selected_recipe_id ->
+        PlanningHandler.assign_with_leftovers(
+          plan_id,
+          s.slot_key,
+          s.selected_recipe_id,
+          s.servings,
+          MapSet.to_list(s.leftover_days)
+        )
 
-  def handle_event("generate_plan", _params, socket) do
-    %{plan_id: plan_id, week_start: week_start} = socket.assigns
+        {:noreply, assign(socket, slot_action: nil)}
 
-    case PlanningHandler.generate_plan(plan_id, week_start) do
-      {:ok, _events} -> {:noreply, socket}
-      {:error, :budget_exceeded} -> {:noreply, put_flash(socket, :error, "Monthly LLM budget reached")}
-      {:error, :cooldown} -> {:noreply, put_flash(socket, :error, "Please wait a moment before generating again")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Plan generation failed")}
+      true ->
+        {:noreply, socket}
     end
   end
 
-  def handle_event("build_grocery_list", _params, socket) do
-    %{plan_state: plan_state, week_start: week_start} = socket.assigns
-    list_id = grocery_id(week_start)
+  def handle_event("regenerate_suggestion", _, socket) do
+    s = socket.assigns.slot_action
+    plan_id = socket.assigns.plan_id
+    parent = self()
+    sk = s.slot_key
+
+    Task.start(fn ->
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, include_llm: true) do
+        {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
+        {:error, reason} -> send(parent, {:suggestion_error, sk, reason})
+      end
+    end)
+
+    {:noreply, update_slot(socket, fn s -> %{s | loading_suggestions: true} end)}
+  end
+
+  def handle_event("remove_meal", %{"slot_key" => sk}, socket) do
+    PlanningHandler.remove_recipe(socket.assigns.plan_id, sk)
+    {:noreply, socket}
+  end
+
+  defp update_slot(socket, fun) do
+    case socket.assigns.slot_action do
+      nil -> socket
+      s -> assign(socket, slot_action: fun.(s))
+    end
+  end
+
+  defp rebuild_grocery_list(socket) do
+    %{week_start: week_start} = socket.assigns
+    {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
 
     recipe_ids =
       plan_state.slots
       |> Map.values()
+      |> Enum.reject(&(&1.skipped || &1.leftover))
       |> Enum.map(& &1.recipe_id)
       |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
 
-    GroceriesHandler.build_list(list_id, week_start, recipe_ids)
-    {:noreply, socket}
+    if recipe_ids != [] do
+      GroceriesHandler.build_list(grocery_id(week_start), week_start, recipe_ids)
+    end
+
+    socket
   end
 
   def handle_info({:events, _events}, socket) do
     {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
-    {:ok, grocery_state} = GroceriesHandler.load_list(socket.assigns.list_id)
-    {:noreply, assign(socket, plan_state: plan_state, grocery_state: grocery_state)}
+    rebuild_grocery_list(socket)
+    {:noreply, assign(socket, plan_state: plan_state)}
+  end
+
+  def handle_info({:suggestions_loaded, sk, suggestions}, socket) do
+    case socket.assigns.slot_action do
+      %{slot_key: ^sk} = s ->
+        {:noreply,
+         assign(socket, slot_action: %{s | suggestions: suggestions, loading_suggestions: false})}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info({:suggestion_error, sk, reason}, socket) do
+    case socket.assigns.slot_action do
+      %{slot_key: ^sk} = s ->
+        msg =
+          case reason do
+            :budget_exceeded -> "Monthly LLM budget reached"
+            :cooldown -> "Please wait a moment before trying again"
+            _ -> "Couldn't fetch a new suggestion"
+          end
+
+        {:noreply,
+         socket
+         |> put_flash(:error, msg)
+         |> assign(slot_action: %{s | loading_suggestions: false})}
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def render(assigns) do
     assigns =
       assign(assigns,
         days: @days,
-        meals: @meals,
         week_end: Date.add(assigns.week_start, 6),
-        today_day: today_day_key(assigns.today, assigns.week_start),
-        today_slot: today_dinner_slot(assigns.plan_state, assigns.today, assigns.week_start),
-        grocery_items: sorted_grocery_items(assigns.grocery_state.items)
+        week_number: week_number(assigns.week_start)
       )
 
     ~H"""
-    <div>
-      <%= if @view == :today do %>
-        <.today_view
-          today={@today}
-          today_slot={@today_slot}
-          recipes={@recipes}
-          grocery_items={@grocery_items}
-          plan_state={@plan_state}
-          week_start={@week_start}
-        />
-      <% else %>
-        <.week_view
-          week_start={@week_start}
-          week_end={@week_end}
-          days={@days}
-          today={@today}
-          plan_state={@plan_state}
-          recipes={@recipes}
-          slot_action={@slot_action}
-          show_lunch={@show_lunch}
-        />
-        <%= if @slot_action do %>
-          <.slot_modal slot_action={@slot_action} plan_state={@plan_state} recipes={@recipes} />
-        <% end %>
-      <% end %>
-    </div>
-    """
-  end
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/"}>
+    <.page max_width={:md}>
+      <header class="flex items-center justify-between gap-4 mb-5">
+        <button
+          type="button"
+          phx-click="prev_week"
+          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+          aria-label="Previous week"
+        >
+          <.icon name="hero-chevron-left" class="size-5" />
+        </button>
 
-  attr :today, :any, required: true
-  attr :today_slot, :any, required: true
-  attr :recipes, :list, required: true
-  attr :grocery_items, :list, required: true
-  attr :plan_state, :any, required: true
-  attr :week_start, :any, required: true
-
-  defp today_view(assigns) do
-    recipe = recipe_by_id(assigns.recipes, assigns.today_slot[:recipe_id])
-    assigns = assign(assigns, recipe: recipe)
-
-    ~H"""
-    <div class="min-h-[calc(100vh-3.5rem)] flex items-center justify-center p-6">
-      <div class="flex gap-6 w-full max-w-3xl">
-        <%!-- Today card --%>
-        <div class="flex-1 bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-          <%!-- Top bar with calendar nav --%>
-          <div class="flex items-center justify-between px-5 pt-5 pb-0">
-            <button phx-click="switch_view" phx-value-view="week"
-                    class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400"
-                    title="Week view">
-              <.icon name="hero-calendar-days" class="w-5 h-5" />
-            </button>
-            <div class="text-xs font-semibold uppercase tracking-widest text-gray-400">
-              <%= Calendar.strftime(@today, "%A, %B %-d") %>
-            </div>
-            <div class="w-8" />
-          </div>
-
-          <div class="p-6 pt-4 pb-4">
-            <%= if @recipe do %>
-              <h1 class="text-3xl font-bold text-gray-900 mb-4 leading-tight"><%= @recipe.title %></h1>
-              <div class="space-y-2 mb-2">
-                <%= if @today_slot[:servings] do %>
-                  <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <.icon name="hero-user-group" class="w-4 h-4" />
-                    <span><%= @today_slot[:servings] %> servings</span>
-                  </div>
-                <% end %>
-                <%= if @today_slot[:leftover] do %>
-                  <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <.icon name="hero-arrow-path" class="w-4 h-4" />
-                    <span>Leftovers tomorrow</span>
-                  </div>
-                <% end %>
-              </div>
-            <% else %>
-              <h1 class="text-2xl font-bold text-gray-300 mb-4">No dinner planned</h1>
-            <% end %>
-          </div>
-
-          <%= if @recipe && @recipe.image_path do %>
-            <img src={@recipe.image_path} class="w-full h-52 object-cover" />
-          <% else %>
-            <div class="w-full h-52 bg-gray-50 flex items-center justify-center">
-              <.icon name="hero-fire" class="w-12 h-12 text-gray-200" />
-            </div>
-          <% end %>
-
-          <div class="p-6 pt-4">
-            <%= if @recipe && @recipe.source_url do %>
-              <a href={@recipe.source_url} target="_blank"
-                 class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl py-3.5 font-semibold text-sm transition-colors">
-                <.icon name="hero-fire" class="w-4 h-4" /> Start cooking
-              </a>
-            <% else %>
-              <button class="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl py-3.5 font-semibold text-sm">
-                <.icon name="hero-fire" class="w-4 h-4" /> Start cooking
-              </button>
-            <% end %>
-          </div>
+        <div class="text-center">
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">This week</h1>
+          <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+            {plan_subtitle(@plan_state, @week_start, @week_end)}
+          </p>
         </div>
 
-        <%!-- Grocery list panel --%>
-        <div class="w-64 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-          <div class="p-5 pb-3 flex items-center justify-between">
-            <h2 class="font-semibold text-gray-900">Grocery list</h2>
-            <%= if Enum.any?(@grocery_items, & !&1.checked) do %>
-              <span class="bg-gray-900 text-white text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center">
-                <%= Enum.count(@grocery_items, & !&1.checked) %>
-              </span>
-            <% end %>
-          </div>
+        <button
+          type="button"
+          phx-click="next_week"
+          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+          aria-label="Next week"
+        >
+          <.icon name="hero-chevron-right" class="size-5" />
+        </button>
+      </header>
 
-          <div class="flex-1 overflow-y-auto px-3 pb-2">
-            <%= if @grocery_items == [] do %>
-              <p class="text-xs text-gray-400 text-center py-6">No items yet</p>
-            <% else %>
-              <ul class="space-y-0.5">
-                <%= for item <- @grocery_items do %>
-                  <li class="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50">
-                    <button
-                      phx-click={if item.checked, do: "uncheck_item", else: "check_item"}
-                      phx-value-item_id={item.id}
-                      class="shrink-0"
-                    >
-                      <div class={[
-                        "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
-                        item.checked && "bg-green-500 border-green-500",
-                        !item.checked && "border-gray-300"
-                      ]}>
-                        <%= if item.checked do %>
-                          <.icon name="hero-check" class="w-3 h-3 text-white" />
-                        <% end %>
-                      </div>
-                    </button>
-                    <span class={["flex-1 text-sm", item.checked && "line-through text-gray-400", !item.checked && "text-gray-700"]}>
-                      <%= item.name %>
-                    </span>
-                  </li>
-                <% end %>
-              </ul>
-            <% end %>
-          </div>
-
-          <div class="px-3 pb-4 pt-2 border-t border-gray-50">
-            <form phx-submit="add_grocery_item" class="flex items-center gap-2">
-              <input type="text" name="name" placeholder="Add item" required
-                     class="flex-1 text-sm text-gray-700 placeholder-gray-400 border-0 focus:outline-none bg-transparent py-2" />
-              <button type="submit" class="text-gray-400 hover:text-gray-600">
-                <.icon name="hero-plus" class="w-4 h-4" />
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr :week_start, :any, required: true
-  attr :week_end, :any, required: true
-  attr :days, :list, required: true
-  attr :plan_state, :any, required: true
-  attr :recipes, :list, required: true
-  attr :slot_action, :any, required: true
-  attr :show_lunch, :boolean, required: true
-  attr :today, :any, required: true
-
-  defp week_view(assigns) do
-    ~H"""
-    <div class="max-w-2xl mx-auto px-4 py-6">
-      <%!-- Header --%>
-      <div class="flex items-center justify-between mb-5">
-        <div class="flex items-center gap-2">
-          <button phx-click="switch_view" phx-value-view="today"
-                  class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400"
-                  title="Back to today">
-            <.icon name="hero-calendar-days" class="w-5 h-5" />
-          </button>
-          <button phx-click="prev_week"
-                  class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400">
-            <.icon name="hero-chevron-left" class="w-4 h-4" />
-          </button>
-          <div class="text-center">
-            <div class="font-semibold text-gray-900">This week</div>
-            <div class="text-xs text-gray-400">
-              <%= Calendar.strftime(@week_start, "%b %-d") %> – <%= Calendar.strftime(@week_end, "%b %-d, %Y") %>
-            </div>
-          </div>
-          <button phx-click="next_week"
-                  class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400">
-            <.icon name="hero-chevron-right" class="w-4 h-4" />
-          </button>
-        </div>
-        <div class="flex items-center gap-2">
-          <button phx-click="build_grocery_list"
-                  class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
-            Build grocery list
-          </button>
-          <button phx-click="generate_plan"
-                  class="flex items-center gap-1.5 px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium">
-            <.icon name="hero-sparkles" class="w-4 h-4" /> Generate plan
-          </button>
-        </div>
-      </div>
-
-      <%!-- Week dots --%>
-      <div class="flex justify-center gap-2 mb-5">
-        <%= for {day, i} <- Enum.with_index(@days) do %>
-          <% date = Date.add(@week_start, i) %>
-          <% is_today = date == @today %>
-          <% has_recipe = Map.get(@plan_state.slots, "#{day}_dinner") |> then(& &1 && &1.recipe_id) %>
-          <div class={[
-            "w-2 h-2 rounded-full transition-colors",
-            is_today && "bg-green-500",
-            !is_today && has_recipe && "bg-gray-400",
-            !is_today && !has_recipe && "bg-gray-200"
-          ]} title={Calendar.strftime(date, "%A")} />
-        <% end %>
-      </div>
-
-      <%!-- Day list --%>
-      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden divide-y divide-gray-50">
-        <%= for {day, i} <- Enum.with_index(@days) do %>
-          <% date = Date.add(@week_start, i) %>
-          <% is_today = date == @today %>
-          <.week_row
+      <.card padded={false}>
+        <ul class="divide-y divide-[color:var(--hairline)]">
+          <.day_row
+            :for={{day, i} <- Enum.with_index(@days)}
             day={day}
-            date={date}
-            is_today={is_today}
+            date={Date.add(@week_start, i)}
+            today={@today}
             slot_key={"#{day}_dinner"}
-            meal="Dinner"
             plan_state={@plan_state}
             recipes={@recipes}
-            slot_action={@slot_action}
+            days={@days}
           />
-          <%= if @show_lunch do %>
-            <.week_row
-              day={day}
-              date={date}
-              is_today={false}
-              slot_key={"#{day}_lunch"}
-              meal="Lunch"
-              plan_state={@plan_state}
-              recipes={@recipes}
-              slot_action={@slot_action}
-            />
-          <% end %>
-        <% end %>
-      </div>
+        </ul>
 
-      <%!-- Footer --%>
-      <div class="mt-4 flex items-center justify-between text-xs text-gray-400 px-1">
-        <button phx-click="toggle_lunch" class="hover:text-gray-600">
-          <%= if @show_lunch, do: "Hide lunch", else: "Show lunch" %>
-        </button>
-        <.plan_summary plan_state={@plan_state} recipes={@recipes} />
-      </div>
-    </div>
+        <p class="px-6 py-4 text-center text-[color:var(--subtle)]" style="font-size: var(--t-meta);">
+          Swipe left to right to see other weeks
+        </p>
+      </.card>
+
+      <.slot_modal
+        :if={@slot_action}
+        slot_action={@slot_action}
+        plan_state={@plan_state}
+        recipes={@recipes}
+      />
+    </.page>
+    </Layouts.app>
     """
   end
 
   attr :day, :string, required: true
   attr :date, :any, required: true
-  attr :is_today, :boolean, required: true
+  attr :today, :any, required: true
   attr :slot_key, :string, required: true
-  attr :meal, :string, required: true
   attr :plan_state, :any, required: true
   attr :recipes, :list, required: true
-  attr :slot_action, :any, required: true
+  attr :days, :list, required: true
 
-  defp week_row(assigns) do
+  defp day_row(assigns) do
     slot = Map.get(assigns.plan_state.slots, assigns.slot_key)
     recipe = recipe_by_id(assigns.recipes, slot[:recipe_id])
-    leftover_days = leftover_label(assigns.plan_state, assigns.slot_key, assigns.day)
-    assigns = assign(assigns, slot: slot, recipe: recipe, leftover_days: leftover_days)
+    is_today = assigns.date == assigns.today
+    assigns = assign(assigns, slot: slot, recipe: recipe, is_today: is_today)
 
     ~H"""
-    <div
-      class={[
-        "flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors",
-        @slot && @slot.skipped && "opacity-40"
-      ]}
-      phx-click="slot_action"
-      phx-value-slot_key={@slot_key}
-      phx-value-action="menu"
-    >
-      <%!-- Day label --%>
-      <div class="w-12 shrink-0">
-        <div class={["text-xs font-medium uppercase tracking-wide", @is_today && "text-green-600", !@is_today && "text-gray-400"]}>
-          <%= String.upcase(@day) %>
+    <li class={[
+      "grid grid-cols-[56px_80px_1fr_auto_auto] items-center gap-4 px-5 py-3 transition-colors group",
+      @slot && @slot.skipped && "opacity-50"
+    ]}>
+      <button
+        type="button"
+        phx-click="open_slot"
+        phx-value-slot_key={@slot_key}
+        aria-label="Edit meal"
+        class="contents text-left"
+      >
+        <div class="flex flex-col items-center">
+          <div
+            class={[
+              "uppercase tracking-wide font-medium leading-none",
+              !@is_today && "text-[color:var(--subtle)]",
+              @is_today && "text-[color:var(--accent)]"
+            ]}
+            style="font-size: 11px;"
+          >
+            {Calendar.strftime(@date, "%a")}
+          </div>
+          <div
+            class={[
+              "font-semibold leading-none mt-1.5",
+              @is_today && "text-[color:var(--accent)]",
+              !@is_today && "text-[var(--text)]"
+            ]}
+            style="font-size: 22px;"
+          >
+            {Calendar.strftime(@date, "%-d")}
+          </div>
+          <div :if={@is_today} class="mt-1 text-[color:var(--accent)] font-medium leading-none" style="font-size: 11px;">
+            Today
+          </div>
         </div>
-        <div class={["text-xl font-bold leading-tight", @is_today && "text-green-600", !@is_today && "text-gray-800"]}>
-          <%= Calendar.strftime(@date, "%-d") %>
-        </div>
-        <%= if @is_today do %>
-          <div class="text-xs text-green-500 font-medium">Today</div>
-        <% end %>
-      </div>
 
-      <%!-- Thumbnail --%>
-      <%= if @recipe && @recipe.image_path do %>
-        <img src={@recipe.image_path} class="w-16 h-16 rounded-xl object-cover shrink-0" />
-      <% else %>
         <div class={[
-          "w-16 h-16 rounded-xl shrink-0 flex items-center justify-center",
-          @slot && "bg-gray-100",
-          !@slot && "bg-gray-50 border-2 border-dashed border-gray-200"
+          "h-[60px] w-20 rounded-[var(--r-lg)] overflow-hidden flex items-center justify-center text-[color:var(--subtle)]",
+          @recipe && "bg-[color:var(--hairline)]",
+          !@recipe && "bg-transparent border border-dashed border-[color:var(--border)]"
         ]}>
+          <img :if={@recipe && @recipe.image_path} src={@recipe.image_path} alt="" class="h-full w-full object-cover" />
+          <.icon :if={@recipe && !@recipe.image_path} name="hero-photo" class="size-6" />
+          <.icon :if={!@recipe} name="hero-plus" class="size-5" />
+        </div>
+
+        <div class="min-w-0">
           <%= cond do %>
+            <% @recipe -> %>
+              <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">
+                {@recipe.title}
+              </p>
+              <div class="mt-1 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                <span :if={@slot.servings} class="inline-flex items-center gap-1">
+                  <.icon name="hero-user-group" class="size-3.5" /> {@slot.servings} servings
+                </span>
+                <span :if={@slot.leftover} class="inline-flex items-center gap-1">
+                  <.icon name="hero-arrow-uturn-right" class="size-3.5" /> Uses leftovers
+                </span>
+              </div>
             <% @slot && @slot.leftover -> %>
-              <.icon name="hero-arrow-path" class="w-5 h-5 text-amber-400" />
+              <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">Leftovers</p>
             <% @slot && @slot.skipped -> %>
-              <.icon name="hero-x-mark" class="w-5 h-5 text-gray-400" />
-            <% @slot -> %>
-              <.icon name="hero-fire" class="w-5 h-5 text-gray-300" />
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">Skipped</p>
             <% true -> %>
-              <.icon name="hero-plus" class="w-5 h-5 text-gray-300" />
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">— add a meal</p>
           <% end %>
         </div>
+
+        <.chip :if={leftover_target(@plan_state, @days, @date) != nil} tone={:accent}>
+          Leftovers for {leftover_target(@plan_state, @days, @date)}
+        </.chip>
+        <span :if={leftover_target(@plan_state, @days, @date) == nil}></span>
+      </button>
+
+      <%= if @slot && @slot.recipe_id do %>
+        <button
+          type="button"
+          phx-click="remove_meal"
+          phx-value-slot_key={@slot_key}
+          data-confirm="Remove this meal?"
+          aria-label="Remove meal"
+          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--subtle)] hover:text-[color:var(--danger)] hover:bg-[color:var(--hairline)] justify-self-end"
+        >
+          <.icon name="hero-ellipsis-horizontal" class="size-4" />
+        </button>
+      <% else %>
+        <span class="size-9 inline-flex items-center justify-center text-[color:var(--muted)] justify-self-end">
+          <.icon name="hero-chevron-right" class="size-5" />
+        </span>
       <% end %>
-
-      <%!-- Recipe info --%>
-      <div class="flex-1 min-w-0">
-        <%= if @recipe do %>
-          <div class="font-semibold text-gray-900 truncate"><%= @recipe.title %></div>
-          <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
-            <%= if @slot.servings do %>
-              <span class="flex items-center gap-1">
-                <.icon name="hero-user-group" class="w-3 h-3" /> <%= @slot.servings %> servings
-              </span>
-            <% end %>
-            <%= if (@recipe.prep_time_minutes || 0) + (@recipe.cook_time_minutes || 0) > 0 do %>
-              <span class="flex items-center gap-1">
-                <.icon name="hero-clock" class="w-3 h-3" />
-                <%= (@recipe.prep_time_minutes || 0) + (@recipe.cook_time_minutes || 0) %> min
-              </span>
-            <% end %>
-            <%= if @slot.leftover do %>
-              <span>Uses leftovers</span>
-            <% end %>
-          </div>
-        <% else %>
-          <div class="text-sm text-gray-400">
-            <%= if @slot && @slot.skipped, do: "Skipped", else: "Tap to add" %>
-          </div>
-        <% end %>
-      </div>
-
-      <%!-- Leftover pill --%>
-      <%= if @leftover_days do %>
-        <div class="shrink-0 flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 text-xs text-gray-500">
-          <.icon name="hero-arrow-path" class="w-3 h-3" />
-          <span>Leftovers for<br /><span class="font-medium"><%= @leftover_days %></span></span>
-        </div>
-      <% end %>
-
-      <%!-- Chevron --%>
-      <.icon name="hero-chevron-right" class="w-4 h-4 text-gray-300 shrink-0" />
-    </div>
+    </li>
     """
   end
 
-  attr :plan_state, :any, required: true
-  attr :recipes, :list, required: true
+  # If this day has a meal AND the next day(s) consume leftovers from it, show
+  # the chip with the consuming day name(s).
+  defp leftover_target(plan_state, days, date) do
+    weekday_idx = Date.day_of_week(date) - 1
 
-  defp plan_summary(assigns) do
-    filled = assigns.plan_state.slots |> Map.values() |> Enum.count(& &1.recipe_id)
-    total_servings =
-      assigns.plan_state.slots
-      |> Map.values()
-      |> Enum.reduce(0, fn s, acc -> acc + (s.servings || 0) end)
-    assigns = assign(assigns, filled: filled, total_servings: total_servings)
+    next =
+      days
+      |> Enum.with_index()
+      |> Enum.drop(weekday_idx + 1)
+      |> Enum.find(fn {d, _} ->
+        slot = Map.get(plan_state.slots, "#{d}_dinner")
+        slot && slot.leftover
+      end)
 
-    ~H"""
-    <span>
-      <%= @filled %> meals · <%= @total_servings %> portions
-    </span>
-    """
+    case next do
+      {d, _} -> String.capitalize(d)
+      nil -> nil
+    end
   end
 
   attr :slot_action, :map, required: true
@@ -545,75 +421,201 @@ defmodule ScullionWeb.PlannerLive do
   attr :recipes, :list, required: true
 
   defp slot_modal(assigns) do
+    sa = assigns.slot_action
+
+    suggested_ids = MapSet.new(sa.suggestions, & &1.recipe.id)
+
+    other_recipes =
+      assigns.recipes
+      |> Enum.reject(&MapSet.member?(suggested_ids, &1.id))
+      |> filter_recipes(sa.search)
+
     assigns =
       assign(assigns,
-        slot: Map.get(assigns.plan_state.slots, assigns.slot_action.slot_key),
-        pinned: Map.has_key?(assigns.plan_state.pins, assigns.slot_action.slot_key)
+        suggested_ids: suggested_ids,
+        other_recipes: other_recipes,
+        days_after: days_after(sa.slot_key),
+        save_disabled: !sa.skipped && is_nil(sa.selected_recipe_id)
       )
 
     ~H"""
-    <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" phx-click="close_slot_action">
-      <div class="bg-white rounded-2xl shadow-xl p-6 w-96 max-h-[80vh] overflow-y-auto" phx-click-stop="true">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="font-semibold text-gray-800"><%= slot_label(@slot_action.slot_key) %></h2>
-          <button phx-click="close_slot_action" class="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+    <div
+      class="fixed inset-0 bg-black/30 z-50 flex items-end md:items-center justify-center p-4"
+      phx-click="close_slot"
+    >
+      <div
+        class="bg-[var(--surface)] w-full md:max-w-md max-h-[92vh] flex flex-col rounded-[var(--r-xl)] shadow-[0_6px_24px_rgba(17,24,39,0.18)] overflow-hidden"
+        phx-click-away="close_slot"
+        onclick="event.stopPropagation()"
+      >
+        <header class="flex items-center justify-between px-6 py-4 border-b border-[color:var(--hairline)] shrink-0">
+          <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
+            {slot_label(@slot_action.slot_key)}
+          </h2>
+          <.icon_button icon="hero-x-mark" label="Close" phx-click="close_slot" />
+        </header>
+
+        <div class={[
+          "flex-1 overflow-y-auto px-6 pt-4 pb-4 space-y-5",
+          @slot_action.skipped && "opacity-50 pointer-events-none"
+        ]}>
+          <form phx-change="search_slot_recipes">
+            <div class="relative">
+              <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
+              <input
+                type="text"
+                name="q"
+                value={@slot_action.search}
+                placeholder="Search recipes…"
+                class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              />
+            </div>
+          </form>
+
+          <%= if @slot_action.search == "" do %>
+            <section>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">Suggested</h3>
+                <button
+                  type="button"
+                  phx-click="regenerate_suggestion"
+                  disabled={@slot_action.loading_suggestions}
+                  class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline disabled:opacity-40"
+                  style="font-size: var(--t-meta);"
+                >
+                  <.icon name="hero-sparkles" class="size-3.5" /> Try another
+                </button>
+              </div>
+
+              <%= if @slot_action.loading_suggestions and @slot_action.suggestions == [] do %>
+                <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">Loading…</p>
+              <% else %>
+                <%= if @slot_action.suggestions == [] do %>
+                  <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No suggestions yet — pick from below.</p>
+                <% else %>
+                  <ul class="space-y-2">
+                    <.recipe_pick_row :for={sug <- @slot_action.suggestions}
+                      recipe={sug.recipe}
+                      reasons={sug.reasons}
+                      selected={@slot_action.selected_recipe_id == sug.recipe.id} />
+                  </ul>
+                <% end %>
+              <% end %>
+            </section>
+          <% end %>
+
+          <section>
+            <h3 class="uppercase tracking-wider text-[color:var(--subtle)] mb-2" style="font-size: var(--t-micro); font-weight: 600;">
+              <%= if @slot_action.search == "", do: "All recipes", else: "Results" %>
+            </h3>
+            <%= if @other_recipes == [] do %>
+              <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No recipes match.</p>
+            <% else %>
+              <ul class="space-y-2">
+                <.recipe_pick_row :for={r <- @other_recipes}
+                  recipe={r}
+                  reasons={[]}
+                  selected={@slot_action.selected_recipe_id == r.id} />
+              </ul>
+            <% end %>
+          </section>
         </div>
 
-        <%= if @slot do %>
-          <div class="mb-4 p-3 bg-gray-50 rounded-lg">
-            <div class="font-medium text-gray-800"><%= recipe_title(@recipes, @slot.recipe_id) %></div>
-            <div class="text-sm text-gray-400 mt-0.5">Servings: <%= @slot.servings || "—" %></div>
+        <footer class="border-t border-[color:var(--hairline)] px-6 py-4 space-y-4 shrink-0">
+          <div class={[@slot_action.skipped && "opacity-50 pointer-events-none"]}>
+            <div class="flex items-center justify-between">
+              <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">Portions</span>
+              <div class="inline-flex items-center gap-3">
+                <button type="button" phx-click="dec_servings"
+                        class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] hover:border-[color:var(--subtle)]"
+                        aria-label="Fewer servings">
+                  <.icon name="hero-minus" class="size-4" />
+                </button>
+                <span class="w-8 text-center font-semibold tabular-nums" style="font-size: var(--t-h2);">{@slot_action.servings}</span>
+                <button type="button" phx-click="inc_servings"
+                        class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] hover:border-[color:var(--subtle)]"
+                        aria-label="More servings">
+                  <.icon name="hero-plus" class="size-4" />
+                </button>
+              </div>
+            </div>
+
+            <div :if={@days_after != [] and @slot_action.selected_recipe_id} class="mt-4">
+              <p class="text-[color:var(--muted)] mb-2" style="font-size: var(--t-meta); font-weight: 500;">Leftovers for</p>
+              <div class="flex flex-wrap gap-2">
+                <button :for={d <- @days_after}
+                  type="button"
+                  phx-click="toggle_leftover_day"
+                  phx-value-day={"#{d}_dinner"}
+                  class={[
+                    "h-8 px-3 rounded-[var(--r-pill)] transition-colors capitalize",
+                    MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+                    !MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
+                  ]}
+                  style="font-size: var(--t-meta); font-weight: 500;"
+                >
+                  {String.capitalize(d)}
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="flex flex-col gap-1.5 mb-4">
-            <button phx-click="skip_meal" phx-value-slot_key={@slot_action.slot_key}
-                    class="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm text-left hover:bg-gray-50">
-              Mark as skipped
-            </button>
-            <button phx-click="mark_leftover" phx-value-slot_key={@slot_action.slot_key}
-                    class="w-full py-2 px-3 border border-gray-200 rounded-lg text-sm text-left hover:bg-gray-50">
-              Mark as leftover
-            </button>
-            <button phx-click="remove_recipe" phx-value-slot_key={@slot_action.slot_key}
-                    class="w-full py-2 px-3 border border-red-100 rounded-lg text-sm text-left text-red-500 hover:bg-red-50">
-              Remove recipe
-            </button>
-          </div>
-          <div class="border-t border-gray-100 pt-4">
-            <div class="text-sm font-medium text-gray-600 mb-2">Swap recipe</div>
-            <.recipe_picker slot_key={@slot_action.slot_key} recipes={@recipes} />
-          </div>
-        <% else %>
-          <.recipe_picker slot_key={@slot_action.slot_key} recipes={@recipes} />
-        <% end %>
+
+          <label class="flex items-center justify-between gap-3 cursor-pointer pt-3 border-t border-[color:var(--hairline)]">
+            <span class="text-[var(--text)]" style="font-size: var(--t-body);">No dinner planned</span>
+            <input
+              type="checkbox"
+              checked={@slot_action.skipped}
+              phx-click="toggle_skipped"
+              class="size-5 rounded border-[color:var(--border)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]"
+            />
+          </label>
+
+          <.button variant={:primary} size={:lg} full disabled={@save_disabled} phx-click="save_slot">
+            Save
+          </.button>
+        </footer>
       </div>
     </div>
     """
   end
 
-  attr :slot_key, :string, required: true
-  attr :recipes, :list, required: true
+  attr :recipe, :any, required: true
+  attr :reasons, :list, default: []
+  attr :selected, :boolean, default: false
 
-  defp recipe_picker(assigns) do
+  defp recipe_pick_row(assigns) do
+    total = (assigns.recipe.prep_time_minutes || 0) + (assigns.recipe.cook_time_minutes || 0)
+    assigns = assign(assigns, total_min: total)
+
     ~H"""
-    <form phx-submit="assign_recipe" class="flex flex-col gap-2">
-      <input type="hidden" name="slot_key" value={@slot_key} />
-      <select name="recipe_id" class="border border-gray-200 rounded-lg px-2 py-2 text-sm w-full bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-        <option value="">Select a recipe…</option>
-        <%= for r <- @recipes do %>
-          <option value={r.id}><%= r.title %></option>
-        <% end %>
-      </select>
-      <input
-        type="number"
-        name="servings"
-        placeholder="Servings"
-        min="1"
-        class="border border-gray-200 rounded-lg px-2 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-green-500"
-      />
-      <button type="submit" class="bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-medium">
-        Assign
+    <li>
+      <button
+        type="button"
+        phx-click="pick_recipe"
+        phx-value-id={@recipe.id}
+        class={[
+          "w-full flex items-start gap-3 p-3 rounded-[var(--r-lg)] border text-left transition-colors",
+          @selected && "border-[color:var(--accent)] bg-[color:var(--accent-soft)]/40",
+          !@selected && "border-[color:var(--border)] hover:border-[color:var(--subtle)]"
+        ]}
+      >
+        <div class="size-12 shrink-0 rounded-[var(--r-md)] overflow-hidden bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
+          <img :if={@recipe.image_path} src={@recipe.image_path} alt="" class="h-full w-full object-cover" />
+          <.icon :if={!@recipe.image_path} name="hero-photo" class="size-5" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">{@recipe.title}</p>
+          <p class="mt-0.5 text-[color:var(--muted)] truncate" style="font-size: var(--t-meta);">
+            <%= if @reasons != [] do %>
+              {Enum.join(@reasons, " · ")}
+            <% else %>
+              <%= if @total_min > 0, do: "#{@total_min} min", else: "" %><%= if @recipe.base_servings, do: " · #{@recipe.base_servings} portions", else: "" %>
+            <% end %>
+          </p>
+        </div>
       </button>
-    </form>
+    </li>
     """
   end
 
@@ -623,18 +625,36 @@ defmodule ScullionWeb.PlannerLive do
     assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state)
   end
 
-  defp recipe_title(recipes, recipe_id) do
-    Enum.find_value(recipes, "Unknown", fn r ->
-      if r.id == recipe_id, do: r.title
-    end)
-  end
-
   defp recipe_by_id(_recipes, nil), do: nil
   defp recipe_by_id(recipes, id), do: Enum.find(recipes, &(&1.id == id))
 
+  @full_day_names %{
+    "mon" => "Monday",
+    "tue" => "Tuesday",
+    "wed" => "Wednesday",
+    "thu" => "Thursday",
+    "fri" => "Friday",
+    "sat" => "Saturday",
+    "sun" => "Sunday"
+  }
+
   defp slot_label(slot_key) do
     [day, meal] = String.split(slot_key, "_", parts: 2)
-    "#{String.capitalize(day)} #{String.capitalize(meal)}"
+    "#{Map.get(@full_day_names, day, String.capitalize(day))} · #{String.capitalize(meal)}"
+  end
+
+  defp days_after(slot_key) do
+    [day, _meal] = String.split(slot_key, "_", parts: 2)
+    days = ~w[mon tue wed thu fri sat sun]
+    idx = Enum.find_index(days, &(&1 == day))
+    if idx, do: Enum.drop(days, idx + 1), else: []
+  end
+
+  defp filter_recipes(recipes, ""), do: recipes
+
+  defp filter_recipes(recipes, q) do
+    q = String.downcase(q)
+    Enum.filter(recipes, &String.contains?(String.downcase(&1.title), q))
   end
 
   defp week_start(date) do
@@ -642,40 +662,20 @@ defmodule ScullionWeb.PlannerLive do
     Date.add(date, -(dow - 1))
   end
 
-  defp leftover_label(plan_state, slot_key, day) do
-    [_, meal] = String.split(slot_key, "_", parts: 2)
-    slot = Map.get(plan_state.slots, slot_key)
-    unless slot && slot.recipe_id do
-      nil
-    else
-      days_after =
-        @days
-        |> Enum.drop_while(&(&1 != day))
-        |> Enum.drop(1)
-        |> Enum.filter(fn d ->
-          future_slot = Map.get(plan_state.slots, "#{d}_#{meal}")
-          future_slot && future_slot.leftover
-        end)
-        |> Enum.map(&String.capitalize/1)
-
-      if days_after == [], do: nil, else: Enum.join(days_after, ", ")
-    end
+  defp week_number(date) do
+    {_y, w} = :calendar.iso_week_number({date.year, date.month, date.day})
+    w
   end
 
-  defp today_day_key(today, week_start) do
-    offset = Date.diff(today, week_start)
-    Enum.at(@days, offset)
-  end
+  defp plan_subtitle(plan_state, week_start, week_end) do
+    range = "#{Calendar.strftime(week_start, "%b %-d")} – #{Calendar.strftime(week_end, "%b %-d")}"
 
-  defp today_dinner_slot(plan_state, today, week_start) do
-    day_key = today_day_key(today, week_start)
-    if day_key, do: Map.get(plan_state.slots, "#{day_key}_dinner"), else: nil
-  end
+    meals =
+      plan_state.slots
+      |> Map.values()
+      |> Enum.count(fn s -> s.recipe_id && !s.skipped end)
 
-  defp sorted_grocery_items(items) do
-    items
-    |> Map.values()
-    |> Enum.sort_by(fn i -> {i.checked, i.name} end)
+    if meals > 0, do: "#{range} · #{meals} meals planned", else: range
   end
 
   defp plan_id(week_start), do: "plan:#{Date.to_iso8601(week_start)}"

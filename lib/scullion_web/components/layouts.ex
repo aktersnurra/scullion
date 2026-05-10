@@ -1,71 +1,111 @@
 defmodule ScullionWeb.Layouts do
   @moduledoc """
-  This module holds layouts and related functionality
-  used by your application.
+  Application layout + chrome (top nav, mobile bottom nav, flash group).
   """
   use ScullionWeb, :html
 
-  # Embed all files in layouts/* within this module.
-  # The default root.html.heex file contains the HTML
-  # skeleton of your application, namely HTML headers
-  # and other static content.
   embed_templates "layouts/*"
 
-  @doc """
-  Renders your app layout.
+  @nav_items [
+    {"/", "Week", "hero-calendar-days"},
+    {"/recipes", "Recipes", "hero-book-open"},
+    {"/groceries", "Groceries", "hero-shopping-cart"},
+    {"/prep", "Prep", "hero-fire"},
+    {"/pantry", "Pantry", "hero-archive-box"},
+    {"/costs", "Costs", "hero-banknotes"},
+    {"/settings", "Settings", "hero-cog-6-tooth"}
+  ]
 
-  This function is typically invoked from every template,
-  and it often contains your application menu, sidebar,
-  or similar.
-
-  ## Examples
-
-      <Layouts.app flash={@flash}>
-        <h1>Content</h1>
-      </Layouts.app>
-
-  """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-
-  attr :current_scope, :map,
-    default: nil,
-    doc: "the current [scope](https://hexdocs.pm/phoenix/scopes.html)"
-
+  attr :flash, :map, required: true
+  attr :current_scope, :map, default: nil
+  attr :current_path, :string, default: "/"
   slot :inner_block, required: true
 
   def app(assigns) do
+    assigns = assign(assigns, :nav_items, @nav_items)
+
     ~H"""
-    <header class="bg-white border-b border-gray-100 px-6 h-14 flex items-center justify-between sticky top-0 z-40">
-      <a href="/" class="flex items-center gap-2 text-gray-900 font-semibold text-base tracking-tight">
-        <span class="text-green-600 font-bold">S</span>cullion
-      </a>
-      <nav class="flex items-center gap-1 text-sm">
-        <a href="/" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Planner</a>
-        <a href="/recipes" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Recipes</a>
-        <a href="/groceries" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Grocery</a>
-        <a href="/prep" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Prep</a>
-        <a href="/pantry" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Pantry</a>
-        <a href="/costs" class="px-3 py-1.5 rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors">Costs</a>
-      </nav>
+    <header class="sticky top-0 z-40 hidden md:block h-[var(--nav-height)] px-6 bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
+      <div class="relative h-full flex items-center justify-center">
+        <nav class="flex items-center gap-1">
+          <.nav_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} label={label} />
+        </nav>
+        <a
+          href="/logout"
+          class="absolute right-0 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[var(--text)]"
+          style="font-size: var(--t-meta);"
+        >
+          Sign out
+        </a>
+      </div>
     </header>
 
-    <main class="bg-gray-50 min-h-[calc(100vh-3.5rem)]">
+    <main class="min-h-[calc(100vh-var(--nav-height))] px-4 py-4 md:px-6 md:py-6 pb-24 md:pb-6">
       {render_slot(@inner_block)}
     </main>
+
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 bg-[var(--surface)] border-t border-[color:var(--border)]">
+      <.bottom_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon}>
+        {label}
+      </.bottom_link>
+    </nav>
 
     <.flash_group flash={@flash} />
     """
   end
 
-  @doc """
-  Shows the flash group with standard titles and content.
+  attr :path, :string, required: true
+  attr :current, :string, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
 
-  ## Examples
+  defp nav_link(assigns) do
+    assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
 
-      <.flash_group flash={@flash} />
-  """
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :id, :string, default: "flash-group", doc: "the optional id of flash container"
+    ~H"""
+    <a
+      href={@path}
+      title={@label}
+      aria-label={@label}
+      class={[
+        "px-3 h-[var(--nav-height)] inline-flex items-center justify-center border-b-2 transition-colors",
+        @active? && "text-[color:var(--accent)] border-[color:var(--accent)]",
+        !@active? && "text-[color:var(--muted)] border-transparent hover:text-[var(--text)]"
+      ]}
+    >
+      <.icon name={@icon} class="size-5" />
+    </a>
+    """
+  end
+
+  attr :path, :string, required: true
+  attr :current, :string, required: true
+  attr :icon, :string, required: true
+  slot :inner_block, required: true
+
+  defp bottom_link(assigns) do
+    assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
+
+    ~H"""
+    <a
+      href={@path}
+      class={[
+        "flex flex-col items-center justify-center gap-0.5 h-14",
+        @active? && "text-[color:var(--accent)]",
+        !@active? && "text-[color:var(--muted)]"
+      ]}
+    >
+      <.icon name={@icon} class="size-5" />
+      <span style="font-size: 11px; font-weight: 500;">{render_slot(@inner_block)}</span>
+    </a>
+    """
+  end
+
+  defp active?(current, "/"), do: current == "/"
+  defp active?(current, path), do: String.starts_with?(current, path)
+
+  attr :flash, :map, required: true
+  attr :id, :string, default: "flash-group"
 
   def flash_group(assigns) do
     ~H"""
@@ -96,43 +136,6 @@ defmodule ScullionWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-    </div>
-    """
-  end
-
-  @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
-
-  See <head> in root.html.heex which applies the theme before page load.
-  """
-  def theme_toggle(assigns) do
-    ~H"""
-    <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
-      >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="light"
-      >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="dark"
-      >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
     </div>
     """
   end

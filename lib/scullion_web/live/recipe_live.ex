@@ -22,6 +22,7 @@ defmodule ScullionWeb.RecipeLive do
        image_extract_state: :idle,
        extracted_attrs: nil,
        selected: nil,
+       detail_tab: "ingredients",
        form: nil,
        error: nil,
        sorts: @sorts,
@@ -124,6 +125,10 @@ defmodule ScullionWeb.RecipeLive do
     {:noreply, assign(socket, selected: nil, form: nil, extracted_attrs: nil, error: nil)}
   end
 
+  def handle_event("set_tab", %{"tab" => tab}, socket) do
+    {:noreply, assign(socket, detail_tab: tab)}
+  end
+
   def handle_event("scrape_submit", %{"url" => url}, socket) do
     url = String.trim(url)
 
@@ -214,338 +219,316 @@ defmodule ScullionWeb.RecipeLive do
 
   def render(assigns) do
     ~H"""
-    <div class="p-6">
-      <div class="max-w-6xl mx-auto">
-        <div class="flex items-center justify-between mb-6">
-          <h1 class="text-xl font-semibold text-gray-900">Recipes</h1>
-          <button phx-click="new_recipe" class="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg text-sm font-medium">
-            + New recipe
-          </button>
-        </div>
-
-        <%!-- Search & filters --%>
-        <div class="mb-5 space-y-3">
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/recipes"}>
+    <.page max_width={:xl}>
+      <.card class="mb-6">
+        <header class="flex items-center justify-between gap-4 mb-5 pb-5 border-b border-[color:var(--hairline)]">
+          <div>
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Recipes</h1>
+            <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{recipe_count_label(@recipes)}</p>
+          </div>
+          <.button variant={:primary} phx-click="new_recipe">
+            <.icon name="hero-plus" class="size-4" /> New recipe
+          </.button>
+        </header>
+        <form phx-change="search" class="relative">
+          <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
           <input
             type="text"
-            phx-change="search"
             name="query"
             value={@search}
             placeholder="Search recipes or ingredients…"
-            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+            style="font-size: var(--t-body);"
           />
+        </form>
 
-          <div class="flex flex-wrap gap-2 text-sm">
-            <%= for type <- @types do %>
-              <button
-                phx-click="filter_type"
-                phx-value-type={type}
-                class={[
-                  "px-3 py-1 rounded-full border text-sm",
-                  if(@filter_type == type,
-                    do: "bg-gray-900 border-gray-900 text-white",
-                    else: "border-gray-200 text-gray-500 hover:border-gray-400"
-                  )
-                ]}
-              >
-                {type}
-              </button>
-            <% end %>
-          </div>
-
-          <div class="flex flex-wrap gap-2 text-sm">
-            <%= for tag <- common_tags() do %>
-              <button
-                phx-click="filter_tag"
-                phx-value-tag={tag}
-                class={[
-                  "px-3 py-1 rounded-full border text-sm",
-                  if(tag in @filter_tags,
-                    do: "bg-green-600 border-green-600 text-white",
-                    else: "border-gray-200 text-gray-500 hover:border-gray-400"
-                  )
-                ]}
-              >
-                {tag}
-              </button>
-            <% end %>
-          </div>
-
-          <div class="flex gap-4 text-sm text-gray-400">
-            <span>Time:</span>
-            <%= for t <- @time_filters do %>
-              <button
-                phx-click="filter_time"
-                phx-value-max={t}
-                class={if @filter_max_min == t, do: "text-gray-900 font-semibold", else: "hover:text-gray-700"}
-              >
-                {if t == :any, do: "Any", else: "≤#{t}m"}
-              </button>
-            <% end %>
-
-            <span class="ml-4">Sort:</span>
-            <%= for s <- @sorts do %>
-              <button
-                phx-click="sort"
-                phx-value-by={s}
-                class={if @sort == s, do: "text-gray-900 font-semibold", else: "hover:text-gray-700"}
-              >
-                {sort_label(s)}
-              </button>
-            <% end %>
-          </div>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            :for={type <- @types}
+            phx-click="filter_type"
+            phx-value-type={type}
+            class={[
+              "px-3 h-8 rounded-[var(--r-pill)] transition-colors capitalize",
+              @filter_type == type && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+              @filter_type != type && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
+            ]}
+            style="font-size: var(--t-meta); font-weight: 500;"
+          >
+            {type}
+          </button>
         </div>
 
-        <%!-- Import bar --%>
-        <div class="mb-6 space-y-2">
-          <form class="flex gap-2" phx-submit="scrape_submit">
-            <input
-              type="text"
-              name="url"
-              value={@scrape_url}
-              placeholder="Paste recipe URL to import…"
-              class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <button
-              type="submit"
-              disabled={@scrape_state == :loading}
-              class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm disabled:opacity-40"
-            >
-              {if @scrape_state == :loading, do: "Importing…", else: "Import"}
-            </button>
-          </form>
-
-          <form phx-submit="extract_from_images" phx-change="validate">
-            <div class="flex gap-2 items-start">
-              <div class="flex-1">
-                <div class="border border-dashed border-gray-300 rounded-xl px-4 py-3 bg-white text-sm text-gray-400 hover:border-gray-400 transition-colors">
-                  <label class="cursor-pointer flex items-center gap-2">
-                    <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
-                    <.icon name="hero-camera" class="w-4 h-4 shrink-0" />
-                    <span>
-                      {if @uploads.recipe_images.entries == [],
-                        do: "Upload recipe photos (up to 10)…",
-                        else: "#{length(@uploads.recipe_images.entries)} photo(s) selected"}
-                    </span>
-                  </label>
-                </div>
-                <%= for entry <- @uploads.recipe_images.entries do %>
-                  <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                    <span class="flex-1 truncate">{entry.client_name}</span>
-                    <button type="button" phx-click="cancel_upload" phx-value-ref={entry.ref}
-                            class="text-gray-400 hover:text-red-500">✕</button>
-                  </div>
-                <% end %>
-              </div>
-              <button
-                type="submit"
-                disabled={@image_extract_state == :loading or @uploads.recipe_images.entries == []}
-                class="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-xl text-sm disabled:opacity-40 shrink-0"
-              >
-                {if @image_extract_state == :loading, do: "Extracting…", else: "Extract"}
-              </button>
-            </div>
-          </form>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button
+            :for={tag <- common_tags()}
+            phx-click="filter_tag"
+            phx-value-tag={tag}
+            class={[
+              "px-3 h-7 rounded-[var(--r-pill)] transition-colors",
+              tag in @filter_tags && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+              tag not in @filter_tags && "text-[color:var(--muted)] hover:text-[var(--text)]"
+            ]}
+            style="font-size: var(--t-meta);"
+          >
+            {tag}
+          </button>
         </div>
 
-        <%= if @error do %>
-          <p class="text-red-500 text-sm mb-4 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{@error}</p>
-        <% end %>
+        <div class="mt-4 pt-4 border-t border-[color:var(--hairline)] flex flex-wrap items-center gap-x-6 gap-y-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+          <span class="text-[color:var(--subtle)] font-medium">Time</span>
+          <button
+            :for={t <- @time_filters}
+            phx-click="filter_time"
+            phx-value-max={t}
+            class={[
+              @filter_max_min == t && "text-[color:var(--accent)] font-medium",
+              @filter_max_min != t && "hover:text-[var(--text)]"
+            ]}
+          >
+            {if t == :any, do: "Any", else: "≤ #{t} min"}
+          </button>
 
-        <div class="flex gap-6">
-          <%!-- Recipe grid --%>
+          <span class="ml-4 text-[color:var(--subtle)] font-medium">Sort</span>
+          <button
+            :for={s <- @sorts}
+            phx-click="sort"
+            phx-value-by={s}
+            class={[
+              @sort == s && "text-[color:var(--accent)] font-medium",
+              @sort != s && "hover:text-[var(--text)]"
+            ]}
+          >
+            {sort_label(s)}
+          </button>
+        </div>
+      </.card>
+
+      <.card class="mb-6">
+        <h2 class="font-semibold mb-3" style="font-size: var(--t-h2);">Import</h2>
+        <form class="flex gap-2 mb-3" phx-submit="scrape_submit">
+          <input
+            type="text"
+            name="url"
+            value={@scrape_url}
+            placeholder="Paste recipe URL…"
+            class="flex-1 h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+            style="font-size: var(--t-body);"
+          />
+          <.button type="submit" variant={:primary} disabled={@scrape_state == :loading}>
+            {if @scrape_state == :loading, do: "Importing…", else: "Import"}
+          </.button>
+        </form>
+
+        <form phx-submit="extract_from_images" phx-change="validate" class="flex gap-2 items-start">
           <div class="flex-1">
-            <%= if @recipes == [] do %>
-              <div class="text-center py-20 text-gray-400">
-                <p class="text-sm">No recipes yet — add one or import from a URL.</p>
+            <label class="cursor-pointer flex items-center gap-2 h-11 px-3 border border-dashed border-[color:var(--border)] rounded-[var(--r-lg)] text-[color:var(--muted)] hover:border-[color:var(--subtle)] transition-colors" style="font-size: var(--t-meta);">
+              <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
+              <.icon name="hero-camera" class="size-4 shrink-0" />
+              <span>
+                {if @uploads.recipe_images.entries == [],
+                  do: "Upload photos (up to 10)…",
+                  else: "#{length(@uploads.recipe_images.entries)} selected"}
+              </span>
+            </label>
+            <div :for={entry <- @uploads.recipe_images.entries} class="flex items-center gap-2 mt-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+              <span class="flex-1 truncate">{entry.client_name}</span>
+              <button type="button" phx-click="cancel_upload" phx-value-ref={entry.ref}
+                      class="text-[color:var(--subtle)] hover:text-[color:var(--danger)]">✕</button>
+            </div>
+          </div>
+          <.button
+            type="submit"
+            variant={:secondary}
+            disabled={@image_extract_state == :loading or @uploads.recipe_images.entries == []}
+          >
+            {if @image_extract_state == :loading, do: "Extracting…", else: "Extract"}
+          </.button>
+        </form>
+      </.card>
+
+      <p :if={@error} class="mb-4 text-[color:var(--danger)]" style="font-size: var(--t-meta);">{@error}</p>
+
+      <%= if @recipes == [] do %>
+        <.card><.empty message="No recipes — add one or import from a URL" /></.card>
+      <% else %>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <button
+            :for={recipe <- @recipes}
+            type="button"
+            phx-click="select_recipe"
+            phx-value-id={recipe.id}
+            class={[
+              "group block text-left bg-[var(--surface)] rounded-[var(--r-xl)] overflow-hidden border transition-all shadow-[0_1px_2px_rgba(17,24,39,0.04)] hover:shadow-[0_4px_16px_rgba(17,24,39,0.08)]",
+              @selected && @selected.id == recipe.id && "border-[color:var(--accent)]",
+              !(@selected && @selected.id == recipe.id) && "border-[color:var(--border)]"
+            ]}
+          >
+            <div class="aspect-[4/3] w-full bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
+              <img :if={recipe.image_path} src={recipe.image_path} alt="" class="h-full w-full object-cover transition-transform group-hover:scale-[1.02]" />
+              <.icon :if={!recipe.image_path} name="hero-photo" class="size-10" />
+            </div>
+            <div class="p-4">
+              <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">{recipe.title}</p>
+              <div class="mt-1.5 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                <span class="inline-flex items-center gap-1"><.icon name="hero-clock" class="size-3.5" /> {total_time(recipe)}</span>
+              </div>
+              <div :if={recipe.tags != []} class="flex flex-wrap gap-1.5 mt-3">
+                <.chip :for={tag <- Enum.take(recipe.tags, 3)} tone={:accent}>{tag.name}</.chip>
+              </div>
+            </div>
+          </button>
+        </div>
+      <% end %>
+
+      <.drawer id="recipe-drawer" show={@selected != nil or @form != nil} on_close={JS.push("close")}>
+        <%= cond do %>
+          <% @form -> %>
+            {render_form(assigns)}
+          <% @selected -> %>
+            {render_detail(assigns)}
+          <% true -> %>
+        <% end %>
+      </.drawer>
+    </.page>
+    </Layouts.app>
+    """
+  end
+
+  defp render_detail(assigns) do
+    tabs = [
+      %{id: "ingredients", label: "Ingredients"},
+      %{id: "instructions", label: "Instructions"},
+      %{id: "notes", label: "Notes"}
+    ]
+    assigns = assign(assigns, tabs: tabs)
+
+    ~H"""
+    <div>
+      <button
+        type="button"
+        phx-click="close"
+        class="inline-flex items-center gap-1 text-[color:var(--muted)] hover:text-[var(--text)] mb-3"
+        style="font-size: var(--t-meta);"
+      >
+        <.icon name="hero-chevron-left" class="size-4" /> Back
+      </button>
+
+      <div :if={@selected.image_path} class="aspect-[4/3] w-full overflow-hidden rounded-[var(--r-xl)] bg-[color:var(--hairline)] mb-4">
+        <img src={@selected.image_path} alt="" class="h-full w-full object-cover" />
+      </div>
+
+      <h2 class="font-semibold tracking-tight text-[var(--text)] mb-3" style="font-size: var(--t-h1);">
+        {@selected.title}
+      </h2>
+
+      <div class="flex flex-wrap items-center gap-2 mb-5">
+        <.chip :if={total_time(@selected) != "—"} tone={:neutral} icon="hero-clock">{total_time(@selected)}</.chip>
+        <.chip :if={@selected.base_servings} tone={:neutral} icon="hero-user-group">{@selected.base_servings} servings</.chip>
+        <.chip :for={tag <- Enum.take(@selected.tags, 4)} tone={:accent}>{tag.name}</.chip>
+      </div>
+
+      <.tabs items={@tabs} active={@detail_tab} />
+
+      <div class="pt-4 mb-6">
+        <%= cond do %>
+          <% @detail_tab == "ingredients" and @selected.recipe_ingredients != [] -> %>
+            <ul class="divide-y divide-[color:var(--hairline)]">
+              <li :for={ri <- @selected.recipe_ingredients} class="flex items-center gap-3 py-2.5" style="font-size: var(--t-body);">
+                <span class="size-1.5 rounded-full bg-[color:var(--accent)] shrink-0"></span>
+                <span class="flex-1 text-[var(--text)]">{ri.ingredient.name}</span>
+                <span :if={ri.quantity} class="shrink-0 text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
+                  {ri.quantity} {ri.unit}
+                </span>
+              </li>
+            </ul>
+          <% @detail_tab == "ingredients" -> %>
+            <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No ingredients listed.</p>
+          <% @detail_tab == "instructions" -> %>
+            <%= if grouped_steps(@selected) != [] do %>
+              <div :for={{phase, steps} <- grouped_steps(@selected)} class="mb-5">
+                <h3 :if={phase} class="font-semibold mb-2" style="font-size: var(--t-h2);">{phase}</h3>
+                <ol class="space-y-3">
+                  <li :for={step <- steps} class="flex gap-3" style="font-size: var(--t-body);">
+                    <span class="size-6 shrink-0 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] inline-flex items-center justify-center font-semibold" style="font-size: var(--t-meta);">{step["order"]}</span>
+                    <div class="flex-1">
+                      <span class="text-[var(--text)]">{step["action"]}</span>
+                      <span :if={step["duration_minutes"]} class="ml-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                        {step["duration_minutes"]}m
+                      </span>
+                      <div :if={step["ingredients"] && step["ingredients"] != []} class="flex flex-wrap gap-1.5 mt-1.5">
+                        <.chip :for={ing <- step["ingredients"]} tone={:accent}>{ing}</.chip>
+                      </div>
+                    </div>
+                  </li>
+                </ol>
               </div>
             <% else %>
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <%= for recipe <- @recipes do %>
-                  <button
-                    phx-click="select_recipe"
-                    phx-value-id={recipe.id}
-                    class={[
-                      "text-left bg-white rounded-xl border overflow-hidden hover:shadow-md transition-shadow",
-                      if(@selected && @selected.id == recipe.id,
-                        do: "border-green-500 ring-1 ring-green-500",
-                        else: "border-gray-100"
-                      )
-                    ]}
-                  >
-                    <%= if recipe.image_path do %>
-                      <img src={recipe.image_path} class="w-full h-36 object-cover" />
-                    <% else %>
-                      <div class="w-full h-36 bg-gray-100 flex items-center justify-center text-gray-300 text-xs">
-                        No image
-                      </div>
-                    <% end %>
-                    <div class="p-3">
-                      <p class="font-medium text-sm text-gray-900">{recipe.title}</p>
-                      <div class="flex flex-wrap gap-1 mt-2">
-                        <%= for tag <- recipe.tags do %>
-                          <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag.name}</span>
-                        <% end %>
-                      </div>
-                      <p class="text-xs text-gray-400 mt-1.5">{total_time(recipe)}</p>
-                    </div>
-                  </button>
-                <% end %>
-              </div>
+              <p :if={@selected.instructions} class="whitespace-pre-wrap text-[var(--text)]" style="font-size: var(--t-body);">{@selected.instructions}</p>
+              <p :if={!@selected.instructions} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No instructions yet.</p>
             <% end %>
-          </div>
-
-          <%!-- Detail / form panel --%>
-          <%= if @form do %>
-            <div class="w-80 bg-white rounded-xl border border-gray-100 p-5 shrink-0">
-              <div class="flex justify-between items-center mb-4">
-                <h2 class="font-semibold text-gray-900">{if @selected, do: "Edit Recipe", else: "New Recipe"}</h2>
-                <button phx-click="close" class="text-gray-400 hover:text-gray-600">✕</button>
-              </div>
-              <form phx-submit="save_recipe">
-                <div class="space-y-3 text-sm">
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Title *</label>
-                    <input type="text" name="recipe[title]" value={@form[:title]} required
-                           class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Type</label>
-                    <select name="recipe[recipe_type]" class="w-full border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
-                      <%= for t <- [:meal, :component, :assembly] do %>
-                        <option value={t} selected={@form[:recipe_type] == to_string(t)}>{t}</option>
-                      <% end %>
-                    </select>
-                  </div>
-                  <div class="flex gap-2">
-                    <div class="flex-1">
-                      <label class="block text-xs text-gray-500 mb-1">Prep (min)</label>
-                      <input type="number" name="recipe[prep_time_minutes]" value={@form[:prep_time_minutes]}
-                             class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    </div>
-                    <div class="flex-1">
-                      <label class="block text-xs text-gray-500 mb-1">Cook (min)</label>
-                      <input type="number" name="recipe[cook_time_minutes]" value={@form[:cook_time_minutes]}
-                             class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Servings</label>
-                    <input type="number" name="recipe[base_servings]" value={@form[:base_servings]}
-                           class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Tags (comma-separated)</label>
-                    <input type="text" name="recipe[tags]" value={@form[:tags]} placeholder="quick, batch, vegetarian"
-                           class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Source URL</label>
-                    <input type="text" name="recipe[source_url]" value={@form[:source_url]}
-                           class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Instructions</label>
-                    <textarea name="recipe[instructions]" rows="5"
-                              class="w-full border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-500">{@form[:instructions]}</textarea>
-                  </div>
-                </div>
-                <div class="flex gap-2 mt-4">
-                  <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-medium">
-                    Save
-                  </button>
-                  <%= if @selected do %>
-                    <button type="button" phx-click="delete_recipe"
-                            class="px-3 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-sm">
-                      Delete
-                    </button>
-                  <% end %>
-                </div>
-              </form>
-            </div>
-          <% end %>
-
-          <%= if @selected && !@form do %>
-            <div class="w-80 bg-white rounded-xl border border-gray-100 overflow-hidden shrink-0">
-              <div class="flex justify-between items-center p-4 pb-3">
-                <h2 class="font-semibold text-gray-900 text-sm">{@selected.title}</h2>
-                <button phx-click="close" class="text-gray-400 hover:text-gray-600">✕</button>
-              </div>
-              <%= if @selected.image_path do %>
-                <img src={@selected.image_path} class="w-full h-44 object-cover" />
-              <% end %>
-              <div class="p-4 text-sm text-gray-600 space-y-2">
-                <p><span class="text-gray-400">Type:</span> {@selected.recipe_type}</p>
-                <p><span class="text-gray-400">Time:</span> {total_time(@selected)}</p>
-                <%= if @selected.base_servings do %>
-                  <p><span class="text-gray-400">Servings:</span> {@selected.base_servings}</p>
-                <% end %>
-                <div class="flex flex-wrap gap-1">
-                  <%= for tag <- @selected.tags do %>
-                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{tag.name}</span>
-                  <% end %>
-                </div>
-                <%= if @selected.recipe_ingredients != [] do %>
-                  <div class="mt-2 pt-2 border-t border-gray-100">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ingredients</p>
-                    <ul class="space-y-1">
-                      <%= for ri <- @selected.recipe_ingredients do %>
-                        <li class="flex items-baseline gap-1.5 text-xs text-gray-700">
-                          <%= if ri.quantity do %>
-                            <span class="text-gray-400 shrink-0">{ri.quantity} {ri.unit}</span>
-                          <% end %>
-                          <span>{ri.ingredient.name}</span>
-                        </li>
-                      <% end %>
-                    </ul>
-                  </div>
-                <% end %>
-                <%= for {phase, steps} <- grouped_steps(@selected) do %>
-                  <div class="mt-2 pt-2 border-t border-gray-100">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{phase}</p>
-                    <ol class="space-y-2">
-                      <%= for step <- steps do %>
-                        <li class="flex gap-2 text-xs">
-                          <span class="text-gray-300 shrink-0 w-4 text-right">{step["order"]}.</span>
-                          <div class="flex-1">
-                            <span class="text-gray-700">{step["action"]}</span>
-                            <%= if step["duration_minutes"] do %>
-                              <span class="ml-1 text-gray-400">({step["duration_minutes"]}m)</span>
-                            <% end %>
-                            <%= if step["ingredients"] && step["ingredients"] != [] do %>
-                              <div class="flex flex-wrap gap-1 mt-1">
-                                <%= for ing <- step["ingredients"] do %>
-                                  <span class="bg-green-50 text-green-700 px-1.5 py-0.5 rounded text-xs">{ing}</span>
-                                <% end %>
-                              </div>
-                            <% end %>
-                          </div>
-                        </li>
-                      <% end %>
-                    </ol>
-                  </div>
-                <% end %>
-                <%= if @selected.steps == nil && @selected.instructions do %>
-                  <div class="mt-2 pt-2 border-t border-gray-100">
-                    <p class="text-xs text-gray-400 mb-1">Instructions</p>
-                    <p class="whitespace-pre-wrap text-xs text-gray-600">{@selected.instructions}</p>
-                  </div>
-                <% end %>
-                <%= if @selected.source_url do %>
-                  <a href={@selected.source_url} target="_blank"
-                     class="text-green-600 hover:underline text-xs block mt-2">
-                    Source ↗
-                  </a>
-                <% end %>
-              </div>
-              <div class="px-4 pb-4">
-                <button phx-click="edit_recipe" class="w-full border border-gray-200 rounded-lg py-2 text-sm hover:bg-gray-50 text-gray-700">
-                  Edit
-                </button>
-              </div>
-            </div>
-          <% end %>
-        </div>
+          <% @detail_tab == "notes" -> %>
+            <a :if={@selected.source_url} href={@selected.source_url} target="_blank"
+               class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">
+              <.icon name="hero-link" class="size-4" /> Source
+            </a>
+            <p :if={!@selected.source_url} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No notes.</p>
+        <% end %>
       </div>
+
+      <div class="flex gap-2 pt-4 border-t border-[color:var(--hairline)]">
+        <.button variant={:secondary} phx-click="edit_recipe">Edit</.button>
+        <.button variant={:danger} phx-click="delete_recipe">Delete</.button>
+      </div>
+    </div>
+    """
+  end
+
+  defp render_form(assigns) do
+    ~H"""
+    <div>
+      <h2 class="font-semibold tracking-tight text-[var(--text)] mb-5" style="font-size: var(--t-h1);">
+        {if @selected, do: "Edit recipe", else: "New recipe"}
+      </h2>
+
+      <form phx-submit="save_recipe" class="space-y-5">
+        <.field name="recipe[title]" label="Title" value={@form[:title] || ""} required />
+
+        <label class="block">
+          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Type</span>
+          <select name="recipe[recipe_type]"
+                  class="w-full bg-transparent border-0 border-b border-[color:var(--border)] py-2 text-[var(--text)] focus:outline-none focus:ring-0 focus:border-[color:var(--accent)]"
+                  style="font-size: var(--t-body);">
+            <option :for={t <- [:meal, :component, :assembly]} value={t} selected={@form[:recipe_type] == to_string(t)}>{t}</option>
+          </select>
+        </label>
+
+        <div class="flex gap-4">
+          <div class="flex-1">
+            <.field name="recipe[prep_time_minutes]" label="Prep (min)" type="number" value={to_string_or_empty(@form[:prep_time_minutes])} />
+          </div>
+          <div class="flex-1">
+            <.field name="recipe[cook_time_minutes]" label="Cook (min)" type="number" value={to_string_or_empty(@form[:cook_time_minutes])} />
+          </div>
+        </div>
+
+        <.field name="recipe[base_servings]" label="Servings" type="number" value={to_string_or_empty(@form[:base_servings])} />
+        <.field name="recipe[tags]" label="Tags" value={@form[:tags] || ""} placeholder="quick, batch, vegetarian" />
+        <.field name="recipe[source_url]" label="Source URL" value={@form[:source_url] || ""} />
+
+        <label class="block">
+          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Instructions</span>
+          <textarea name="recipe[instructions]" rows="6"
+                    class="w-full bg-transparent border border-[color:var(--border)] rounded-[var(--r-sm)] px-3 py-2 text-[var(--text)] focus:outline-none focus:ring-0 focus:border-[color:var(--accent)]"
+                    style="font-size: var(--t-body);"
+          >{@form[:instructions]}</textarea>
+        </label>
+
+        <div class="flex gap-2 pt-4 border-t border-[color:var(--border)]">
+          <.button type="submit" variant={:primary}>Save</.button>
+          <.button variant={:ghost} phx-click="close">Cancel</.button>
+        </div>
+      </form>
     </div>
     """
   end
@@ -679,6 +662,13 @@ defmodule ScullionWeb.RecipeLive do
   defp sort_label(:recently_added), do: "Recent"
   defp sort_label(:last_used), do: "Last used"
   defp sort_label(:alphabetical), do: "A–Z"
+
+  defp recipe_count_label([]), do: nil
+  defp recipe_count_label([_]), do: "1 recipe"
+  defp recipe_count_label(list), do: "#{length(list)} recipes"
+
+  defp to_string_or_empty(nil), do: ""
+  defp to_string_or_empty(v), do: to_string(v)
 
   defp common_tags, do: ["quick", "batch", "base-recipe", "vegetarian", "swedish", "asian"]
 end

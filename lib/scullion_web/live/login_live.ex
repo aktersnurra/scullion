@@ -78,47 +78,62 @@ defmodule ScullionWeb.LoginLive do
   attr :locked, :boolean, required: true
   defp numpad_button(assigns) do
     ~H"""
-    <button id={"digit-#{@value}"}
-            phx-click={JS.push("digit", value: %{value: @value})}
-            disabled={@locked}
-            class="bg-white border border-gray-200 text-gray-800 text-xl font-semibold py-4 rounded-xl hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 shadow-sm">
+    <button
+      id={"digit-#{@value}"}
+      phx-click={JS.push("digit", value: %{value: @value})}
+      disabled={@locked}
+      class="h-16 bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] text-[var(--text)] font-semibold hover:bg-[color:var(--hairline)] active:bg-[color:var(--accent-soft)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.04)] transition-colors"
+      style="font-size: 22px;"
+    >
       {@value}
     </button>
     """
   end
 
   def render(assigns) do
+    assigns = assign(assigns, slots: digit_slots(assigns.digits))
+
     ~H"""
-    <div class="min-h-screen flex items-center justify-center bg-gray-50" phx-window-keydown="keydown">
-      <div class="w-full max-w-xs">
-        <div class="text-center mb-8">
-          <div class="inline-flex items-center gap-1 text-2xl font-bold text-gray-900">
-            <span class="text-green-600">S</span>cullion
-          </div>
-          <p class="text-sm text-gray-400 mt-1">Enter your 16-digit code</p>
+    <div class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8" phx-window-keydown="keydown">
+      <div class="w-full max-w-sm">
+        <div class="flex items-center justify-center gap-2 mb-6">
+          <.icon name="hero-cake" class="size-5 text-[color:var(--accent)]" />
+          <span class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Scullion</span>
         </div>
 
-        <%!-- Code display --%>
-        <div class="bg-white rounded-2xl border border-gray-100 px-4 py-5 mb-4">
-          <div class="flex justify-center items-center gap-3 font-mono">
-            <%= for group <- digit_groups(@digits) do %>
-              <div class="flex gap-1.5">
-                <%= for d <- group do %>
-                  <span class={["text-lg leading-none", d == :empty && "text-gray-200", d != :empty && "text-gray-800"]}>
-                    {if d == :empty, do: "·", else: "●"}
-                  </span>
-                <% end %>
-              </div>
-            <% end %>
+        <h1 class="text-center font-semibold text-[var(--text)] mb-5" style="font-size: var(--t-h1); line-height: 1.2;">
+          Enter your<br />16-digit code
+        </h1>
+
+        <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] py-3 px-4 mb-5 shadow-[0_1px_2px_rgba(17,24,39,0.04)]">
+          <div class="flex items-center justify-center gap-3 font-mono tabular-nums" style="font-size: 18px; letter-spacing: 0.18em;">
+            <div :for={{group, gi} <- Enum.with_index(@slots)} class="flex gap-2">
+              <span
+                :for={{d, di} <- Enum.with_index(group)}
+                class={[
+                  "inline-flex items-center justify-center w-5 h-7 rounded",
+                  d == :cursor && "border border-[color:var(--accent)]",
+                  d == :empty && "text-[color:var(--subtle)]",
+                  is_binary(d) && "text-[var(--text)]"
+                ]}
+                data-pos={"#{gi}-#{di}"}
+                data-digit-filled={if is_binary(d), do: "true"}
+              >
+                {cond do
+                  is_binary(d) -> d
+                  d == :cursor -> ""
+                  true -> "·"
+                end}
+              </span>
+            </div>
           </div>
         </div>
 
-        <%= if @error do %>
-          <p class="text-red-500 text-center text-sm mb-3 bg-red-50 rounded-xl py-2 px-3">{@error}</p>
-        <% end %>
+        <p :if={@error} class="text-[color:var(--danger)] text-center mb-3 bg-red-50 rounded-[var(--r-lg)] py-2 px-3" style="font-size: var(--t-meta);">
+          {@error}
+        </p>
 
-        <%!-- Numpad --%>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-3 gap-3">
           <.numpad_button value="1" locked={@locked} />
           <.numpad_button value="2" locked={@locked} />
           <.numpad_button value="3" locked={@locked} />
@@ -129,27 +144,46 @@ defmodule ScullionWeb.LoginLive do
           <.numpad_button value="8" locked={@locked} />
           <.numpad_button value="9" locked={@locked} />
 
-          <button phx-click="backspace" disabled={@locked}
-                  class="bg-white border border-gray-200 text-gray-500 text-lg py-4 rounded-xl hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40 shadow-sm">
-            ⌫
+          <button
+            phx-click="backspace"
+            disabled={@locked}
+            aria-label="Backspace"
+            class="h-16 bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.04)] inline-flex items-center justify-center"
+          >
+            <.icon name="hero-backspace" class="size-5" />
           </button>
 
           <.numpad_button value="0" locked={@locked} />
 
-          <button phx-click="submit" disabled={@locked or length(@digits) < 16}
-                  class="bg-green-600 hover:bg-green-700 text-white text-lg py-4 rounded-xl disabled:opacity-40 shadow-sm font-medium">
-            ↵
+          <button
+            phx-click="submit"
+            disabled={@locked or length(@digits) < 16}
+            aria-label="Submit"
+            class="h-16 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white rounded-[var(--r-xl)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.06)] inline-flex items-center justify-center"
+          >
+            <.icon name="hero-arrow-right" class="size-5" />
           </button>
+        </div>
+
+        <div class="mt-6 text-center">
+          <a href="#" class="text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">Need help?</a>
         </div>
       </div>
     </div>
     """
   end
 
-  defp digit_groups(digits) do
-    filled = Enum.map(digits, fn _ -> :filled end)
-    padded = filled ++ List.duplicate(:empty, 16 - length(filled))
-    Enum.chunk_every(padded, 4)
+  defp digit_slots(digits) do
+    pos = length(digits)
+
+    Enum.map(0..15, fn i ->
+      cond do
+        i < pos -> Enum.at(digits, i)
+        i == pos and pos < 16 -> :cursor
+        true -> :empty
+      end
+    end)
+    |> Enum.chunk_every(4)
   end
 
   defp peer_ip(socket) do

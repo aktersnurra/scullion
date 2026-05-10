@@ -4,7 +4,7 @@ defmodule ScullionWeb.Live.Auth do
   alias Scullion.Accounts
 
   def on_mount(:require_authenticated, _params, session, socket) do
-    socket = mount_current_user(session, socket)
+    socket = socket |> mount_current_user(session) |> attach_current_path()
 
     if socket.assigns.current_user do
       {:cont, socket}
@@ -14,7 +14,7 @@ defmodule ScullionWeb.Live.Auth do
   end
 
   def on_mount(:require_admin, _params, session, socket) do
-    socket = mount_current_user(session, socket)
+    socket = socket |> mount_current_user(session) |> attach_current_path()
 
     case socket.assigns.current_user do
       %{role: :admin} -> {:cont, socket}
@@ -23,7 +23,16 @@ defmodule ScullionWeb.Live.Auth do
     end
   end
 
-  defp mount_current_user(session, socket) do
+  defp attach_current_path(socket) do
+    socket
+    |> assign(:current_path, "/")
+    |> attach_hook(:current_path, :handle_params, fn _params, url, socket ->
+      path = URI.parse(url).path || "/"
+      {:cont, assign(socket, :current_path, path)}
+    end)
+  end
+
+  defp mount_current_user(socket, session) do
     case session["user_id"] do
       nil ->
         assign(socket, :current_user, nil)
