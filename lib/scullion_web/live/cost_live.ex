@@ -43,10 +43,10 @@ defmodule ScullionWeb.CostLive do
       {:ok, _} ->
         today = Date.utc_today()
         {:ok, summary} = Costs.monthly_summary(today.year, today.month)
-        {:noreply, socket |> assign(summary: summary) |> put_flash(:info, "Logged")}
+        {:noreply, socket |> assign(summary: summary) |> put_flash(:info, gettext("Logged"))}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to log")}
+        {:noreply, put_flash(socket, :error, gettext("Failed to log"))}
     end
   end
 
@@ -65,10 +65,10 @@ defmodule ScullionWeb.CostLive do
       {:ok, _} ->
         today = Date.utc_today()
         {:ok, summary} = Costs.monthly_summary(today.year, today.month)
-        {:noreply, socket |> assign(summary: summary) |> put_flash(:info, "Receipt saved")}
+        {:noreply, socket |> assign(summary: summary) |> put_flash(:info, gettext("Receipt saved"))}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to save")}
+        {:noreply, put_flash(socket, :error, gettext("Failed to save"))}
     end
   end
 
@@ -82,9 +82,9 @@ defmodule ScullionWeb.CostLive do
 
   def render(assigns) do
     tabs = [
-      %{id: "overview", label: "Overview"},
-      %{id: "receipts", label: "Receipts"},
-      %{id: "dining", label: "Dining"}
+      %{id: "overview", label: gettext("Overview")},
+      %{id: "receipts", label: gettext("Receipts")},
+      %{id: "dining", label: gettext("Dining")}
     ]
 
     grocery_amt = decimal_to_int(assigns.summary.grocery_total)
@@ -100,30 +100,30 @@ defmodule ScullionWeb.CostLive do
     <.page max_width={:md}>
       <.card padded={false}>
         <header class="flex items-center justify-between px-6 pt-6 pb-3">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Costs</h1>
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Costs")}</h1>
           <button
             type="button"
             class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
             style="font-size: var(--t-meta);"
           >
-            This month <.icon name="hero-chevron-down" class="size-3.5" />
+            {gettext("This month")} <.icon name="hero-chevron-down" class="size-3.5" />
           </button>
         </header>
 
         <div class="px-6 pb-5 border-t border-[color:var(--hairline)] pt-5">
-          <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Total spend</p>
+          <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Total spend")}</p>
           <p class="mt-1 font-semibold text-[var(--text)]" style="font-size: var(--t-display);">{format_money(@total_amt)} kr</p>
 
           <div class="mt-5 divide-y divide-[color:var(--hairline)]">
             <div class="flex items-center gap-3 py-3">
               <span class="size-2.5 rounded-full bg-[color:var(--accent)] shrink-0"></span>
-              <span class="flex-1 text-[var(--text)]" style="font-size: var(--t-body);">Groceries</span>
+              <span class="flex-1 text-[var(--text)]" style="font-size: var(--t-body);">{gettext("Groceries")}</span>
               <span class="text-[var(--text)] font-medium tabular-nums" style="font-size: var(--t-body);">{format_money(@grocery_amt)} kr</span>
               <span class="w-10 text-right text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">{@grocery_pct}%</span>
             </div>
             <div class="flex items-center gap-3 py-3">
               <span class="size-2.5 rounded-full bg-[color:var(--warn)] shrink-0"></span>
-              <span class="flex-1 text-[var(--text)]" style="font-size: var(--t-body);">Dining out</span>
+              <span class="flex-1 text-[var(--text)]" style="font-size: var(--t-body);">{gettext("Dining out")}</span>
               <span class="text-[var(--text)] font-medium tabular-nums" style="font-size: var(--t-body);">{format_money(@dining_amt)} kr</span>
               <span class="w-10 text-right text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">{@dining_pct}%</span>
             </div>
@@ -139,15 +139,15 @@ defmodule ScullionWeb.CostLive do
             <% @view == :overview -> %>
               <div class="grid grid-cols-3 gap-3">
                 <div class="text-center">
-                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Receipts</p>
+                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Receipts")}</p>
                   <p class="mt-1 font-semibold" style="font-size: var(--t-h2);">{@summary.receipt_count}</p>
                 </div>
                 <div class="text-center">
-                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Dining</p>
+                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Dining")}</p>
                   <p class="mt-1 font-semibold" style="font-size: var(--t-h2);">{@summary.dining_count}</p>
                 </div>
                 <div class="text-center">
-                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Total</p>
+                  <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Total")}</p>
                   <p class="mt-1 font-semibold" style="font-size: var(--t-h2);">{format_money(@total_amt)} kr</p>
                 </div>
               </div>
@@ -159,10 +159,10 @@ defmodule ScullionWeb.CostLive do
                     <div class="flex-1"><.field name="store_name" label="Store" placeholder="ICA Maxi" /></div>
                   </div>
                   <.field name="total_amount" type="number" label="Total (kr)" placeholder="0.00" required />
-                  <.button type="submit" variant={:primary} size={:lg} full>Save receipt</.button>
+                  <.button type="submit" variant={:primary} size={:lg} full>{gettext("Save receipt")}</.button>
                 </form>
               <% end %>
-              <.empty message="No receipts loaded" />
+              <.empty message={gettext("No receipts loaded")} />
             <% @view == :dining -> %>
               <%= if @current_user && @current_user.role in [:member, :admin] do %>
                 <form phx-submit="log_dining_out" class="space-y-3 mb-4">
@@ -170,12 +170,12 @@ defmodule ScullionWeb.CostLive do
                     <div class="flex-1"><.field name="date" type="date" label="Date" value={Date.to_iso8601(Date.utc_today())} required /></div>
                     <div class="flex-1"><.field name="num_people" type="number" label="People" value="1" /></div>
                   </div>
-                  <.field name="description" label="Restaurant / occasion" placeholder="Sushi night" />
+                  <.field name="description" label={gettext("Restaurant / occasion")} placeholder={gettext("Sushi night")} />
                   <.field name="total_amount" type="number" label="Total (kr)" placeholder="0.00" required />
-                  <.button type="submit" variant={:primary} size={:lg} full>Log dining</.button>
+                  <.button type="submit" variant={:primary} size={:lg} full>{gettext("Log dining")}</.button>
                 </form>
               <% end %>
-              <.empty message="Dining entries will appear here" />
+              <.empty message={gettext("Dining entries will appear here")} />
           <% end %>
         </div>
       </.card>

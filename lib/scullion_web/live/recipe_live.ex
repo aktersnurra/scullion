@@ -69,7 +69,7 @@ defmodule ScullionWeb.RecipeLive do
   end
 
   def handle_event("get_ideas", _, socket) do
-    {:noreply, put_flash(socket, :info, "Coming soon")}
+    {:noreply, put_flash(socket, :info, gettext("Coming soon"))}
   end
 
   def handle_event("import_action", %{"url" => url}, socket) do
@@ -87,7 +87,7 @@ defmodule ScullionWeb.RecipeLive do
         {:noreply, assign(socket, scrape_state: :loading, error: nil)}
 
       true ->
-        {:noreply, assign(socket, error: "Paste a URL or drop screenshots first")}
+        {:noreply, assign(socket, error: gettext("Paste a URL or drop screenshots first"))}
     end
   end
 
@@ -149,7 +149,7 @@ defmodule ScullionWeb.RecipeLive do
         {:noreply, socket |> assign(selected: nil, form: nil) |> reload_recipes()}
 
       {:error, _} ->
-        {:noreply, assign(socket, error: "Could not delete recipe")}
+        {:noreply, assign(socket, error: gettext("Could not delete recipe"))}
     end
   end
 
@@ -241,11 +241,11 @@ defmodule ScullionWeb.RecipeLive do
       <.card class="mb-6">
         <header class="flex items-center justify-between gap-4 mb-5 pb-5 border-b border-[color:var(--hairline)]">
           <div>
-            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Recipes</h1>
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Recipes")}</h1>
             <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{recipe_count_label(@recipes)}</p>
           </div>
           <.button variant={:primary} phx-click="new_recipe">
-            <.icon name="hero-plus" class="size-4" /> New recipe
+            <.icon name="hero-plus" class="size-4" /> {gettext("New recipe")}
           </.button>
         </header>
 
@@ -257,7 +257,7 @@ defmodule ScullionWeb.RecipeLive do
               type="text"
               name="query"
               value={@search}
-              placeholder="Search recipes, ingredients, or meals…"
+              placeholder={gettext("Search recipes, ingredients, or meals…")}
               class="w-full h-12 pl-10 pr-3 bg-[color:var(--hairline)] rounded-[var(--r-lg)] border-2 border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
               style="font-size: var(--t-body);"
             />
@@ -290,7 +290,7 @@ defmodule ScullionWeb.RecipeLive do
               ]}
               style="font-size: var(--t-meta); font-weight: 500;"
             >
-              More filters
+              {gettext("More filters")}
               <.icon name={if @show_more_filters, do: "hero-chevron-up", else: "hero-chevron-down"} class="size-3.5" />
             </button>
           </div>
@@ -313,7 +313,7 @@ defmodule ScullionWeb.RecipeLive do
               </button>
             </div>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-              <span class="text-[color:var(--subtle)] font-medium">Time</span>
+              <span class="text-[color:var(--subtle)] font-medium">{gettext("Time")}</span>
               <button
                 :for={t <- @time_filters}
                 phx-click="filter_time"
@@ -323,9 +323,9 @@ defmodule ScullionWeb.RecipeLive do
                   @filter_max_min != t && "hover:text-[var(--text)]"
                 ]}
               >
-                {if t == :any, do: "Any", else: "≤ #{t} min"}
+                {if t == :any, do: gettext("Any"), else: gettext("≤ %{n} min", n: t)}
               </button>
-              <span class="ml-4 text-[color:var(--subtle)] font-medium">Sort</span>
+              <span class="ml-4 text-[color:var(--subtle)] font-medium">{gettext("Sort")}</span>
               <button
                 :for={s <- @sorts}
                 phx-click="sort"
@@ -345,11 +345,11 @@ defmodule ScullionWeb.RecipeLive do
             <div class="flex items-start gap-3">
               <.icon name="hero-sparkles" class="size-5 text-[color:var(--accent)] shrink-0 mt-0.5" />
               <div>
-                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-meta);">What can we cook tonight?</p>
-                <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Get ideas based on your pantry and this week's deals</p>
+                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-meta);">{gettext("What can we cook tonight?")}</p>
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Get ideas based on your pantry and this week's deals")}</p>
               </div>
             </div>
-            <.button variant={:secondary} phx-click="get_ideas">Get ideas</.button>
+            <.button variant={:secondary} phx-click="get_ideas">{gettext("Get ideas")}</.button>
           </div>
 
           <%!-- Import row --%>
@@ -360,7 +360,7 @@ defmodule ScullionWeb.RecipeLive do
                   type="text"
                   name="url"
                   value=""
-                  placeholder="Paste a recipe URL or drop screenshots…"
+                  placeholder={gettext("Paste a recipe URL or drop screenshots…")}
                   class="w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)] pr-10"
                   style="font-size: var(--t-body);"
                 />
@@ -375,9 +375,9 @@ defmodule ScullionWeb.RecipeLive do
                 disabled={@scrape_state == :loading or @image_extract_state == :loading}
               >
                 {cond do
-                  @scrape_state == :loading -> "Importing…"
-                  @image_extract_state == :loading -> "Extracting…"
-                  true -> "Import"
+                  @scrape_state == :loading -> gettext("Importing…")
+                  @image_extract_state == :loading -> gettext("Extracting…")
+                  true -> gettext("Import")
                 end}
               </.button>
             </div>
@@ -393,7 +393,7 @@ defmodule ScullionWeb.RecipeLive do
       <p :if={@error} class="mb-4 text-[color:var(--danger)]" style="font-size: var(--t-meta);">{@error}</p>
 
       <%= if @recipes == [] do %>
-        <.card><.empty message="No recipes — add one or import from a URL" /></.card>
+        <.card><.empty message={gettext("No recipes — add one or import from a URL")} /></.card>
       <% else %>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
@@ -466,10 +466,10 @@ defmodule ScullionWeb.RecipeLive do
             <div :if={@show_recipe_menu} class="absolute right-0 top-10 w-36 bg-[var(--surface)] rounded-[var(--r-lg)] shadow-[var(--shadow-pop)] border border-[color:var(--border)] overflow-hidden z-10">
               <button type="button" phx-click="edit_recipe"
                 class="w-full text-left px-4 py-2.5 text-[var(--text)] hover:bg-[color:var(--hairline)]"
-                style="font-size: var(--t-meta);">Edit</button>
+                style="font-size: var(--t-meta);">{gettext("Edit")}</button>
               <button type="button" phx-click="delete_recipe"
                 class="w-full text-left px-4 py-2.5 text-[color:var(--danger)] hover:bg-[color:var(--hairline)]"
-                style="font-size: var(--t-meta);">Delete</button>
+                style="font-size: var(--t-meta);">{gettext("Delete")}</button>
             </div>
           </div>
         </div>
@@ -487,7 +487,7 @@ defmodule ScullionWeb.RecipeLive do
               <.icon name="hero-clock" class="size-4" /> {total_time(@selected)}
             </span>
             <span :if={@selected.base_servings} class="inline-flex items-center gap-1.5">
-              <.icon name="hero-user-group" class="size-4" /> {@selected.base_servings} servings
+              <.icon name="hero-user-group" class="size-4" /> {gettext("%{n} servings", n: @selected.base_servings)}
             </span>
           </div>
           <div :if={@selected.tags != []} class="flex flex-wrap gap-1.5 mt-3">
@@ -497,7 +497,7 @@ defmodule ScullionWeb.RecipeLive do
 
         <%!-- Ingredients --%>
         <div :if={@selected.recipe_ingredients != []}>
-          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">Ingredients</h3>
+          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">{gettext("Ingredients")}</h3>
           <ul class="space-y-2">
             <li :for={ri <- @selected.recipe_ingredients} class="flex items-baseline gap-3" style="font-size: var(--t-body);">
               <span class="size-1.5 rounded-full bg-[color:var(--accent)] shrink-0 mt-2"></span>
@@ -511,7 +511,7 @@ defmodule ScullionWeb.RecipeLive do
 
         <%!-- Instructions --%>
         <div :if={@selected.steps || @selected.instructions}>
-          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">Instructions</h3>
+          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">{gettext("Instructions")}</h3>
           <%= if grouped_steps(@selected) != [] do %>
             <div :for={{phase, steps} <- grouped_steps(@selected)} class="mb-5 last:mb-0">
               <h4 :if={phase} class="font-medium text-[color:var(--muted)] mb-2 uppercase tracking-wide" style="font-size: var(--t-micro);">{phase}</h4>
@@ -535,7 +535,7 @@ defmodule ScullionWeb.RecipeLive do
           <a href={@selected.source_url} target="_blank"
             class="inline-flex items-center gap-1.5 text-[color:var(--muted)] hover:text-[var(--text)]"
             style="font-size: var(--t-meta);">
-            <.icon name="hero-link" class="size-4" /> Original recipe
+            <.icon name="hero-link" class="size-4" /> {gettext("Original recipe")}
           </a>
         </div>
       </div>
@@ -548,7 +548,7 @@ defmodule ScullionWeb.RecipeLive do
     <div>
       <div class="flex items-center justify-between mb-5">
         <h2 class="font-semibold tracking-tight text-[var(--text)]" style="font-size: var(--t-h1);">
-          {if @selected, do: "Edit recipe", else: "New recipe"}
+          {if @selected, do: gettext("Edit recipe"), else: gettext("New recipe")}
         </h2>
         <button
           type="button"
@@ -563,7 +563,7 @@ defmodule ScullionWeb.RecipeLive do
         <.field name="recipe[title]" label="Title" value={@form[:title] || ""} required />
 
         <label class="block">
-          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Type</span>
+          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Type")}</span>
           <select name="recipe[recipe_type]"
                   class="w-full bg-transparent border-0 border-b border-[color:var(--border)] py-2 text-[var(--text)] focus:outline-none focus:ring-0 focus:border-[color:var(--accent)]"
                   style="font-size: var(--t-body);">
@@ -583,14 +583,14 @@ defmodule ScullionWeb.RecipeLive do
         <.field name="recipe[base_servings]" label="Servings" type="number" value={to_string_or_empty(@form[:base_servings])} />
         <.field name="recipe[tags]" label="Tags" value={@form[:tags] || ""} placeholder="quick, batch, vegetarian" />
         <div>
-          <span class="block mb-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Ingredients</span>
+          <span class="block mb-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Ingredients")}</span>
           <div class="space-y-2">
             <div :for={{row, idx} <- Enum.with_index(@ingredient_rows)} class="flex items-center gap-2">
               <input
                 type="text"
                 name={"ingredients[#{idx}][name]"}
                 value={row.name}
-                placeholder="Ingredient"
+                placeholder={gettext("Ingredient")}
                 phx-change="sync_ingredient"
                 phx-value-index={idx}
                 phx-debounce="blur"
@@ -601,7 +601,7 @@ defmodule ScullionWeb.RecipeLive do
                 type="text"
                 name={"ingredients[#{idx}][quantity]"}
                 value={row.quantity}
-                placeholder="Qty"
+                placeholder={gettext("Qty")}
                 phx-change="sync_ingredient"
                 phx-value-index={idx}
                 phx-debounce="blur"
@@ -612,7 +612,7 @@ defmodule ScullionWeb.RecipeLive do
                 type="text"
                 name={"ingredients[#{idx}][unit]"}
                 value={row.unit}
-                placeholder="Unit"
+                placeholder={gettext("Unit")}
                 phx-change="sync_ingredient"
                 phx-value-index={idx}
                 phx-debounce="blur"
@@ -635,13 +635,13 @@ defmodule ScullionWeb.RecipeLive do
             class="mt-2 inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline"
             style="font-size: var(--t-meta); font-weight: 500;"
           >
-            <.icon name="hero-plus" class="size-4" /> Add ingredient
+            <.icon name="hero-plus" class="size-4" /> {gettext("Add ingredient")}
           </button>
         </div>
         <.field name="recipe[source_url]" label="Source URL" value={@form[:source_url] || ""} />
 
         <label class="block">
-          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Instructions</span>
+          <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Instructions")}</span>
           <textarea name="recipe[instructions]" rows="6"
                     class="w-full bg-transparent border border-[color:var(--border)] rounded-[var(--r-sm)] px-3 py-2 text-[var(--text)] focus:outline-none focus:ring-0 focus:border-[color:var(--accent)]"
                     style="font-size: var(--t-body);"
@@ -649,8 +649,8 @@ defmodule ScullionWeb.RecipeLive do
         </label>
 
         <div class="flex gap-2 pt-4 border-t border-[color:var(--border)]">
-          <.button type="submit" variant={:primary}>Save</.button>
-          <.button variant={:ghost} phx-click="close">Cancel</.button>
+          <.button type="submit" variant={:primary}>{gettext("Save")}</.button>
+          <.button variant={:ghost} phx-click="close">{gettext("Cancel")}</.button>
         </div>
       </form>
     </div>
@@ -770,25 +770,25 @@ defmodule ScullionWeb.RecipeLive do
     if total > 0, do: "#{total} min", else: "—"
   end
 
-  defp extract_error(:provider_budget_exceeded), do: "Monthly LLM budget reached"
-  defp extract_error(:rate_limited), do: "Too many requests — try again in a moment"
-  defp extract_error({:openrouter_error, status, _}), do: "Extraction failed (API error #{status})"
-  defp extract_error(_), do: "Could not extract recipe from the images"
+  defp extract_error(:provider_budget_exceeded), do: gettext("Monthly LLM budget reached")
+  defp extract_error(:rate_limited), do: gettext("Too many requests — try again in a moment")
+  defp extract_error({:openrouter_error, status, _}), do: gettext("Extraction failed (API error %{status})", status: status)
+  defp extract_error(_), do: gettext("Could not extract recipe from the images")
 
   defp scrape_error({:http_error, status}) when is_integer(status),
-    do: "Could not fetch page (HTTP #{status})"
+    do: gettext("Could not fetch page (HTTP %{status})", status: status)
 
   defp scrape_error({:req_error, _}),
-    do: "Could not reach the URL — check your connection or the address"
+    do: gettext("Could not reach the URL — check your connection or the address")
 
   defp scrape_error(:not_implemented),
-    do: "This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead"
+    do: gettext("This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead")
 
   defp scrape_error({:openrouter_error, status, _}),
-    do: "Recipe extraction failed (API error #{status})"
+    do: gettext("Recipe extraction failed (API error %{status})", status: status)
 
   defp scrape_error(_),
-    do: "Could not extract a recipe from this page"
+    do: gettext("Could not extract a recipe from this page")
 
   defp error_message(changeset) do
     changeset.errors
@@ -796,13 +796,13 @@ defmodule ScullionWeb.RecipeLive do
     |> Enum.join(", ")
   end
 
-  defp sort_label(:recently_added), do: "Recent"
-  defp sort_label(:last_used), do: "Last used"
+  defp sort_label(:recently_added), do: gettext("Recent")
+  defp sort_label(:last_used), do: gettext("Last used")
   defp sort_label(:alphabetical), do: "A–Z"
 
   defp recipe_count_label([]), do: nil
-  defp recipe_count_label([_]), do: "1 recipe"
-  defp recipe_count_label(list), do: "#{length(list)} recipes"
+  defp recipe_count_label([_]), do: gettext("1 recipe")
+  defp recipe_count_label(list), do: gettext("%{n} recipes", n: length(list))
 
   defp to_string_or_empty(nil), do: ""
   defp to_string_or_empty(v), do: to_string(v)

@@ -233,9 +233,9 @@ defmodule ScullionWeb.PlannerLive do
       %{slot_key: ^sk} = s ->
         msg =
           case reason do
-            :budget_exceeded -> "Monthly LLM budget reached"
-            :cooldown -> "Please wait a moment before trying again"
-            _ -> "Couldn't fetch a new suggestion"
+            :budget_exceeded -> gettext("Monthly LLM budget reached")
+            :cooldown -> gettext("Please wait a moment before trying again")
+            _ -> gettext("Couldn't fetch a new suggestion")
           end
 
         {:noreply,
@@ -264,13 +264,13 @@ defmodule ScullionWeb.PlannerLive do
           type="button"
           phx-click="prev_week"
           class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
-          aria-label="Previous week"
+          aria-label={gettext("Previous week")}
         >
           <.icon name="hero-chevron-left" class="size-5" />
         </button>
 
         <div class="text-center">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">This week</h1>
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("This week")}</h1>
           <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
             {plan_subtitle(@plan_state, @week_start, @week_end)}
           </p>
@@ -280,7 +280,7 @@ defmodule ScullionWeb.PlannerLive do
           type="button"
           phx-click="next_week"
           class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
-          aria-label="Next week"
+          aria-label={gettext("Next week")}
         >
           <.icon name="hero-chevron-right" class="size-5" />
         </button>
@@ -301,7 +301,7 @@ defmodule ScullionWeb.PlannerLive do
         </ul>
 
         <p class="px-6 py-4 text-center text-[color:var(--subtle)]" style="font-size: var(--t-meta);">
-          Swipe left to right to see other weeks
+          {gettext("Swipe left to right to see other weeks")}
         </p>
       </.card>
 
@@ -338,7 +338,7 @@ defmodule ScullionWeb.PlannerLive do
         class="grid grid-cols-[56px_80px_1fr_auto] items-center gap-4 px-5 py-3 cursor-pointer hover:bg-[color:var(--accent-soft)]/20"
         role="button"
         tabindex="0"
-        aria-label={"Edit #{slot_label(@slot_key)}"}
+        aria-label={gettext("Edit %{label}", label: slot_label(@slot_key))}
       >
         <div class="flex flex-col items-center">
           <div
@@ -362,7 +362,7 @@ defmodule ScullionWeb.PlannerLive do
             {Calendar.strftime(@date, "%-d")}
           </div>
           <div :if={@is_today} class="mt-1 text-[color:var(--accent)] font-medium leading-none" style="font-size: 11px;">
-            Today
+            {gettext("Today")}
           </div>
         </div>
 
@@ -384,23 +384,23 @@ defmodule ScullionWeb.PlannerLive do
               </p>
               <div class="mt-1 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
                 <span :if={@slot.servings} class="inline-flex items-center gap-1">
-                  <.icon name="hero-user-group" class="size-3.5" /> {@slot.servings} servings
+                  <.icon name="hero-user-group" class="size-3.5" /> {gettext("%{n} servings", n: @slot.servings)}
                 </span>
                 <span :if={@slot.leftover} class="inline-flex items-center gap-1">
-                  <.icon name="hero-arrow-uturn-right" class="size-3.5" /> Uses leftovers
+                  <.icon name="hero-arrow-uturn-right" class="size-3.5" /> {gettext("Uses leftovers")}
                 </span>
               </div>
             <% @slot && @slot.leftover -> %>
-              <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">Leftovers</p>
+              <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("Leftovers")}</p>
             <% @slot && @slot.skipped -> %>
-              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">Skipped</p>
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">{gettext("Skipped")}</p>
             <% true -> %>
-              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">— add a meal</p>
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">{gettext("— add a meal")}</p>
           <% end %>
         </div>
 
         <.chip :if={leftover_target(@plan_state, @days, @date) != nil} tone={:accent}>
-          Leftovers for {leftover_target(@plan_state, @days, @date)}
+          {gettext("Leftovers for %{day}", day: leftover_target(@plan_state, @days, @date))}
         </.chip>
         <.icon :if={leftover_target(@plan_state, @days, @date) == nil} name="hero-chevron-right" class="size-5 text-[color:var(--subtle)]" />
       </div>
@@ -489,13 +489,13 @@ defmodule ScullionWeb.PlannerLive do
               </div>
             <% else %>
               <div class="px-6 pt-6 pb-2">
-                <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">No meal chosen yet — tap Change recipe to pick one.</p>
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("No meal chosen yet — tap Change recipe to pick one.")}</p>
               </div>
             <% end %>
 
             <div class={["px-6 py-5 space-y-4", @slot_action.skipped && "opacity-40 pointer-events-none"]}>
               <div class="flex items-center justify-between">
-                <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">Portions</span>
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">{gettext("Portions")}</span>
                 <div class="inline-flex items-center gap-3">
                   <button type="button" phx-click="dec_servings"
                     class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]">
@@ -510,7 +510,7 @@ defmodule ScullionWeb.PlannerLive do
               </div>
 
               <div :if={@days_after != [] and @slot_action.selected_recipe_id} class="flex items-start gap-3">
-                <span class="text-[color:var(--muted)] mt-1.5" style="font-size: var(--t-meta); font-weight: 500;">Leftovers for</span>
+                <span class="text-[color:var(--muted)] mt-1.5" style="font-size: var(--t-meta); font-weight: 500;">{gettext("Leftovers for")}</span>
                 <div class="flex flex-wrap gap-1.5">
                   <button :for={d <- @days_after}
                     type="button"
@@ -536,7 +536,7 @@ defmodule ScullionWeb.PlannerLive do
                 class="inline-flex items-center gap-1.5 text-[color:var(--accent)] hover:underline"
                 style="font-size: var(--t-meta); font-weight: 500;"
               >
-                <.icon name="hero-arrow-path" class="size-4" /> Change recipe
+                <.icon name="hero-arrow-path" class="size-4" /> {gettext("Change recipe")}
               </button>
 
               <button
@@ -550,7 +550,7 @@ defmodule ScullionWeb.PlannerLive do
                 style="font-size: var(--t-meta);"
               >
                 <.icon name={if @slot_action.skipped, do: "hero-x-circle", else: "hero-x-circle"} class="size-4" />
-                <%= if @slot_action.skipped, do: "Skipped", else: "Skip dinner" %>
+                <%= if @slot_action.skipped, do: gettext("Skipped"), else: gettext("Skip dinner") %>
               </button>
             </div>
           </div>
@@ -562,7 +562,7 @@ defmodule ScullionWeb.PlannerLive do
                 class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]">
                 <.icon name="hero-chevron-left" class="size-5" />
               </button>
-              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Choose a recipe</h2>
+              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Choose a recipe")}</h2>
             </header>
 
             <div class="flex-1 overflow-y-auto px-6 pt-4 pb-6 space-y-4">
@@ -573,7 +573,7 @@ defmodule ScullionWeb.PlannerLive do
                     type="text"
                     name="q"
                     value={@slot_action.search}
-                    placeholder="Search recipes…"
+                    placeholder={gettext("Search recipes…")}
                     class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
                     style="font-size: var(--t-body);"
                   />
@@ -583,7 +583,7 @@ defmodule ScullionWeb.PlannerLive do
               <%= if @slot_action.search == "" do %>
                 <section>
                   <div class="flex items-center justify-between mb-2">
-                    <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">Suggested</h3>
+                    <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Suggested")}</h3>
                     <button
                       type="button"
                       phx-click="regenerate_suggestion"
@@ -591,12 +591,12 @@ defmodule ScullionWeb.PlannerLive do
                       class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline disabled:opacity-40"
                       style="font-size: var(--t-meta);"
                     >
-                      <.icon name="hero-sparkles" class="size-3.5" /> Surprise me
+                      <.icon name="hero-sparkles" class="size-3.5" /> {gettext("Surprise me")}
                     </button>
                   </div>
 
                   <%= if @slot_action.loading_suggestions and @slot_action.suggestions == [] do %>
-                    <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">Finding suggestions…</p>
+                    <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">{gettext("Finding suggestions…")}</p>
                   <% else %>
                     <ul class="space-y-2">
                       <.recipe_pick_row :for={sug <- @slot_action.suggestions}
@@ -610,7 +610,7 @@ defmodule ScullionWeb.PlannerLive do
 
               <section>
                 <h3 class="uppercase tracking-wider text-[color:var(--subtle)] mb-2" style="font-size: var(--t-micro); font-weight: 600;">
-                  <%= if @slot_action.search == "", do: "All recipes", else: "Results" %>
+                  <%= if @slot_action.search == "", do: gettext("All recipes"), else: gettext("Results") %>
                 </h3>
                 <ul class="space-y-2">
                   <.recipe_pick_row :for={r <- @other_recipes}
@@ -618,7 +618,7 @@ defmodule ScullionWeb.PlannerLive do
                     reasons={[]}
                     selected={@slot_action.selected_recipe_id == r.id} />
                 </ul>
-                <p :if={@other_recipes == [] and @slot_action.search != ""} class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No recipes match.</p>
+                <p :if={@other_recipes == [] and @slot_action.search != ""} class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">{gettext("No recipes match.")}</p>
               </section>
             </div>
           </div>
@@ -659,7 +659,7 @@ defmodule ScullionWeb.PlannerLive do
             <%= if @reasons != [] do %>
               {Enum.join(@reasons, " · ")}
             <% else %>
-              <%= if @total_min > 0, do: "#{@total_min} min", else: "" %><%= if @recipe.base_servings, do: " · #{@recipe.base_servings} portions", else: "" %>
+              <%= if @total_min > 0, do: gettext("%{n} min", n: @total_min), else: "" %><%= if @recipe.base_servings, do: " · #{gettext("%{n} portions", n: @recipe.base_servings)}", else: "" %>
             <% end %>
           </p>
         </div>

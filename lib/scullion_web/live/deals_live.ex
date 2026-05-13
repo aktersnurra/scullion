@@ -16,10 +16,10 @@ defmodule ScullionWeb.DealsLive do
         {:noreply,
          socket
          |> assign(deals: Deals.list_current())
-         |> put_flash(:info, "Imported #{count} deals")}
+         |> put_flash(:info, gettext("Imported %{count} deals", count: count))}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Scrape failed")}
+        {:noreply, put_flash(socket, :error, gettext("Scrape failed"))}
     end
   end
 
@@ -29,13 +29,13 @@ defmodule ScullionWeb.DealsLive do
     {:noreply,
      socket
      |> assign(deals: Deals.list_current())
-     |> put_flash(:info, "Scrape triggered")}
+     |> put_flash(:info, gettext("Scrape triggered"))}
   end
 
   def render(assigns) do
     ~H"""
     <div class="max-w-2xl mx-auto p-4">
-      <h1 class="text-xl font-semibold mb-4">Current Deals</h1>
+      <h1 class="text-xl font-semibold mb-4">{gettext("Current Deals")}</h1>
 
       <%= if @current_user && @current_user.role == :admin do %>
         <div class="mb-6 flex gap-2">
@@ -53,13 +53,13 @@ defmodule ScullionWeb.DealsLive do
             phx-click="scrape_all"
             class="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
           >
-            Scrape All
+            {gettext("Scrape All")}
           </button>
         </div>
       <% end %>
 
       <%= if Enum.empty?(@deals) do %>
-        <p class="text-gray-500 text-sm">No current deals.</p>
+        <p class="text-gray-500 text-sm">{gettext("No current deals.")}</p>
       <% else %>
         <ul class="divide-y">
           <%= for deal <- @deals do %>

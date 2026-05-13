@@ -21,21 +21,21 @@ defmodule ScullionWeb.PrepLive do
         {:noreply, assign(socket, guide: guide)}
 
       {:error, :budget_exceeded} ->
-        {:noreply, put_flash(socket, :error, "Monthly LLM budget reached")}
+        {:noreply, put_flash(socket, :error, gettext("Monthly LLM budget reached"))}
 
       {:error, :cooldown} ->
-        {:noreply, put_flash(socket, :error, "Please wait a moment before generating again")}
+        {:noreply, put_flash(socket, :error, gettext("Please wait a moment before generating again"))}
 
       {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Prep guide generation failed")}
+        {:noreply, put_flash(socket, :error, gettext("Prep guide generation failed"))}
     end
   end
 
   def render(assigns) do
     tabs = [
-      %{id: "timeline", label: "Timeline"},
-      %{id: "components", label: "Components"},
-      %{id: "notes", label: "Notes"}
+      %{id: "timeline", label: gettext("Timeline")},
+      %{id: "components", label: gettext("Components")},
+      %{id: "notes", label: gettext("Notes")}
     ]
 
     total_min =
@@ -51,7 +51,7 @@ defmodule ScullionWeb.PrepLive do
     <.page max_width={:md}>
       <.card padded={false}>
         <header class="flex items-center justify-between px-6 pt-6 pb-3">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Prep Guide</h1>
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Prep Guide")}</h1>
           <button
             type="button"
             class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
@@ -65,12 +65,12 @@ defmodule ScullionWeb.PrepLive do
         <%= if @guide do %>
           <div class="px-6 pt-3 border-t border-[color:var(--hairline)]">
             <div class="flex items-baseline justify-between pb-4 border-b border-[color:var(--hairline)]">
-              <h2 class="font-semibold" style="font-size: var(--t-h2);">Sunday Prep Plan</h2>
-              <span :if={@total_min > 0} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{format_duration(@total_min)} total</span>
+              <h2 class="font-semibold" style="font-size: var(--t-h2);">{gettext("Sunday Prep Plan")}</h2>
+              <span :if={@total_min > 0} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("%{duration} total", duration: format_duration(@total_min))}</span>
             </div>
 
             <p class="mt-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-              Batch prep to make the week easier. Most components keep 3–4 days.
+              {gettext("Batch prep to make the week easier. Most components keep 3–4 days.")}
             </p>
 
             <div class="mt-4">
@@ -82,7 +82,7 @@ defmodule ScullionWeb.PrepLive do
                 <% @tab == "timeline" and @guide.timeline -> %>
                   {timeline_render(assigns)}
                 <% @tab == "timeline" -> %>
-                  <.empty message="No timeline yet" />
+                  <.empty message={gettext("No timeline yet")} />
                 <% @tab == "components" and @guide.prep_session -> %>
                   <div class="space-y-4">
                     <div :for={key <- ["proteins", "bases", "sauces", "vegetables"]}>
@@ -93,10 +93,10 @@ defmodule ScullionWeb.PrepLive do
                     </div>
                   </div>
                 <% @tab == "components" -> %>
-                  <.empty message="No components" />
+                  <.empty message={gettext("No components")} />
                 <% @tab == "notes" -> %>
                   <p :if={@guide.storage_notes} class="text-[var(--text)]" style="font-size: var(--t-body);">{@guide.storage_notes}</p>
-                  <.empty :if={!@guide.storage_notes} message="No notes" />
+                  <.empty :if={!@guide.storage_notes} message={gettext("No notes")} />
               <% end %>
             </div>
           </div>
@@ -105,13 +105,13 @@ defmodule ScullionWeb.PrepLive do
             <div class="size-14 rounded-full bg-[color:var(--accent-soft)] inline-flex items-center justify-center mb-5">
               <.icon name="hero-fire" class="size-7 text-[color:var(--accent)]" />
             </div>
-            <h3 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">No guide yet</h3>
+            <h3 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("No guide yet")}</h3>
             <p class="mt-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-              Assign recipes in the planner, then generate your prep guide.
+              {gettext("Assign recipes in the planner, then generate your prep guide.")}
             </p>
             <div class="mt-5">
               <.button variant={:primary} size={:lg} phx-click="generate_guide">
-                <.icon name="hero-sparkles" class="size-4" /> Generate guide
+                <.icon name="hero-sparkles" class="size-4" /> {gettext("Generate guide")}
               </.button>
             </div>
           </div>

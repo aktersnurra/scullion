@@ -84,9 +84,9 @@ defmodule ScullionWeb.GroceryLive do
       <.card padded={false}>
         <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
           <div>
-            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Groceries</h1>
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Groceries")}</h1>
             <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-              {@unchecked_count} unchecked · Week {@week_number}
+              {gettext("%{n} unchecked · Week %{week}", n: @unchecked_count, week: @week_number)}
             </p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
@@ -95,13 +95,13 @@ defmodule ScullionWeb.GroceryLive do
               class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
               style="font-size: var(--t-meta);"
             >
-              <.icon name="hero-funnel" class="size-4" /> Group by category
+              <.icon name="hero-funnel" class="size-4" /> {gettext("Group by category")}
               <.icon name="hero-chevron-down" class="size-3.5" />
             </button>
             <button
               type="button"
               phx-click="export_list"
-              aria-label="More"
+              aria-label={gettext("More")}
               class="size-9 inline-flex items-center justify-center rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
             >
               <.icon name="hero-ellipsis-horizontal" class="size-4" />
@@ -112,7 +112,7 @@ defmodule ScullionWeb.GroceryLive do
         <div :if={@export_text} class="mx-6 mb-4 border border-[color:var(--border)] rounded-[var(--r-lg)] p-3">
           <div class="flex items-center justify-between mb-2">
             <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">
-              Export
+              {gettext("Export")}
             </span>
             <.icon_button icon="hero-x-mark" label="Close" phx-click="clear_export" />
           </div>
@@ -126,7 +126,7 @@ defmodule ScullionWeb.GroceryLive do
 
         <div class="px-6 pb-3">
           <%= if @total == 0 do %>
-            <.empty message="No items yet" />
+            <.empty message={gettext("No items yet")} />
           <% else %>
             <ul class="divide-y divide-[color:var(--hairline)]">
               <.grocery_row :for={item <- @unchecked} item={item} />
@@ -134,7 +134,7 @@ defmodule ScullionWeb.GroceryLive do
 
             <%= if @checked != [] do %>
               <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mt-6 mb-1" style="font-size: var(--t-micro); font-weight: 600;">
-                Done · {length(@checked)}
+                {gettext("Done · %{n}", n: length(@checked))}
               </h2>
               <ul class="divide-y divide-[color:var(--hairline)]">
                 <.grocery_row :for={item <- @checked} item={item} />
@@ -147,7 +147,7 @@ defmodule ScullionWeb.GroceryLive do
             <input
               type="text"
               name="name"
-              placeholder="Add item…"
+              placeholder={gettext("Add item…")}
               required
               class="flex-1 h-10 bg-transparent border-0 text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none"
               style="font-size: var(--t-body);"
@@ -155,7 +155,7 @@ defmodule ScullionWeb.GroceryLive do
             <input
               type="text"
               name="quantity"
-              placeholder="Qty"
+              placeholder={gettext("Qty")}
               inputmode="decimal"
               class="w-16 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] tabular-nums text-right focus:outline-none"
               style="font-size: var(--t-meta);"
@@ -163,7 +163,7 @@ defmodule ScullionWeb.GroceryLive do
             <input
               type="text"
               name="unit"
-              placeholder="Unit"
+              placeholder={gettext("Unit")}
               class="w-12 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] focus:outline-none"
               style="font-size: var(--t-meta);"
             />
@@ -211,7 +211,7 @@ defmodule ScullionWeb.GroceryLive do
         type="button"
         phx-click="remove_item"
         phx-value-item_id={@item.id}
-        aria-label="Remove"
+        aria-label={gettext("Remove")}
         class="size-9 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]"
       >
         <.icon name="hero-x-mark" class="size-4" />

@@ -18,7 +18,7 @@ defmodule ScullionWeb.PantryLive do
 
     case Pantry.add_item(attrs) do
       {:ok, _} -> {:noreply, assign(socket, items: Pantry.list_inventory())}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to add item")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, gettext("Failed to add item"))}
     end
   end
 
@@ -33,11 +33,11 @@ defmodule ScullionWeb.PantryLive do
     <.page max_width={:md}>
       <.card padded={false}>
         <header class="px-6 pt-6 pb-3">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">Pantry</h1>
+          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Pantry")}</h1>
         </header>
 
         <%= if @items == [] do %>
-          <div class="px-6 py-8 border-t border-[color:var(--hairline)]"><.empty message="Nothing in pantry yet" /></div>
+          <div class="px-6 py-8 border-t border-[color:var(--hairline)]"><.empty message={gettext("Nothing in pantry yet")} /></div>
         <% else %>
           <ul class="px-6 pt-2 border-t border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
             <li :for={item <- @items} class={["flex items-center gap-3 py-3", expiring_soon?(item.expires_at) && "text-[color:var(--danger)]"]}>
@@ -46,7 +46,7 @@ defmodule ScullionWeb.PantryLive do
                 <p :if={item.category || item.expires_at} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
                   <span :if={item.category}>{item.category}</span>
                   <span :if={item.category && item.expires_at}> · </span>
-                  <span :if={item.expires_at}>expires {format_date(item.expires_at)}</span>
+                  <span :if={item.expires_at}>{gettext("expires %{date}", date: format_date(item.expires_at))}</span>
                 </p>
               </div>
               <span class="shrink-0 text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
@@ -54,7 +54,7 @@ defmodule ScullionWeb.PantryLive do
               </span>
               <%= if @current_user && @current_user.role in [:member, :admin] do %>
                 <button phx-click="remove_item" phx-value-id={item.id}
-                        class="size-9 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]" aria-label="Remove">
+                        class="size-9 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]" aria-label={gettext("Remove")}>
                   <.icon name="hero-x-mark" class="size-4" />
                 </button>
               <% end %>
@@ -64,7 +64,7 @@ defmodule ScullionWeb.PantryLive do
 
         <%= if @current_user && @current_user.role in [:member, :admin] do %>
           <form phx-submit="add_item" class="px-6 py-5 mt-2 border-t border-[color:var(--hairline)] space-y-4">
-            <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Add to pantry</h2>
+            <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Add to pantry")}</h2>
             <.field name="name" label="Item" placeholder="e.g. Pasta" required />
             <div class="grid grid-cols-2 gap-3">
               <.field name="quantity" label="Quantity" placeholder="500" />
@@ -74,7 +74,7 @@ defmodule ScullionWeb.PantryLive do
               <.field name="category" label="Category" placeholder="dairy" />
               <.field name="expires_at" label="Expires" type="date" />
             </div>
-            <.button type="submit" variant={:primary} size={:lg} full>Add</.button>
+            <.button type="submit" variant={:primary} size={:lg} full>{gettext("Add")}</.button>
           </form>
         <% end %>
       </.card>

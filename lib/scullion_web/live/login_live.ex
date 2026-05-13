@@ -44,14 +44,14 @@ defmodule ScullionWeb.LoginLive do
 
     cond do
       length(digits) < 16 ->
-        {:noreply, assign(socket, error: "Enter all 16 digits")}
+        {:noreply, assign(socket, error: gettext("Enter all 16 digits"))}
 
       match?({:error, :locked, _}, RateLimiter.check(ip)) ->
         {:error, :locked, retry_after} = RateLimiter.check(ip)
 
         {:noreply,
          assign(socket,
-           error: "Too many attempts. Try again in #{retry_after}s",
+           error: gettext("Too many attempts. Try again in %{n}s", n: retry_after),
            digits: [],
            locked: true
          )}
@@ -68,7 +68,7 @@ defmodule ScullionWeb.LoginLive do
           {:error, :invalid_code} ->
             RateLimiter.record_failure(ip)
             locked = rate_limit_state(ip)
-            error = if locked, do: "Too many attempts. Try again later.", else: "Invalid code"
+            error = if locked, do: gettext("Too many attempts. Try again later."), else: gettext("Invalid code")
             {:noreply, assign(socket, error: error, digits: [], locked: locked)}
         end
     end
@@ -98,11 +98,11 @@ defmodule ScullionWeb.LoginLive do
       <div class="w-full max-w-sm">
         <div class="flex items-center justify-center gap-2 mb-6">
           <.icon name="hero-cake" class="size-5 text-[color:var(--accent)]" />
-          <span class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Scullion</span>
+          <span class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Scullion")}</span>
         </div>
 
         <h1 class="text-center font-semibold text-[var(--text)] mb-5" style="font-size: var(--t-h1); line-height: 1.2;">
-          Enter your<br />16-digit code
+          {gettext("Enter your 16-digit code")}
         </h1>
 
         <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] py-3 px-4 mb-5 shadow-[0_1px_2px_rgba(17,24,39,0.04)]">
@@ -147,7 +147,7 @@ defmodule ScullionWeb.LoginLive do
           <button
             phx-click="backspace"
             disabled={@locked}
-            aria-label="Backspace"
+            aria-label={gettext("Backspace")}
             class="h-16 bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.04)] inline-flex items-center justify-center"
           >
             <.icon name="hero-backspace" class="size-5" />
@@ -158,7 +158,7 @@ defmodule ScullionWeb.LoginLive do
           <button
             phx-click="submit"
             disabled={@locked or length(@digits) < 16}
-            aria-label="Submit"
+            aria-label={gettext("Submit")}
             class="h-16 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white rounded-[var(--r-xl)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.06)] inline-flex items-center justify-center"
           >
             <.icon name="hero-arrow-right" class="size-5" />
@@ -166,7 +166,7 @@ defmodule ScullionWeb.LoginLive do
         </div>
 
         <div class="mt-6 text-center">
-          <a href="#" class="text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">Need help?</a>
+          <a href="#" class="text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">{gettext("Need help?")}</a>
         </div>
       </div>
     </div>
