@@ -6,15 +6,17 @@ defmodule ScullionWeb.Layouts do
 
   embed_templates "layouts/*"
 
-  @nav_items [
-    {"/", "Week", "hero-calendar-days"},
-    {"/recipes", "Recipes", "hero-book-open"},
-    {"/groceries", "Groceries", "hero-shopping-cart"},
-    {"/prep", "Prep", "hero-fire"},
-    {"/pantry", "Pantry", "hero-archive-box"},
-    {"/costs", "Costs", "hero-banknotes"},
-    {"/settings", "Settings", "hero-cog-6-tooth"}
-  ]
+  defp nav_items do
+    [
+      {"/", gettext("Week"), "hero-calendar-days"},
+      {"/recipes", gettext("Recipes"), "hero-book-open"},
+      {"/groceries", gettext("Groceries"), "hero-shopping-cart"},
+      {"/prep", gettext("Prep"), "hero-fire"},
+      {"/pantry", gettext("Pantry"), "hero-archive-box"},
+      {"/costs", gettext("Costs"), "hero-banknotes"},
+      {"/settings", gettext("Settings"), "hero-cog-6-tooth"}
+    ]
+  end
 
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
@@ -22,7 +24,7 @@ defmodule ScullionWeb.Layouts do
   slot :inner_block, required: true
 
   def app(assigns) do
-    assigns = assign(assigns, :nav_items, @nav_items)
+    assigns = assign(assigns, :nav_items, nav_items())
 
     ~H"""
     <header class="sticky top-0 z-40 hidden md:block h-[var(--nav-height)] px-6 bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
