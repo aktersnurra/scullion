@@ -42,6 +42,17 @@ defmodule ScullionWeb.PlannerLive do
   def handle_event("open_slot", %{"slot_key" => sk}, socket) do
     slot = Map.get(socket.assigns.plan_state.slots, sk)
 
+    # Find which future slots are already marked as leftovers from this slot's recipe
+    existing_leftover_days =
+      if slot && slot.recipe_id do
+        socket.assigns.plan_state.slots
+        |> Enum.filter(fn {_k, s} -> s.leftover && s.recipe_id == slot.recipe_id end)
+        |> Enum.map(fn {k, _} -> k end)
+        |> MapSet.new()
+      else
+        MapSet.new()
+      end
+
     initial = %{
       slot_key: sk,
       search: "",
@@ -49,8 +60,9 @@ defmodule ScullionWeb.PlannerLive do
       loading_suggestions: true,
       selected_recipe_id: slot && slot.recipe_id,
       servings: (slot && slot.servings) || 4,
-      leftover_days: MapSet.new(),
-      skipped: (slot && slot.skipped) || false
+      leftover_days: existing_leftover_days,
+      skipped: (slot && slot.skipped) || false,
+      flipped: false
     }
 
     parent = self()
@@ -66,7 +78,15 @@ defmodule ScullionWeb.PlannerLive do
     {:noreply, assign(socket, slot_action: initial)}
   end
 
-  def handle_event("close_slot", _params, socket), do: {:noreply, assign(socket, slot_action: nil)}
+  def handle_event("flip_slot", _, socket) do
+    {:noreply, update_slot(socket, fn s -> %{s | flipped: !s.flipped, search: ""} end)}
+  end
+
+  def handle_event("close_slot", _params, socket) do
+    # Auto-save pending state before closing
+    socket = auto_save_slot(socket)
+    {:noreply, assign(socket, slot_action: nil)}
+  end
 
   def handle_event("search_slot_recipes", %{"q" => q}, socket) do
     {:noreply, update_slot(socket, fn s -> %{s | search: q} end)}
@@ -76,10 +96,14 @@ defmodule ScullionWeb.PlannerLive do
     rid = String.to_integer(rid)
     recipe = Enum.find(socket.assigns.recipes, &(&1.id == rid))
 
-    {:noreply,
-     update_slot(socket, fn s ->
-       %{s | selected_recipe_id: rid, servings: s.servings || (recipe && recipe.base_servings) || 4}
-     end)}
+    socket =
+      update_slot(socket, fn s ->
+        %{s | selected_recipe_id: rid, servings: (recipe && recipe.base_servings) || s.servings || 4, flipped: false}
+      end)
+
+    # Auto-save immediately on recipe pick
+    socket = auto_save_slot(socket)
+    {:noreply, socket}
   end
 
   def handle_event("inc_servings", _, socket) do
@@ -91,46 +115,26 @@ defmodule ScullionWeb.PlannerLive do
   end
 
   def handle_event("toggle_leftover_day", %{"day" => d}, socket) do
-    {:noreply,
-     update_slot(socket, fn s ->
-       new =
-         if MapSet.member?(s.leftover_days, d),
-           do: MapSet.delete(s.leftover_days, d),
-           else: MapSet.put(s.leftover_days, d)
+    socket =
+      update_slot(socket, fn s ->
+        new =
+          if MapSet.member?(s.leftover_days, d),
+            do: MapSet.delete(s.leftover_days, d),
+            else: MapSet.put(s.leftover_days, d)
 
-       %{s | leftover_days: new}
-     end)}
+        %{s | leftover_days: new}
+      end)
+
+    {:noreply, auto_save_slot(socket)}
   end
 
   def handle_event("toggle_skipped", _, socket) do
-    {:noreply, update_slot(socket, fn s -> %{s | skipped: !s.skipped} end)}
+    socket = update_slot(socket, fn s -> %{s | skipped: !s.skipped} end)
+    {:noreply, auto_save_slot(socket)}
   end
 
   def handle_event("save_slot", _, socket) do
-    s = socket.assigns.slot_action
-    plan_id = socket.assigns.plan_id
-
-    cond do
-      s.skipped ->
-        # Skip requires the slot to exist; if there's nothing assigned, just close.
-        slot = Map.get(socket.assigns.plan_state.slots, s.slot_key)
-        if slot, do: PlanningHandler.skip_meal(plan_id, s.slot_key)
-        {:noreply, assign(socket, slot_action: nil)}
-
-      s.selected_recipe_id ->
-        PlanningHandler.assign_with_leftovers(
-          plan_id,
-          s.slot_key,
-          s.selected_recipe_id,
-          s.servings,
-          MapSet.to_list(s.leftover_days)
-        )
-
-        {:noreply, assign(socket, slot_action: nil)}
-
-      true ->
-        {:noreply, socket}
-    end
+    {:noreply, assign(socket, slot_action: nil)}
   end
 
   def handle_event("regenerate_suggestion", _, socket) do
@@ -158,6 +162,33 @@ defmodule ScullionWeb.PlannerLive do
     case socket.assigns.slot_action do
       nil -> socket
       s -> assign(socket, slot_action: fun.(s))
+    end
+  end
+
+  defp auto_save_slot(socket) do
+    case socket.assigns.slot_action do
+      nil -> socket
+      s ->
+        plan_id = socket.assigns.plan_id
+
+        cond do
+          s.skipped ->
+            slot = Map.get(socket.assigns.plan_state.slots, s.slot_key)
+            if slot, do: PlanningHandler.skip_meal(plan_id, s.slot_key)
+
+          s.selected_recipe_id ->
+            PlanningHandler.assign_with_leftovers(
+              plan_id,
+              s.slot_key,
+              s.selected_recipe_id,
+              s.servings,
+              MapSet.to_list(s.leftover_days)
+            )
+
+          true -> :noop
+        end
+
+        socket
     end
   end
 
@@ -256,7 +287,7 @@ defmodule ScullionWeb.PlannerLive do
       </header>
 
       <.card padded={false}>
-        <ul class="divide-y divide-[color:var(--hairline)]">
+        <ul class="divide-y divide-[color:var(--hairline)]" inert={if @slot_action, do: true}>
           <.day_row
             :for={{day, i} <- Enum.with_index(@days)}
             day={day}
@@ -300,16 +331,14 @@ defmodule ScullionWeb.PlannerLive do
     assigns = assign(assigns, slot: slot, recipe: recipe, is_today: is_today)
 
     ~H"""
-    <li class={[
-      "grid grid-cols-[56px_80px_1fr_auto_auto] items-center gap-4 px-5 py-3 transition-colors group",
-      @slot && @slot.skipped && "opacity-50"
-    ]}>
-      <button
-        type="button"
+    <li class={["transition-colors", @slot && @slot.skipped && "opacity-50"]}>
+      <div
         phx-click="open_slot"
         phx-value-slot_key={@slot_key}
-        aria-label="Edit meal"
-        class="contents text-left"
+        class="grid grid-cols-[56px_80px_1fr_auto] items-center gap-4 px-5 py-3 cursor-pointer hover:bg-[color:var(--accent-soft)]/20"
+        role="button"
+        tabindex="0"
+        aria-label={"Edit #{slot_label(@slot_key)}"}
       >
         <div class="flex flex-col items-center">
           <div
@@ -373,25 +402,8 @@ defmodule ScullionWeb.PlannerLive do
         <.chip :if={leftover_target(@plan_state, @days, @date) != nil} tone={:accent}>
           Leftovers for {leftover_target(@plan_state, @days, @date)}
         </.chip>
-        <span :if={leftover_target(@plan_state, @days, @date) == nil}></span>
-      </button>
-
-      <%= if @slot && @slot.recipe_id do %>
-        <button
-          type="button"
-          phx-click="remove_meal"
-          phx-value-slot_key={@slot_key}
-          data-confirm="Remove this meal?"
-          aria-label="Remove meal"
-          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--subtle)] hover:text-[color:var(--danger)] hover:bg-[color:var(--hairline)] justify-self-end"
-        >
-          <.icon name="hero-ellipsis-horizontal" class="size-4" />
-        </button>
-      <% else %>
-        <span class="size-9 inline-flex items-center justify-center text-[color:var(--muted)] justify-self-end">
-          <.icon name="hero-chevron-right" class="size-5" />
-        </span>
-      <% end %>
+        <.icon :if={leftover_target(@plan_state, @days, @date) == nil} name="hero-chevron-right" class="size-5 text-[color:var(--subtle)]" />
+      </div>
     </li>
     """
   end
@@ -422,7 +434,7 @@ defmodule ScullionWeb.PlannerLive do
 
   defp slot_modal(assigns) do
     sa = assigns.slot_action
-
+    selected = Enum.find(assigns.recipes, &(&1.id == sa.selected_recipe_id))
     suggested_ids = MapSet.new(sa.suggestions, & &1.recipe.id)
 
     other_recipes =
@@ -432,149 +444,186 @@ defmodule ScullionWeb.PlannerLive do
 
     assigns =
       assign(assigns,
+        selected_recipe: selected,
         suggested_ids: suggested_ids,
         other_recipes: other_recipes,
-        days_after: days_after(sa.slot_key),
-        save_disabled: !sa.skipped && is_nil(sa.selected_recipe_id)
+        days_after: days_after(sa.slot_key)
       )
 
     ~H"""
-    <div
-      class="fixed inset-0 bg-black/30 z-50 flex items-end md:items-center justify-center p-4"
-      phx-click="close_slot"
-    >
+    <%!-- Backdrop: JS-only dismiss so phx-click on backdrop can't swallow card clicks --%>
+    <div class="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4">
+      <%!-- The actual dimmed backdrop, purely decorative — dismiss handled below --%>
+      <div class="absolute inset-0 bg-black/40" phx-click="close_slot"></div>
+
+      <%!-- Card wrapper sits above the backdrop; ESC closes, outside-click closes --%>
       <div
-        class="bg-[var(--surface)] w-full md:max-w-md max-h-[92vh] flex flex-col rounded-[var(--r-xl)] shadow-[0_6px_24px_rgba(17,24,39,0.18)] overflow-hidden"
-        phx-click-away="close_slot"
-        onclick="event.stopPropagation()"
+        class="relative w-full md:max-w-md"
+        phx-window-keydown="close_slot"
+        phx-key="Escape"
       >
-        <header class="flex items-center justify-between px-6 py-4 border-b border-[color:var(--hairline)] shrink-0">
-          <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
-            {slot_label(@slot_action.slot_key)}
-          </h2>
-          <.icon_button icon="hero-x-mark" label="Close" phx-click="close_slot" />
-        </header>
+        <div class={["slot-panel-wrap bg-[var(--surface)] rounded-[var(--r-xl)] shadow-[0_8px_32px_rgba(17,24,39,0.16)]", @slot_action.flipped && "is-flipped"]}>
 
-        <div class={[
-          "flex-1 overflow-y-auto px-6 pt-4 pb-4 space-y-5",
-          @slot_action.skipped && "opacity-50 pointer-events-none"
-        ]}>
-          <form phx-change="search_slot_recipes">
-            <div class="relative">
-              <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
-              <input
-                type="text"
-                name="q"
-                value={@slot_action.search}
-                placeholder="Search recipes…"
-                class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
-                style="font-size: var(--t-body);"
-              />
-            </div>
-          </form>
+          <%!-- FRONT PANEL --%>
+          <div class="slot-panel slot-panel-front overflow-hidden rounded-[var(--r-xl)]">
+            <header class="flex items-center justify-between px-6 py-4 border-b border-[color:var(--hairline)]">
+              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
+                {slot_label(@slot_action.slot_key)}
+              </h2>
+              <button type="button" phx-click="close_slot"
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]">
+                <.icon name="hero-x-mark" class="size-5" />
+              </button>
+            </header>
 
-          <%= if @slot_action.search == "" do %>
-            <section>
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">Suggested</h3>
-                <button
-                  type="button"
-                  phx-click="regenerate_suggestion"
-                  disabled={@slot_action.loading_suggestions}
-                  class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline disabled:opacity-40"
-                  style="font-size: var(--t-meta);"
-                >
-                  <.icon name="hero-sparkles" class="size-3.5" /> Try another
-                </button>
+            <%= if @selected_recipe do %>
+              <div class="aspect-[16/9] w-full bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
+                <img :if={@selected_recipe.image_path} src={@selected_recipe.image_path} alt="" class="h-full w-full object-cover" />
+                <.icon :if={!@selected_recipe.image_path} name="hero-photo" class="size-10" />
               </div>
-
-              <%= if @slot_action.loading_suggestions and @slot_action.suggestions == [] do %>
-                <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">Loading…</p>
-              <% else %>
-                <%= if @slot_action.suggestions == [] do %>
-                  <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No suggestions yet — pick from below.</p>
-                <% else %>
-                  <ul class="space-y-2">
-                    <.recipe_pick_row :for={sug <- @slot_action.suggestions}
-                      recipe={sug.recipe}
-                      reasons={sug.reasons}
-                      selected={@slot_action.selected_recipe_id == sug.recipe.id} />
-                  </ul>
-                <% end %>
-              <% end %>
-            </section>
-          <% end %>
-
-          <section>
-            <h3 class="uppercase tracking-wider text-[color:var(--subtle)] mb-2" style="font-size: var(--t-micro); font-weight: 600;">
-              <%= if @slot_action.search == "", do: "All recipes", else: "Results" %>
-            </h3>
-            <%= if @other_recipes == [] do %>
-              <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No recipes match.</p>
+              <div class="px-6 pt-4">
+                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{@selected_recipe.title}</p>
+                <div :if={@selected_recipe.tags != []} class="flex flex-wrap gap-1.5 mt-2">
+                  <.chip :for={tag <- Enum.take(@selected_recipe.tags, 3)} tone={:accent}>{tag.name}</.chip>
+                </div>
+              </div>
             <% else %>
-              <ul class="space-y-2">
-                <.recipe_pick_row :for={r <- @other_recipes}
-                  recipe={r}
-                  reasons={[]}
-                  selected={@slot_action.selected_recipe_id == r.id} />
-              </ul>
+              <div class="px-6 pt-6 pb-2">
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">No meal chosen yet — tap Change recipe to pick one.</p>
+              </div>
             <% end %>
-          </section>
-        </div>
 
-        <footer class="border-t border-[color:var(--hairline)] px-6 py-4 space-y-4 shrink-0">
-          <div class={[@slot_action.skipped && "opacity-50 pointer-events-none"]}>
-            <div class="flex items-center justify-between">
-              <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">Portions</span>
-              <div class="inline-flex items-center gap-3">
-                <button type="button" phx-click="dec_servings"
-                        class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] hover:border-[color:var(--subtle)]"
-                        aria-label="Fewer servings">
-                  <.icon name="hero-minus" class="size-4" />
-                </button>
-                <span class="w-8 text-center font-semibold tabular-nums" style="font-size: var(--t-h2);">{@slot_action.servings}</span>
-                <button type="button" phx-click="inc_servings"
-                        class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] hover:border-[color:var(--subtle)]"
-                        aria-label="More servings">
-                  <.icon name="hero-plus" class="size-4" />
-                </button>
+            <div class={["px-6 py-5 space-y-4", @slot_action.skipped && "opacity-40 pointer-events-none"]}>
+              <div class="flex items-center justify-between">
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">Portions</span>
+                <div class="inline-flex items-center gap-3">
+                  <button type="button" phx-click="dec_servings"
+                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]">
+                    <.icon name="hero-minus" class="size-4" />
+                  </button>
+                  <span class="w-6 text-center font-semibold tabular-nums" style="font-size: var(--t-h2);">{@slot_action.servings}</span>
+                  <button type="button" phx-click="inc_servings"
+                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]">
+                    <.icon name="hero-plus" class="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div :if={@days_after != [] and @slot_action.selected_recipe_id} class="flex items-start gap-3">
+                <span class="text-[color:var(--muted)] mt-1.5" style="font-size: var(--t-meta); font-weight: 500;">Leftovers for</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button :for={d <- @days_after}
+                    type="button"
+                    phx-click="toggle_leftover_day"
+                    phx-value-day={"#{d}_dinner"}
+                    class={[
+                      "h-7 px-2.5 rounded-[var(--r-pill)] capitalize transition-colors",
+                      MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] font-medium",
+                      !MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
+                    ]}
+                    style="font-size: var(--t-meta);"
+                  >
+                    {String.capitalize(d)}
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div :if={@days_after != [] and @slot_action.selected_recipe_id} class="mt-4">
-              <p class="text-[color:var(--muted)] mb-2" style="font-size: var(--t-meta); font-weight: 500;">Leftovers for</p>
-              <div class="flex flex-wrap gap-2">
-                <button :for={d <- @days_after}
-                  type="button"
-                  phx-click="toggle_leftover_day"
-                  phx-value-day={"#{d}_dinner"}
-                  class={[
-                    "h-8 px-3 rounded-[var(--r-pill)] transition-colors capitalize",
-                    MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
-                    !MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
-                  ]}
-                  style="font-size: var(--t-meta); font-weight: 500;"
-                >
-                  {String.capitalize(d)}
-                </button>
-              </div>
+            <div class="px-6 pb-5 border-t border-[color:var(--hairline)] pt-4 flex items-center justify-between gap-4">
+              <button
+                type="button"
+                phx-click="flip_slot"
+                class="inline-flex items-center gap-1.5 text-[color:var(--accent)] hover:underline"
+                style="font-size: var(--t-meta); font-weight: 500;"
+              >
+                <.icon name="hero-arrow-path" class="size-4" /> Change recipe
+              </button>
+
+              <button
+                type="button"
+                phx-click="toggle_skipped"
+                class={[
+                  "inline-flex items-center gap-2 rounded-[var(--r-pill)] px-3 h-8 transition-colors",
+                  @slot_action.skipped && "bg-[color:var(--warn-soft)] text-[color:var(--warn)] font-medium",
+                  !@slot_action.skipped && "text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)]"
+                ]}
+                style="font-size: var(--t-meta);"
+              >
+                <.icon name={if @slot_action.skipped, do: "hero-x-circle", else: "hero-x-circle"} class="size-4" />
+                <%= if @slot_action.skipped, do: "Skipped", else: "Skip dinner" %>
+              </button>
             </div>
           </div>
 
-          <label class="flex items-center justify-between gap-3 cursor-pointer pt-3 border-t border-[color:var(--hairline)]">
-            <span class="text-[var(--text)]" style="font-size: var(--t-body);">No dinner planned</span>
-            <input
-              type="checkbox"
-              checked={@slot_action.skipped}
-              phx-click="toggle_skipped"
-              class="size-5 rounded border-[color:var(--border)] text-[color:var(--accent)] focus:ring-[color:var(--accent)]"
-            />
-          </label>
+          <%!-- BACK PANEL (recipe browser) --%>
+          <div class="slot-panel slot-panel-back overflow-hidden rounded-[var(--r-xl)] flex flex-col" style="max-height: 80vh;">
+            <header class="flex items-center gap-3 px-6 py-4 border-b border-[color:var(--hairline)] shrink-0">
+              <button type="button" phx-click="flip_slot"
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]">
+                <.icon name="hero-chevron-left" class="size-5" />
+              </button>
+              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">Choose a recipe</h2>
+            </header>
 
-          <.button variant={:primary} size={:lg} full disabled={@save_disabled} phx-click="save_slot">
-            Save
-          </.button>
-        </footer>
+            <div class="flex-1 overflow-y-auto px-6 pt-4 pb-6 space-y-4">
+              <form phx-change="search_slot_recipes">
+                <div class="relative">
+                  <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
+                  <input
+                    type="text"
+                    name="q"
+                    value={@slot_action.search}
+                    placeholder="Search recipes…"
+                    class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+                    style="font-size: var(--t-body);"
+                  />
+                </div>
+              </form>
+
+              <%= if @slot_action.search == "" do %>
+                <section>
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">Suggested</h3>
+                    <button
+                      type="button"
+                      phx-click="regenerate_suggestion"
+                      disabled={@slot_action.loading_suggestions}
+                      class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline disabled:opacity-40"
+                      style="font-size: var(--t-meta);"
+                    >
+                      <.icon name="hero-sparkles" class="size-3.5" /> Surprise me
+                    </button>
+                  </div>
+
+                  <%= if @slot_action.loading_suggestions and @slot_action.suggestions == [] do %>
+                    <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">Finding suggestions…</p>
+                  <% else %>
+                    <ul class="space-y-2">
+                      <.recipe_pick_row :for={sug <- @slot_action.suggestions}
+                        recipe={sug.recipe}
+                        reasons={sug.reasons}
+                        selected={@slot_action.selected_recipe_id == sug.recipe.id} />
+                    </ul>
+                  <% end %>
+                </section>
+              <% end %>
+
+              <section>
+                <h3 class="uppercase tracking-wider text-[color:var(--subtle)] mb-2" style="font-size: var(--t-micro); font-weight: 600;">
+                  <%= if @slot_action.search == "", do: "All recipes", else: "Results" %>
+                </h3>
+                <ul class="space-y-2">
+                  <.recipe_pick_row :for={r <- @other_recipes}
+                    recipe={r}
+                    reasons={[]}
+                    selected={@slot_action.selected_recipe_id == r.id} />
+                </ul>
+                <p :if={@other_recipes == [] and @slot_action.search != ""} class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">No recipes match.</p>
+              </section>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
     """

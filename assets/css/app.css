@@ -30,18 +30,18 @@
 
 :root {
   /* Color — warm light theme, deep forest green accent (draft-ui.png) */
-  --bg: #f6f4ef;
-  --surface: #ffffff;
-  --text: #111827;
-  --muted: #6b7280;
+  --bg: #F2EFE8;
+  --surface: #FAF8F3;
+  --text: #1F2933;
+  --muted: #6B7280;
   --subtle: #9ca3af;
   --border: #ebe8e1;
   --hairline: #efece6;
-  --accent: #1f7a3a;
-  --accent-hover: #19682f;
-  --accent-soft: #e6f1e8;
-  --accent-ink: #14532d;
-  --warn: #ea7a2c;
+  --accent: #355E3B;
+  --accent-hover: #3d6d44;
+  --accent-soft: #DCE8DD;
+  --accent-ink: #37623e;
+  --warn: #C96A3D;
   --warn-soft: #fbe7d4;
   --danger: #dc2626;
 
@@ -75,4 +75,42 @@ html, body {
   font: 400 var(--t-body)/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* ── Slot modal panels ──────────────────────────────────────────────────── */
+/* Two panels: front slides out left, back slides in from right (and vice versa) */
+.slot-panel-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.slot-panel {
+  width: 100%;
+  transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity  0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Front: visible by default */
+.slot-panel-front {
+  transform: translateX(0);
+  opacity: 1;
+}
+.slot-panel-wrap.is-flipped .slot-panel-front {
+  transform: translateX(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Back: hidden by default (slide in from right) */
+.slot-panel-back {
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.slot-panel-wrap.is-flipped .slot-panel-back {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
 }

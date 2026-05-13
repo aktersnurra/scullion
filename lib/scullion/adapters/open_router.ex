@@ -305,7 +305,7 @@ defmodule Scullion.Adapters.OpenRouter do
   defp parse_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   defp api_key, do: Application.fetch_env!(:scullion, :openrouter_api_key)
-  defp model, do: Application.get_env(:scullion, :openrouter_model, "deepseek/deepseek-v4-flash")
+  defp model, do: Application.get_env(:scullion, :openrouter_model, "openai/gpt-5-mini")
   defp vision_model, do: Application.get_env(:scullion, :openrouter_vision_model, "google/gemini-2.5-flash-lite")
-  defp image_model, do: Application.get_env(:scullion, :openrouter_image_model, "google/gemini-2.5-flash-image")
+  defp image_model, do: Application.get_env(:scullion, :openrouter_image_model, "google/gemini-3.1-flash-image-preview")
 end

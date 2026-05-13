@@ -16,18 +16,18 @@ defmodule ScullionWeb.RecipeLive do
        filter_type: :all,
        filter_max_min: :any,
        sort: :recently_added,
-       scrape_url: "",
        scrape_state: :idle,
-       scrape_result: nil,
        image_extract_state: :idle,
        extracted_attrs: nil,
        selected: nil,
-       detail_tab: "ingredients",
        form: nil,
        error: nil,
        sorts: @sorts,
        types: @types,
-       time_filters: @time_filters
+       time_filters: @time_filters,
+       show_more_filters: false,
+       ingredient_rows: [],
+       show_recipe_menu: false
      )
      |> allow_upload(:recipe_images,
        accept: ~w(.jpg .jpeg .png .webp),
@@ -64,19 +64,44 @@ defmodule ScullionWeb.RecipeLive do
     {:noreply, socket |> assign(sort: parse_sort(by)) |> reload_recipes()}
   end
 
-  def handle_event("new_recipe", _, socket) do
-    {:noreply, assign(socket, form: blank_form(), extracted_attrs: nil, selected: nil, error: nil)}
+  def handle_event("toggle_more_filters", _, socket) do
+    {:noreply, assign(socket, show_more_filters: !socket.assigns.show_more_filters)}
   end
 
-  def handle_event("save_recipe", %{"recipe" => params}, socket) do
-    form_attrs = parse_recipe_params(params)
+  def handle_event("get_ideas", _, socket) do
+    {:noreply, put_flash(socket, :info, "Coming soon")}
+  end
+
+  def handle_event("import_action", %{"url" => url}, socket) do
+    cond do
+      socket.assigns.uploads.recipe_images.entries != [] ->
+        binaries =
+          consume_uploaded_entries(socket, :recipe_images, fn %{path: path}, _entry ->
+            {:ok, File.read!(path)}
+          end)
+        send(self(), {:extract_images, binaries})
+        {:noreply, assign(socket, image_extract_state: :loading, error: nil)}
+
+      String.trim(url) != "" ->
+        send(self(), {:scrape, String.trim(url)})
+        {:noreply, assign(socket, scrape_state: :loading, error: nil)}
+
+      true ->
+        {:noreply, assign(socket, error: "Paste a URL or drop screenshots first")}
+    end
+  end
+
+  def handle_event("new_recipe", _, socket) do
+    {:noreply, assign(socket, form: blank_form(), extracted_attrs: nil, selected: nil, error: nil, ingredient_rows: [])}
+  end
+
+  def handle_event("save_recipe", %{"recipe" => params} = payload, socket) do
+    form_attrs = parse_recipe_params(Map.put(params, "ingredients", payload["ingredients"] || %{}))
 
     attrs =
       case socket.assigns.extracted_attrs do
         nil -> form_attrs
         extracted ->
-          require Logger
-          Logger.debug("save_recipe extracted ingredients: #{inspect(extracted[:ingredients])}")
           Map.merge(extracted, form_attrs)
       end
 
@@ -103,12 +128,19 @@ defmodule ScullionWeb.RecipeLive do
 
   def handle_event("select_recipe", %{"id" => id}, socket) do
     recipe = Recipes.get!(String.to_integer(id))
-    {:noreply, assign(socket, selected: recipe, form: nil, error: nil)}
+    {:noreply, assign(socket, selected: recipe, form: nil, error: nil, show_recipe_menu: false)}
   end
 
   def handle_event("edit_recipe", _, socket) do
     recipe = socket.assigns.selected
-    {:noreply, assign(socket, form: recipe_to_form(recipe), error: nil)}
+    rows = Enum.map(recipe.recipe_ingredients, fn ri ->
+      %{
+        name: ri.ingredient.name,
+        quantity: to_string(ri.quantity || ""),
+        unit: ri.unit || ""
+      }
+    end)
+    {:noreply, assign(socket, form: recipe_to_form(recipe), ingredient_rows: rows, error: nil, show_recipe_menu: false)}
   end
 
   def handle_event("delete_recipe", _, socket) do
@@ -122,64 +154,42 @@ defmodule ScullionWeb.RecipeLive do
   end
 
   def handle_event("close", _, socket) do
-    {:noreply, assign(socket, selected: nil, form: nil, extracted_attrs: nil, error: nil)}
+    {:noreply, assign(socket, selected: nil, form: nil, extracted_attrs: nil, error: nil, show_recipe_menu: false)}
   end
 
-  def handle_event("set_tab", %{"tab" => tab}, socket) do
-    {:noreply, assign(socket, detail_tab: tab)}
-  end
-
-  def handle_event("scrape_submit", %{"url" => url}, socket) do
-    url = String.trim(url)
-
-    if url == "" do
-      {:noreply, assign(socket, error: "Enter a URL")}
-    else
-      send(self(), {:scrape, url})
-      {:noreply, assign(socket, scrape_state: :loading, error: nil)}
-    end
-  end
-
-  def handle_event("confirm_scraped", _, socket) do
-    attrs = socket.assigns.scrape_result
-
-    case Recipes.create(attrs) do
-      {:ok, _recipe} ->
-        {:noreply,
-         socket
-         |> assign(scrape_state: :idle, scrape_result: nil, scrape_url: "", error: nil)
-         |> reload_recipes()}
-
-      {:error, changeset} ->
-        {:noreply, assign(socket, error: error_message(changeset))}
-    end
-  end
-
-  def handle_event("discard_scraped", _, socket) do
-    {:noreply, assign(socket, scrape_state: :idle, scrape_result: nil, error: nil)}
-  end
-
-  def handle_event("extract_from_images", _, socket) do
-    entries = socket.assigns.uploads.recipe_images.entries
-
-    if entries == [] do
-      {:noreply, assign(socket, error: "Select at least one image")}
-    else
-      binaries =
-        consume_uploaded_entries(socket, :recipe_images, fn %{path: path}, _entry ->
-          {:ok, File.read!(path)}
-        end)
-
-      send(self(), {:extract_images, binaries})
-      {:noreply, assign(socket, image_extract_state: :loading, error: nil)}
-    end
+  def handle_event("toggle_recipe_menu", _, socket) do
+    {:noreply, assign(socket, show_recipe_menu: !socket.assigns.show_recipe_menu)}
   end
 
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
+
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :recipe_images, ref)}
   end
+
+  def handle_event("add_ingredient_row", _, socket) do
+    rows = socket.assigns.ingredient_rows ++ [%{name: "", quantity: "", unit: ""}]
+    {:noreply, assign(socket, ingredient_rows: rows)}
+  end
+
+  def handle_event("remove_ingredient_row", %{"index" => idx}, socket) do
+    idx = String.to_integer(idx)
+    rows = List.delete_at(socket.assigns.ingredient_rows, idx)
+    {:noreply, assign(socket, ingredient_rows: rows)}
+  end
+
+  def handle_event("sync_ingredient", params, socket) do
+    rows =
+      (params["ingredients"] || %{})
+      |> Enum.sort_by(fn {k, _} -> String.to_integer(k) end)
+      |> Enum.map(fn {_, ing} ->
+        %{name: ing["name"] || "", quantity: ing["quantity"] || "", unit: ing["unit"] || ""}
+      end)
+    {:noreply, assign(socket, ingredient_rows: rows)}
+  end
+
+
 
   def handle_info({:extract_images, binaries}, socket) do
     case Recipes.extract_from_images(binaries) do
@@ -195,7 +205,14 @@ defmodule ScullionWeb.RecipeLive do
           instructions: attrs[:instructions] || ""
         }
 
-        {:noreply, assign(socket, image_extract_state: :idle, form: form, extracted_attrs: attrs, selected: nil, error: nil)}
+        rows = Enum.map(attrs[:ingredients] || [], fn ing ->
+          %{
+            name: to_string(Map.get(ing, :name) || Map.get(ing, "name") || ""),
+            quantity: to_string(Map.get(ing, :quantity) || Map.get(ing, "quantity") || ""),
+            unit: to_string(Map.get(ing, :unit) || Map.get(ing, "unit") || "")
+          }
+        end)
+        {:noreply, assign(socket, image_extract_state: :idle, form: form, extracted_attrs: attrs, selected: nil, error: nil, ingredient_rows: rows)}
 
       {:error, reason} ->
         {:noreply, assign(socket, image_extract_state: :idle, error: extract_error(reason))}
@@ -206,7 +223,7 @@ defmodule ScullionWeb.RecipeLive do
     case Recipes.scrape_from_url(url) do
       {:ok, recipe} ->
         {:noreply,
-         assign(socket, scrape_state: :idle, scrape_result: nil)
+         assign(socket, scrape_state: :idle)
          |> reload_recipes()
          |> assign(selected: recipe)}
 
@@ -220,7 +237,7 @@ defmodule ScullionWeb.RecipeLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/recipes"}>
-    <.page max_width={:xl}>
+    <.page max_width={:md}>
       <.card class="mb-6">
         <header class="flex items-center justify-between gap-4 mb-5 pb-5 border-b border-[color:var(--hairline)]">
           <div>
@@ -231,120 +248,146 @@ defmodule ScullionWeb.RecipeLive do
             <.icon name="hero-plus" class="size-4" /> New recipe
           </.button>
         </header>
-        <form phx-change="search" class="relative">
-          <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
-          <input
-            type="text"
-            name="query"
-            value={@search}
-            placeholder="Search recipes or ingredients…"
-            class="w-full h-11 pl-10 pr-3 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
-            style="font-size: var(--t-body);"
-          />
-        </form>
 
-        <div class="mt-4 flex flex-wrap gap-2">
-          <button
-            :for={type <- @types}
-            phx-click="filter_type"
-            phx-value-type={type}
-            class={[
-              "px-3 h-8 rounded-[var(--r-pill)] transition-colors capitalize",
-              @filter_type == type && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
-              @filter_type != type && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
-            ]}
-            style="font-size: var(--t-meta); font-weight: 500;"
-          >
-            {type}
-          </button>
-        </div>
+        <div class="space-y-4">
+          <%!-- Search --%>
+          <form phx-change="search" class="relative">
+            <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
+            <input
+              type="text"
+              name="query"
+              value={@search}
+              placeholder="Search recipes, ingredients, or meals…"
+              class="w-full h-12 pl-10 pr-3 bg-[color:var(--hairline)] rounded-[var(--r-lg)] border-2 border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+              style="font-size: var(--t-body);"
+            />
+          </form>
 
-        <div class="mt-3 flex flex-wrap gap-2">
-          <button
-            :for={tag <- common_tags()}
-            phx-click="filter_tag"
-            phx-value-tag={tag}
-            class={[
-              "px-3 h-7 rounded-[var(--r-pill)] transition-colors",
-              tag in @filter_tags && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
-              tag not in @filter_tags && "text-[color:var(--muted)] hover:text-[var(--text)]"
-            ]}
-            style="font-size: var(--t-meta);"
-          >
-            {tag}
-          </button>
-        </div>
+          <%!-- Type filters + More filters toggle --%>
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex flex-wrap gap-2">
+              <button
+                :for={type <- @types}
+                phx-click="filter_type"
+                phx-value-type={type}
+                class={[
+                  "px-3 h-8 rounded-[var(--r-pill)] transition-colors capitalize",
+                  @filter_type == type && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+                  @filter_type != type && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
+                ]}
+                style="font-size: var(--t-meta); font-weight: 500;"
+              >
+                {type}
+              </button>
+            </div>
+            <button
+              type="button"
+              phx-click="toggle_more_filters"
+              class={[
+                "shrink-0 inline-flex items-center gap-1 px-3 h-8 rounded-[var(--r-pill)] transition-colors",
+                @show_more_filters && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+                !@show_more_filters && "text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)]"
+              ]}
+              style="font-size: var(--t-meta); font-weight: 500;"
+            >
+              More filters
+              <.icon name={if @show_more_filters, do: "hero-chevron-up", else: "hero-chevron-down"} class="size-3.5" />
+            </button>
+          </div>
 
-        <div class="mt-4 pt-4 border-t border-[color:var(--hairline)] flex flex-wrap items-center gap-x-6 gap-y-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-          <span class="text-[color:var(--subtle)] font-medium">Time</span>
-          <button
-            :for={t <- @time_filters}
-            phx-click="filter_time"
-            phx-value-max={t}
-            class={[
-              @filter_max_min == t && "text-[color:var(--accent)] font-medium",
-              @filter_max_min != t && "hover:text-[var(--text)]"
-            ]}
-          >
-            {if t == :any, do: "Any", else: "≤ #{t} min"}
-          </button>
+          <%!-- Expanded filters --%>
+          <div :if={@show_more_filters} class="space-y-3 pt-1">
+            <div class="flex flex-wrap gap-2">
+              <button
+                :for={tag <- common_tags()}
+                phx-click="filter_tag"
+                phx-value-tag={tag}
+                class={[
+                  "px-3 h-7 rounded-[var(--r-pill)] transition-colors",
+                  tag in @filter_tags && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]",
+                  tag not in @filter_tags && "text-[color:var(--muted)] hover:text-[var(--text)]"
+                ]}
+                style="font-size: var(--t-meta);"
+              >
+                {tag}
+              </button>
+            </div>
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+              <span class="text-[color:var(--subtle)] font-medium">Time</span>
+              <button
+                :for={t <- @time_filters}
+                phx-click="filter_time"
+                phx-value-max={t}
+                class={[
+                  @filter_max_min == t && "text-[color:var(--accent)] font-medium",
+                  @filter_max_min != t && "hover:text-[var(--text)]"
+                ]}
+              >
+                {if t == :any, do: "Any", else: "≤ #{t} min"}
+              </button>
+              <span class="ml-4 text-[color:var(--subtle)] font-medium">Sort</span>
+              <button
+                :for={s <- @sorts}
+                phx-click="sort"
+                phx-value-by={s}
+                class={[
+                  @sort == s && "text-[color:var(--accent)] font-medium",
+                  @sort != s && "hover:text-[var(--text)]"
+                ]}
+              >
+                {sort_label(s)}
+              </button>
+            </div>
+          </div>
 
-          <span class="ml-4 text-[color:var(--subtle)] font-medium">Sort</span>
-          <button
-            :for={s <- @sorts}
-            phx-click="sort"
-            phx-value-by={s}
-            class={[
-              @sort == s && "text-[color:var(--accent)] font-medium",
-              @sort != s && "hover:text-[var(--text)]"
-            ]}
-          >
-            {sort_label(s)}
-          </button>
-        </div>
-      </.card>
+          <%!-- Hero prompt --%>
+          <div class="flex items-center justify-between gap-4 px-4 py-3 rounded-[var(--r-lg)] bg-[color:var(--accent-soft)]/40">
+            <div class="flex items-start gap-3">
+              <.icon name="hero-sparkles" class="size-5 text-[color:var(--accent)] shrink-0 mt-0.5" />
+              <div>
+                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-meta);">What can we cook tonight?</p>
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">Get ideas based on your pantry and this week's deals</p>
+              </div>
+            </div>
+            <.button variant={:secondary} phx-click="get_ideas">Get ideas</.button>
+          </div>
 
-      <.card class="mb-6">
-        <h2 class="font-semibold mb-3" style="font-size: var(--t-h2);">Import</h2>
-        <form class="flex gap-2 mb-3" phx-submit="scrape_submit">
-          <input
-            type="text"
-            name="url"
-            value={@scrape_url}
-            placeholder="Paste recipe URL…"
-            class="flex-1 h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
-            style="font-size: var(--t-body);"
-          />
-          <.button type="submit" variant={:primary} disabled={@scrape_state == :loading}>
-            {if @scrape_state == :loading, do: "Importing…", else: "Import"}
-          </.button>
-        </form>
-
-        <form phx-submit="extract_from_images" phx-change="validate" class="flex gap-2 items-start">
-          <div class="flex-1">
-            <label class="cursor-pointer flex items-center gap-2 h-11 px-3 border border-dashed border-[color:var(--border)] rounded-[var(--r-lg)] text-[color:var(--muted)] hover:border-[color:var(--subtle)] transition-colors" style="font-size: var(--t-meta);">
-              <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
-              <.icon name="hero-camera" class="size-4 shrink-0" />
-              <span>
-                {if @uploads.recipe_images.entries == [],
-                  do: "Upload photos (up to 10)…",
-                  else: "#{length(@uploads.recipe_images.entries)} selected"}
-              </span>
-            </label>
-            <div :for={entry <- @uploads.recipe_images.entries} class="flex items-center gap-2 mt-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+          <%!-- Import row --%>
+          <form phx-submit="import_action" phx-change="validate" class="space-y-2">
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <input
+                  type="text"
+                  name="url"
+                  value=""
+                  placeholder="Paste a recipe URL or drop screenshots…"
+                  class="w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)] pr-10"
+                  style="font-size: var(--t-body);"
+                />
+                <label class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[color:var(--subtle)] hover:text-[color:var(--muted)]">
+                  <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
+                  <.icon name="hero-camera" class="size-5" />
+                </label>
+              </div>
+              <.button
+                type="submit"
+                variant={:primary}
+                disabled={@scrape_state == :loading or @image_extract_state == :loading}
+              >
+                {cond do
+                  @scrape_state == :loading -> "Importing…"
+                  @image_extract_state == :loading -> "Extracting…"
+                  true -> "Import"
+                end}
+              </.button>
+            </div>
+            <div :for={entry <- @uploads.recipe_images.entries} class="flex items-center gap-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
               <span class="flex-1 truncate">{entry.client_name}</span>
               <button type="button" phx-click="cancel_upload" phx-value-ref={entry.ref}
                       class="text-[color:var(--subtle)] hover:text-[color:var(--danger)]">✕</button>
             </div>
-          </div>
-          <.button
-            type="submit"
-            variant={:secondary}
-            disabled={@image_extract_state == :loading or @uploads.recipe_images.entries == []}
-          >
-            {if @image_extract_state == :loading, do: "Extracting…", else: "Extract"}
-          </.button>
-        </form>
+          </form>
+        </div>
       </.card>
 
       <p :if={@error} class="mb-4 text-[color:var(--danger)]" style="font-size: var(--t-meta);">{@error}</p>
@@ -352,7 +395,7 @@ defmodule ScullionWeb.RecipeLive do
       <%= if @recipes == [] do %>
         <.card><.empty message="No recipes — add one or import from a URL" /></.card>
       <% else %>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
             :for={recipe <- @recipes}
             type="button"
@@ -381,104 +424,120 @@ defmodule ScullionWeb.RecipeLive do
         </div>
       <% end %>
 
-      <.drawer id="recipe-drawer" show={@selected != nil or @form != nil} on_close={JS.push("close")}>
-        <%= cond do %>
-          <% @form -> %>
-            {render_form(assigns)}
-          <% @selected -> %>
-            {render_detail(assigns)}
-          <% true -> %>
-        <% end %>
-      </.drawer>
+      <div :if={@selected != nil or @form != nil} class="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4"
+           phx-window-keydown="close" phx-key="Escape">
+        <div class="absolute inset-0 bg-black/30" phx-click="close"></div>
+        <div class="relative w-full md:max-w-lg bg-[var(--surface)] rounded-[var(--r-xl)] shadow-[0_8px_32px_rgba(17,24,39,0.16)] overflow-y-auto" style="max-height: 90vh;">
+          <%= cond do %>
+            <% @form -> %>
+              <div class="p-6">{render_form(assigns)}</div>
+            <% @selected -> %>
+              {render_detail(assigns)}
+            <% true -> %>
+          <% end %>
+        </div>
+      </div>
     </.page>
     </Layouts.app>
     """
   end
 
   defp render_detail(assigns) do
-    tabs = [
-      %{id: "ingredients", label: "Ingredients"},
-      %{id: "instructions", label: "Instructions"},
-      %{id: "notes", label: "Notes"}
-    ]
-    assigns = assign(assigns, tabs: tabs)
-
     ~H"""
     <div>
-      <button
-        type="button"
-        phx-click="close"
-        class="inline-flex items-center gap-1 text-[color:var(--muted)] hover:text-[var(--text)] mb-3"
-        style="font-size: var(--t-meta);"
-      >
-        <.icon name="hero-chevron-left" class="size-4" /> Back
-      </button>
-
-      <div :if={@selected.image_path} class="aspect-[4/3] w-full overflow-hidden rounded-[var(--r-xl)] bg-[color:var(--hairline)] mb-4">
-        <img src={@selected.image_path} alt="" class="h-full w-full object-cover" />
+      <%!-- Hero image --%>
+      <div class={["w-full bg-[color:var(--hairline)] relative", @selected.image_path && "aspect-[4/3]"]}>
+        <img :if={@selected.image_path} src={@selected.image_path} alt="" class="h-full w-full object-cover" />
+        <%!-- Top bar: close left, actions right --%>
+        <div class={["flex items-center justify-between p-3", @selected.image_path && "absolute top-0 inset-x-0"]}>
+          <button type="button" phx-click="close"
+            class={["size-9 inline-flex items-center justify-center rounded-[var(--r-md)]",
+              @selected.image_path && "bg-black/40 text-white hover:bg-black/60",
+              !@selected.image_path && "text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"]}>
+            <.icon name="hero-x-mark" class="size-5" />
+          </button>
+          <div class="relative" id="recipe-actions">
+            <button type="button" phx-click="toggle_recipe_menu"
+              class={["size-9 inline-flex items-center justify-center rounded-[var(--r-md)]",
+                @selected.image_path && "bg-black/40 text-white hover:bg-black/60",
+                !@selected.image_path && "text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"]}>
+              <.icon name="hero-ellipsis-horizontal" class="size-5" />
+            </button>
+            <div :if={@show_recipe_menu} class="absolute right-0 top-10 w-36 bg-[var(--surface)] rounded-[var(--r-lg)] shadow-[var(--shadow-pop)] border border-[color:var(--border)] overflow-hidden z-10">
+              <button type="button" phx-click="edit_recipe"
+                class="w-full text-left px-4 py-2.5 text-[var(--text)] hover:bg-[color:var(--hairline)]"
+                style="font-size: var(--t-meta);">Edit</button>
+              <button type="button" phx-click="delete_recipe"
+                class="w-full text-left px-4 py-2.5 text-[color:var(--danger)] hover:bg-[color:var(--hairline)]"
+                style="font-size: var(--t-meta);">Delete</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <h2 class="font-semibold tracking-tight text-[var(--text)] mb-3" style="font-size: var(--t-h1);">
-        {@selected.title}
-      </h2>
+      <%!-- Content --%>
+      <div class="p-6 space-y-6">
+        <%!-- Title + meta --%>
+        <div>
+          <h2 class="font-semibold tracking-tight text-[var(--text)] mb-3" style="font-size: var(--t-h1); line-height: 1.2;">
+            {@selected.title}
+          </h2>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+            <span :if={total_time(@selected) != "—"} class="inline-flex items-center gap-1.5">
+              <.icon name="hero-clock" class="size-4" /> {total_time(@selected)}
+            </span>
+            <span :if={@selected.base_servings} class="inline-flex items-center gap-1.5">
+              <.icon name="hero-user-group" class="size-4" /> {@selected.base_servings} servings
+            </span>
+          </div>
+          <div :if={@selected.tags != []} class="flex flex-wrap gap-1.5 mt-3">
+            <.chip :for={tag <- @selected.tags} tone={:accent}>{tag.name}</.chip>
+          </div>
+        </div>
 
-      <div class="flex flex-wrap items-center gap-2 mb-5">
-        <.chip :if={total_time(@selected) != "—"} tone={:neutral} icon="hero-clock">{total_time(@selected)}</.chip>
-        <.chip :if={@selected.base_servings} tone={:neutral} icon="hero-user-group">{@selected.base_servings} servings</.chip>
-        <.chip :for={tag <- Enum.take(@selected.tags, 4)} tone={:accent}>{tag.name}</.chip>
-      </div>
+        <%!-- Ingredients --%>
+        <div :if={@selected.recipe_ingredients != []}>
+          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">Ingredients</h3>
+          <ul class="space-y-2">
+            <li :for={ri <- @selected.recipe_ingredients} class="flex items-baseline gap-3" style="font-size: var(--t-body);">
+              <span class="size-1.5 rounded-full bg-[color:var(--accent)] shrink-0 mt-2"></span>
+              <span class="flex-1 text-[var(--text)]">{ri.ingredient.name}</span>
+              <span :if={ri.quantity} class="shrink-0 text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
+                {ri.quantity}{if ri.unit && ri.unit != "", do: " #{ri.unit}"}
+              </span>
+            </li>
+          </ul>
+        </div>
 
-      <.tabs items={@tabs} active={@detail_tab} />
+        <%!-- Instructions --%>
+        <div :if={@selected.steps || @selected.instructions}>
+          <h3 class="font-semibold text-[var(--text)] mb-3" style="font-size: var(--t-h2);">Instructions</h3>
+          <%= if grouped_steps(@selected) != [] do %>
+            <div :for={{phase, steps} <- grouped_steps(@selected)} class="mb-5 last:mb-0">
+              <h4 :if={phase} class="font-medium text-[color:var(--muted)] mb-2 uppercase tracking-wide" style="font-size: var(--t-micro);">{phase}</h4>
+              <ol class="space-y-4">
+                <li :for={step <- steps} class="flex gap-3" style="font-size: var(--t-body);">
+                  <span class="size-6 shrink-0 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] inline-flex items-center justify-center font-semibold mt-0.5" style="font-size: var(--t-micro);">{step["order"]}</span>
+                  <div class="flex-1 pt-0.5">
+                    <span class="text-[var(--text)]">{step["action"]}</span>
+                    <span :if={step["duration_minutes"]} class="ml-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{step["duration_minutes"]}m</span>
+                  </div>
+                </li>
+              </ol>
+            </div>
+          <% else %>
+            <p class="whitespace-pre-wrap text-[var(--text)] leading-relaxed" style="font-size: var(--t-body);">{@selected.instructions}</p>
+          <% end %>
+        </div>
 
-      <div class="pt-4 mb-6">
-        <%= cond do %>
-          <% @detail_tab == "ingredients" and @selected.recipe_ingredients != [] -> %>
-            <ul class="divide-y divide-[color:var(--hairline)]">
-              <li :for={ri <- @selected.recipe_ingredients} class="flex items-center gap-3 py-2.5" style="font-size: var(--t-body);">
-                <span class="size-1.5 rounded-full bg-[color:var(--accent)] shrink-0"></span>
-                <span class="flex-1 text-[var(--text)]">{ri.ingredient.name}</span>
-                <span :if={ri.quantity} class="shrink-0 text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
-                  {ri.quantity} {ri.unit}
-                </span>
-              </li>
-            </ul>
-          <% @detail_tab == "ingredients" -> %>
-            <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No ingredients listed.</p>
-          <% @detail_tab == "instructions" -> %>
-            <%= if grouped_steps(@selected) != [] do %>
-              <div :for={{phase, steps} <- grouped_steps(@selected)} class="mb-5">
-                <h3 :if={phase} class="font-semibold mb-2" style="font-size: var(--t-h2);">{phase}</h3>
-                <ol class="space-y-3">
-                  <li :for={step <- steps} class="flex gap-3" style="font-size: var(--t-body);">
-                    <span class="size-6 shrink-0 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] inline-flex items-center justify-center font-semibold" style="font-size: var(--t-meta);">{step["order"]}</span>
-                    <div class="flex-1">
-                      <span class="text-[var(--text)]">{step["action"]}</span>
-                      <span :if={step["duration_minutes"]} class="ml-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-                        {step["duration_minutes"]}m
-                      </span>
-                      <div :if={step["ingredients"] && step["ingredients"] != []} class="flex flex-wrap gap-1.5 mt-1.5">
-                        <.chip :for={ing <- step["ingredients"]} tone={:accent}>{ing}</.chip>
-                      </div>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            <% else %>
-              <p :if={@selected.instructions} class="whitespace-pre-wrap text-[var(--text)]" style="font-size: var(--t-body);">{@selected.instructions}</p>
-              <p :if={!@selected.instructions} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No instructions yet.</p>
-            <% end %>
-          <% @detail_tab == "notes" -> %>
-            <a :if={@selected.source_url} href={@selected.source_url} target="_blank"
-               class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">
-              <.icon name="hero-link" class="size-4" /> Source
-            </a>
-            <p :if={!@selected.source_url} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">No notes.</p>
-        <% end %>
-      </div>
-
-      <div class="flex gap-2 pt-4 border-t border-[color:var(--hairline)]">
-        <.button variant={:secondary} phx-click="edit_recipe">Edit</.button>
-        <.button variant={:danger} phx-click="delete_recipe">Delete</.button>
+        <%!-- Source --%>
+        <div :if={@selected.source_url}>
+          <a href={@selected.source_url} target="_blank"
+            class="inline-flex items-center gap-1.5 text-[color:var(--muted)] hover:text-[var(--text)]"
+            style="font-size: var(--t-meta);">
+            <.icon name="hero-link" class="size-4" /> Original recipe
+          </a>
+        </div>
       </div>
     </div>
     """
@@ -487,9 +546,18 @@ defmodule ScullionWeb.RecipeLive do
   defp render_form(assigns) do
     ~H"""
     <div>
-      <h2 class="font-semibold tracking-tight text-[var(--text)] mb-5" style="font-size: var(--t-h1);">
-        {if @selected, do: "Edit recipe", else: "New recipe"}
-      </h2>
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="font-semibold tracking-tight text-[var(--text)]" style="font-size: var(--t-h1);">
+          {if @selected, do: "Edit recipe", else: "New recipe"}
+        </h2>
+        <button
+          type="button"
+          phx-click="close"
+          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+        >
+          <.icon name="hero-x-mark" class="size-5" />
+        </button>
+      </div>
 
       <form phx-submit="save_recipe" class="space-y-5">
         <.field name="recipe[title]" label="Title" value={@form[:title] || ""} required />
@@ -514,6 +582,62 @@ defmodule ScullionWeb.RecipeLive do
 
         <.field name="recipe[base_servings]" label="Servings" type="number" value={to_string_or_empty(@form[:base_servings])} />
         <.field name="recipe[tags]" label="Tags" value={@form[:tags] || ""} placeholder="quick, batch, vegetarian" />
+        <div>
+          <span class="block mb-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">Ingredients</span>
+          <div class="space-y-2">
+            <div :for={{row, idx} <- Enum.with_index(@ingredient_rows)} class="flex items-center gap-2">
+              <input
+                type="text"
+                name={"ingredients[#{idx}][name]"}
+                value={row.name}
+                placeholder="Ingredient"
+                phx-change="sync_ingredient"
+                phx-value-index={idx}
+                phx-debounce="blur"
+                class="flex-1 h-10 px-3 bg-[var(--surface)] rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              />
+              <input
+                type="text"
+                name={"ingredients[#{idx}][quantity]"}
+                value={row.quantity}
+                placeholder="Qty"
+                phx-change="sync_ingredient"
+                phx-value-index={idx}
+                phx-debounce="blur"
+                class="w-20 h-10 px-3 bg-[var(--surface)] rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              />
+              <input
+                type="text"
+                name={"ingredients[#{idx}][unit]"}
+                value={row.unit}
+                placeholder="Unit"
+                phx-change="sync_ingredient"
+                phx-value-index={idx}
+                phx-debounce="blur"
+                class="w-24 h-10 px-3 bg-[var(--surface)] rounded-[var(--r-md)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              />
+              <button
+                type="button"
+                phx-click="remove_ingredient_row"
+                phx-value-index={idx}
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--subtle)] hover:text-[color:var(--danger)] hover:bg-[color:var(--hairline)]"
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            phx-click="add_ingredient_row"
+            class="mt-2 inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline"
+            style="font-size: var(--t-meta); font-weight: 500;"
+          >
+            <.icon name="hero-plus" class="size-4" /> Add ingredient
+          </button>
+        </div>
         <.field name="recipe[source_url]" label="Source URL" value={@form[:source_url] || ""} />
 
         <label class="block">
@@ -579,6 +703,18 @@ defmodule ScullionWeb.RecipeLive do
       |> Enum.map(&String.trim/1)
       |> Enum.reject(&(&1 == ""))
 
+    ingredients =
+      (params["ingredients"] || %{})
+      |> Enum.sort_by(fn {k, _} -> String.to_integer(k) end)
+      |> Enum.map(fn {_, ing} ->
+        %{
+          name: String.trim(ing["name"] || ""),
+          quantity: ing["quantity"],
+          unit: ing["unit"]
+        }
+      end)
+      |> Enum.reject(fn %{name: name} -> name == "" end)
+
     %{
       title: params["title"],
       recipe_type: String.to_existing_atom(params["recipe_type"] || "meal"),
@@ -587,7 +723,8 @@ defmodule ScullionWeb.RecipeLive do
       base_servings: parse_int(params["base_servings"]),
       source_url: params["source_url"],
       instructions: params["instructions"],
-      tags: tag_names
+      tags: tag_names,
+      ingredients: ingredients
     }
   end
 

@@ -26,11 +26,11 @@ config :scullion, ScullionWeb.Endpoint,
 if config_env() == :prod do
   config :scullion, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
   config :scullion, :openrouter_model,
-    System.get_env("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash")
+    System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
   config :scullion, :openrouter_vision_model,
     System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
   config :scullion, :openrouter_image_model,
-    System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-2.5-flash-image")
+    System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
 
   database_path =
     System.get_env("DATABASE_PATH") ||

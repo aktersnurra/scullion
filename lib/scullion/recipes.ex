@@ -30,10 +30,12 @@ defmodule Scullion.Recipes do
   @spec update(Recipe.t(), map()) :: {:ok, Recipe.t()} | {:error, Ecto.Changeset.t()}
   def update(%Recipe{} = recipe, attrs) do
     {tag_names, attrs} = Map.pop(attrs, :tags, nil)
+    {ingredients, attrs} = Map.pop(attrs, :ingredients, nil)
 
     Repo.transaction(fn ->
       with {:ok, updated} <- do_update(recipe, attrs),
-           {:ok, updated} <- maybe_update_tags(updated, tag_names) do
+           {:ok, updated} <- maybe_update_tags(updated, tag_names),
+           {:ok, updated} <- maybe_update_ingredients(updated, ingredients) do
         updated
       else
         {:error, reason} -> Repo.rollback(reason)
@@ -176,6 +178,15 @@ defmodule Scullion.Recipes do
     recipe
     |> Recipe.tag_changeset(tags)
     |> Repo.update()
+  end
+
+  defp maybe_update_ingredients(recipe, nil), do: {:ok, recipe}
+
+  defp maybe_update_ingredients(recipe, ingredients) do
+    Repo.delete_all(from ri in RecipeIngredient, where: ri.recipe_id == ^recipe.id)
+    # insert_ingredients uses Repo.insert! — raises on failure, transaction rolls back
+    insert_ingredients(recipe, ingredients)
+    {:ok, recipe}
   end
 
   defp maybe_generate_image(recipe, image_url) do

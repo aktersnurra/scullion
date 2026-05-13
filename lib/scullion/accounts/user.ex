@@ -7,6 +7,7 @@ defmodule Scullion.Accounts.User do
     field :account_code_hash, :string
     field :role, Ecto.Enum, values: [:admin, :member], default: :member
     field :preferences, :map, default: %{}
+    field :locale, :string, default: "sv"
     timestamps()
   end
 

@@ -68,6 +68,52 @@ defmodule Scullion.RecipesTest do
     end
   end
 
+  describe "update/2 with ingredients" do
+    test "replaces all ingredients on update" do
+      {:ok, recipe} = Recipes.create(%{
+        title: "Soup",
+        recipe_type: :meal,
+        ingredients: [%{name: "Water", quantity: "1", unit: "L"}]
+      })
+
+      {:ok, updated} = Recipes.update(recipe, %{
+        ingredients: [
+          %{name: "Chicken", quantity: "500", unit: "g"},
+          %{name: "Salt", quantity: "1", unit: "tsp"}
+        ]
+      })
+
+      names = Enum.map(updated.recipe_ingredients, & &1.ingredient.name)
+      assert length(updated.recipe_ingredients) == 2
+      assert "Chicken" in names
+      assert "Salt" in names
+      refute "Water" in names
+    end
+
+    test "clears all ingredients when passed empty list" do
+      {:ok, recipe} = Recipes.create(%{
+        title: "Soup",
+        recipe_type: :meal,
+        ingredients: [%{name: "Water", quantity: "1", unit: "L"}]
+      })
+
+      {:ok, updated} = Recipes.update(recipe, %{ingredients: []})
+      assert updated.recipe_ingredients == []
+    end
+
+    test "does not touch ingredients when key is absent" do
+      {:ok, recipe} = Recipes.create(%{
+        title: "Soup",
+        recipe_type: :meal,
+        ingredients: [%{name: "Water", quantity: "1", unit: "L"}]
+      })
+
+      {:ok, updated} = Recipes.update(recipe, %{title: "Updated Soup"})
+      assert length(updated.recipe_ingredients) == 1
+      assert hd(updated.recipe_ingredients).ingredient.name == "Water"
+    end
+  end
+
   describe "list/1" do
     setup do
       {:ok, r1} =
