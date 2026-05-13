@@ -560,7 +560,7 @@ defmodule ScullionWeb.RecipeLive do
       </div>
 
       <form phx-submit="save_recipe" class="space-y-5">
-        <.field name="recipe[title]" label="Title" value={@form[:title] || ""} required />
+        <.field name="recipe[title]" label={gettext("Title")} value={@form[:title] || ""} required />
 
         <label class="block">
           <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Type")}</span>
@@ -573,15 +573,15 @@ defmodule ScullionWeb.RecipeLive do
 
         <div class="flex gap-4">
           <div class="flex-1">
-            <.field name="recipe[prep_time_minutes]" label="Prep (min)" type="number" value={to_string_or_empty(@form[:prep_time_minutes])} />
+            <.field name="recipe[prep_time_minutes]" label={gettext("Prep (min)")} type="number" value={to_string_or_empty(@form[:prep_time_minutes])} />
           </div>
           <div class="flex-1">
-            <.field name="recipe[cook_time_minutes]" label="Cook (min)" type="number" value={to_string_or_empty(@form[:cook_time_minutes])} />
+            <.field name="recipe[cook_time_minutes]" label={gettext("Cook (min)")} type="number" value={to_string_or_empty(@form[:cook_time_minutes])} />
           </div>
         </div>
 
-        <.field name="recipe[base_servings]" label="Servings" type="number" value={to_string_or_empty(@form[:base_servings])} />
-        <.field name="recipe[tags]" label="Tags" value={@form[:tags] || ""} placeholder="quick, batch, vegetarian" />
+        <.field name="recipe[base_servings]" label={gettext("Servings")} type="number" value={to_string_or_empty(@form[:base_servings])} />
+        <.field name="recipe[tags]" label={gettext("Tags")} value={@form[:tags] || ""} placeholder="quick, batch, vegetarian" />
         <div>
           <span class="block mb-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Ingredients")}</span>
           <div class="space-y-2">
@@ -638,7 +638,7 @@ defmodule ScullionWeb.RecipeLive do
             <.icon name="hero-plus" class="size-4" /> {gettext("Add ingredient")}
           </button>
         </div>
-        <.field name="recipe[source_url]" label="Source URL" value={@form[:source_url] || ""} />
+        <.field name="recipe[source_url]" label={gettext("Source URL")} value={@form[:source_url] || ""} />
 
         <label class="block">
           <span class="block mb-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">{gettext("Instructions")}</span>
@@ -798,7 +798,7 @@ defmodule ScullionWeb.RecipeLive do
 
   defp sort_label(:recently_added), do: gettext("Recent")
   defp sort_label(:last_used), do: gettext("Last used")
-  defp sort_label(:alphabetical), do: "A–Z"
+  defp sort_label(:alphabetical), do: gettext("A–Z")
 
   defp recipe_count_label([]), do: nil
   defp recipe_count_label([_]), do: gettext("1 recipe")

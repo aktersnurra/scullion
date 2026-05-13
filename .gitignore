@@ -40,3 +40,6 @@ npm-debug.log
 *.db-*
 
 /priv/static/uploads/
+
+search-mock.png
+mock-v2.png

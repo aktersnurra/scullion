@@ -724,7 +724,9 @@ defmodule ScullionWeb.PlannerLive do
       |> Map.values()
       |> Enum.count(fn s -> s.recipe_id && !s.skipped end)
 
-    if meals > 0, do: "#{range} · #{meals} meals planned", else: range
+    if meals > 0,
+      do: gettext("%{range} · %{meals} meals planned", range: range, meals: meals),
+      else: range
   end
 
   defp plan_id(week_start), do: "plan:#{Date.to_iso8601(week_start)}"

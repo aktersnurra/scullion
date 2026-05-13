@@ -42,12 +42,12 @@ defmodule ScullionWeb.DealsLive do
           <input
             type="text"
             name="url"
-            placeholder="https://www.ica.se/erbjudanden/..."
+            placeholder={gettext("https://www.ica.se/erbjudanden/...")}
             class="flex-1 border rounded px-2 py-1 text-sm"
           />
           <select name="chain" class="border rounded px-2 py-1 text-sm">
-            <option value="ica">ICA</option>
-            <option value="coop">Coop</option>
+            <option value="ica">{gettext("ICA")}</option>
+            <option value="coop">{gettext("Coop")}</option>
           </select>
           <button
             phx-click="scrape_all"
