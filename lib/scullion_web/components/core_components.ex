@@ -859,7 +859,7 @@ defmodule ScullionWeb.CoreComponents do
       <div class="absolute inset-0 bg-black/30" phx-click={@on_close}></div>
       <aside class="absolute right-0 top-0 h-full w-full max-w-[420px] bg-[var(--surface)] shadow-xl overflow-y-auto">
         <div class="flex justify-end p-2 border-b border-[color:var(--border)]">
-          <.icon_button icon="hero-x-mark" label="Close" phx-click={@on_close} />
+          <.icon_button icon="hero-x-mark" label={gettext("Close")} phx-click={@on_close} />
         </div>
         <div class="p-4">{render_slot(@inner_block)}</div>
       </aside>

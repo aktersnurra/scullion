@@ -35,7 +35,7 @@ defmodule ScullionWeb.Layouts do
           class="absolute right-0 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[var(--text)]"
           style="font-size: var(--t-meta);"
         >
-          Sign out
+          {gettext("Sign out")}
         </a>
       </div>
     </header>
