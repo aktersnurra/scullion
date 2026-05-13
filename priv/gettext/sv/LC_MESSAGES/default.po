@@ -1,0 +1,967 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: sv\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: lib/scullion_web/live/prep_live.ex:69
+#, elixir-autogen, elixir-format
+msgid "%{duration} total"
+msgstr "%{duration} totalt"
+
+#: lib/scullion_web/live/planner_live.ex:662
+#, elixir-autogen, elixir-format
+msgid "%{n} min"
+msgstr "%{n} min"
+
+#: lib/scullion_web/live/planner_live.ex:662
+#, elixir-autogen, elixir-format
+msgid "%{n} portions"
+msgstr "%{n} portioner"
+
+#: lib/scullion_web/live/recipe_live.ex:805
+#, elixir-autogen, elixir-format
+msgid "%{n} recipes"
+msgstr "%{n} recept"
+
+#: lib/scullion_web/live/planner_live.ex:387
+#: lib/scullion_web/live/recipe_live.ex:490
+#, elixir-autogen, elixir-format
+msgid "%{n} servings"
+msgstr "%{n} portioner"
+
+#: lib/scullion_web/live/grocery_live.ex:89
+#, elixir-autogen, elixir-format
+msgid "%{n} unchecked · Week %{week}"
+msgstr "%{n} okryssade · Vecka %{week}"
+
+#: lib/scullion_web/live/planner_live.ex:728
+#, elixir-autogen, elixir-format
+msgid "%{range} · %{meals} meals planned"
+msgstr "%{range} · %{meals} måltider planerade"
+
+#: lib/scullion_web/live/recipe_live.ex:804
+#, elixir-autogen, elixir-format
+msgid "1 recipe"
+msgstr "1 recept"
+
+#: lib/scullion_web/components/core_components.ex:308
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "Åtgärder"
+
+#: lib/scullion_web/live/pantry_live.ex:77
+#, elixir-autogen, elixir-format
+msgid "Add"
+msgstr "Lägg till"
+
+#: lib/scullion_web/live/recipe_live.ex:638
+#, elixir-autogen, elixir-format
+msgid "Add ingredient"
+msgstr "Lägg till ingrediens"
+
+#: lib/scullion_web/live/grocery_live.ex:150
+#, elixir-autogen, elixir-format
+msgid "Add item…"
+msgstr "Lägg till vara…"
+
+#: lib/scullion_web/live/pantry_live.ex:67
+#, elixir-autogen, elixir-format
+msgid "Add to pantry"
+msgstr "Lägg till i skafferiet"
+
+#: lib/scullion_web/live/planner_live.ex:613
+#, elixir-autogen, elixir-format
+msgid "All recipes"
+msgstr "Alla recept"
+
+#: lib/scullion_web/live/recipe_live.ex:326
+#, elixir-autogen, elixir-format
+msgid "Any"
+msgstr "Alla"
+
+#: lib/scullion_web/live/prep_live.ex:110
+#, elixir-autogen, elixir-format
+msgid "Assign recipes in the planner, then generate your prep guide."
+msgstr "Tilldela recept i planeraren och generera sedan din förberedelseguide."
+
+#: lib/scullion_web/components/layouts.ex:126
+#: lib/scullion_web/components/layouts.ex:138
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr "Försöker återansluta"
+
+#: lib/scullion_web/live/recipe_live.ex:801
+#, elixir-autogen, elixir-format
+msgid "A–Z"
+msgstr "A–Ö"
+
+#: lib/scullion_web/live/login_live.ex:150
+#, elixir-autogen, elixir-format
+msgid "Backspace"
+msgstr "Backsteg"
+
+#: lib/scullion_web/live/prep_live.ex:73
+#, elixir-autogen, elixir-format
+msgid "Batch prep to make the week easier. Most components keep 3–4 days."
+msgstr "Förbered i omgångar för en enklare vecka. De flesta komponenter håller 3–4 dagar."
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:62
+#, elixir-autogen, elixir-format
+msgid "Build rich, interactive web applications quickly, with less code and fewer moving parts. Join our growing community of developers using Phoenix to craft APIs, HTML5 apps and more, for fun or at scale."
+msgstr "Bygg rika, interaktiva webbapplikationer snabbt, med mindre kod och färre rörliga delar. Gå med i vår växande gemenskap av utvecklare som använder Phoenix för att skapa API:er, HTML5-appar och mer."
+
+#: lib/scullion_web/live/recipe_live.ex:653
+#, elixir-autogen, elixir-format
+msgid "Cancel"
+msgstr "Avbryt"
+
+#: lib/scullion_web/live/planner_live.ex:539
+#, elixir-autogen, elixir-format
+msgid "Change recipe"
+msgstr "Byt recept"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:132
+#, elixir-autogen, elixir-format
+msgid "Changelog"
+msgstr "Ändringslogg"
+
+#: lib/scullion_web/live/planner_live.ex:565
+#, elixir-autogen, elixir-format
+msgid "Choose a recipe"
+msgstr "Välj ett recept"
+
+#: lib/scullion_web/components/core_components.ex:862
+#, elixir-autogen, elixir-format
+msgid "Close"
+msgstr "Stäng"
+
+#: lib/scullion_web/live/recipe_live.ex:72
+#, elixir-autogen, elixir-format
+msgid "Coming soon"
+msgstr "Kommer snart"
+
+#: lib/scullion_web/live/prep_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Components"
+msgstr "Komponenter"
+
+#: lib/scullion_web/live/recipe_live.ex:579
+#, elixir-autogen, elixir-format
+msgid "Cook (min)"
+msgstr "Tillagningstid (min)"
+
+#: lib/scullion_web/live/deals_live.ex:50
+#, elixir-autogen, elixir-format
+msgid "Coop"
+msgstr "Coop"
+
+#: lib/scullion_web/components/layouts.ex:16
+#: lib/scullion_web/live/cost_live.ex:103
+#, elixir-autogen, elixir-format
+msgid "Costs"
+msgstr "Kostnader"
+
+#: lib/scullion_web/live/recipe_live.ex:152
+#, elixir-autogen, elixir-format
+msgid "Could not delete recipe"
+msgstr "Kunde inte ta bort receptet"
+
+#: lib/scullion_web/live/recipe_live.ex:791
+#, elixir-autogen, elixir-format
+msgid "Could not extract a recipe from this page"
+msgstr "Kunde inte hämta ett recept från den här sidan"
+
+#: lib/scullion_web/live/recipe_live.ex:776
+#, elixir-autogen, elixir-format
+msgid "Could not extract recipe from the images"
+msgstr "Kunde inte hämta recept från bilderna"
+
+#: lib/scullion_web/live/recipe_live.ex:779
+#, elixir-autogen, elixir-format
+msgid "Could not fetch page (HTTP %{status})"
+msgstr "Kunde inte hämta sidan (HTTP %{status})"
+
+#: lib/scullion_web/live/recipe_live.ex:782
+#, elixir-autogen, elixir-format
+msgid "Could not reach the URL — check your connection or the address"
+msgstr "Kunde inte nå URL:en — kontrollera din anslutning eller adressen"
+
+#: lib/scullion_web/live/planner_live.ex:238
+#, elixir-autogen, elixir-format
+msgid "Couldn't fetch a new suggestion"
+msgstr "Kunde inte hämta ett nytt förslag"
+
+#: lib/scullion_web/live/setup_live.ex:76
+#, elixir-autogen, elixir-format
+msgid "Create admin account"
+msgstr "Skapa administratörskonto"
+
+#: lib/scullion_web/live/deals_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Current Deals"
+msgstr "Aktuella erbjudanden"
+
+#: lib/scullion_web/live/recipe_live.ex:472
+#, elixir-autogen, elixir-format
+msgid "Delete"
+msgstr "Ta bort"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:194
+#, elixir-autogen, elixir-format
+msgid "Deploy your application"
+msgstr "Driftsätt din applikation"
+
+#: lib/scullion_web/live/settings_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "Device tokens"
+msgstr "Enhetstokens"
+
+#: lib/scullion_web/live/cost_live.ex:87
+#: lib/scullion_web/live/cost_live.ex:146
+#, elixir-autogen, elixir-format
+msgid "Dining"
+msgstr "Restaurang"
+
+#: lib/scullion_web/live/cost_live.ex:178
+#, elixir-autogen, elixir-format
+msgid "Dining entries will appear here"
+msgstr "Restaurangposter visas här"
+
+#: lib/scullion_web/live/cost_live.ex:126
+#, elixir-autogen, elixir-format
+msgid "Dining out"
+msgstr "Äta ute"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:149
+#, elixir-autogen, elixir-format
+msgid "Discuss on the Elixir Forum"
+msgstr "Diskutera på Elixir Forum"
+
+#: lib/scullion_web/live/grocery_live.ex:137
+#, elixir-autogen, elixir-format
+msgid "Done · %{n}"
+msgstr "Klart · %{n}"
+
+#: lib/scullion_web/live/recipe_live.ex:469
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "Redigera"
+
+#: lib/scullion_web/live/planner_live.ex:341
+#, elixir-autogen, elixir-format
+msgid "Edit %{label}"
+msgstr "Redigera %{label}"
+
+#: lib/scullion_web/live/recipe_live.ex:551
+#, elixir-autogen, elixir-format
+msgid "Edit recipe"
+msgstr "Redigera recept"
+
+#: lib/scullion_web/live/login_live.ex:47
+#, elixir-autogen, elixir-format
+msgid "Enter all 16 digits"
+msgstr "Ange alla 16 siffror"
+
+#: lib/scullion_web/live/login_live.ex:105
+#, elixir-autogen, elixir-format
+msgid "Enter your 16-digit code"
+msgstr "Ange din 16-siffriga kod"
+
+#: lib/scullion_web/live/grocery_live.ex:115
+#, elixir-autogen, elixir-format
+msgid "Export"
+msgstr "Exportera"
+
+#: lib/scullion_web/live/recipe_live.ex:379
+#, elixir-autogen, elixir-format
+msgid "Extracting…"
+msgstr "Hämtar…"
+
+#: lib/scullion_web/live/recipe_live.ex:775
+#, elixir-autogen, elixir-format
+msgid "Extraction failed (API error %{status})"
+msgstr "Hämtning misslyckades (API-fel %{status})"
+
+#: lib/scullion_web/live/pantry_live.ex:21
+#, elixir-autogen, elixir-format
+msgid "Failed to add item"
+msgstr "Kunde inte lägga till vara"
+
+#: lib/scullion_web/live/cost_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "Failed to log"
+msgstr "Kunde inte logga"
+
+#: lib/scullion_web/live/cost_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "Failed to save"
+msgstr "Kunde inte spara"
+
+#: lib/scullion_web/live/planner_live.ex:599
+#, elixir-autogen, elixir-format
+msgid "Finding suggestions…"
+msgstr "Söker förslag…"
+
+#: lib/scullion_web/live/prep_live.ex:114
+#, elixir-autogen, elixir-format
+msgid "Generate guide"
+msgstr "Generera guide"
+
+#: lib/scullion_web/live/settings_live.ex:28
+#, elixir-autogen, elixir-format
+msgid "Generate new code"
+msgstr "Generera ny kod"
+
+#: lib/scullion_web/live/settings_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "Generate plan"
+msgstr "Generera plan"
+
+#: lib/scullion_web/live/recipe_live.ex:352
+#, elixir-autogen, elixir-format
+msgid "Get ideas"
+msgstr "Få idéer"
+
+#: lib/scullion_web/live/recipe_live.ex:349
+#, elixir-autogen, elixir-format
+msgid "Get ideas based on your pantry and this week's deals"
+msgstr "Få idéer baserat på ditt skafferi och veckans erbjudanden"
+
+#: lib/scullion_web/live/setup_live.ex:45
+#, elixir-autogen, elixir-format
+msgid "Go to login"
+msgstr "Gå till inloggning"
+
+#: lib/scullion_web/components/layouts.ex:13
+#: lib/scullion_web/live/cost_live.ex:120
+#: lib/scullion_web/live/grocery_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "Groceries"
+msgstr "Inköpslista"
+
+#: lib/scullion_web/live/grocery_live.ex:98
+#, elixir-autogen, elixir-format
+msgid "Group by category"
+msgstr "Gruppera efter kategori"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:84
+#, elixir-autogen, elixir-format
+msgid "Guides & Docs"
+msgstr "Guider och dokumentation"
+
+#: lib/scullion_web/live/deals_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "ICA"
+msgstr "ICA"
+
+#: lib/scullion_web/live/recipe_live.ex:380
+#, elixir-autogen, elixir-format
+msgid "Import"
+msgstr "Importera"
+
+#: lib/scullion_web/live/deals_live.ex:19
+#, elixir-autogen, elixir-format
+msgid "Imported %{count} deals"
+msgstr "Importerade %{count} erbjudanden"
+
+#: lib/scullion_web/live/recipe_live.ex:378
+#, elixir-autogen, elixir-format
+msgid "Importing…"
+msgstr "Importerar…"
+
+#: lib/scullion_web/live/recipe_live.ex:593
+#, elixir-autogen, elixir-format
+msgid "Ingredient"
+msgstr "Ingrediens"
+
+#: lib/scullion_web/live/recipe_live.ex:500
+#: lib/scullion_web/live/recipe_live.ex:586
+#, elixir-autogen, elixir-format
+msgid "Ingredients"
+msgstr "Ingredienser"
+
+#: lib/scullion_web/live/recipe_live.ex:514
+#: lib/scullion_web/live/recipe_live.ex:644
+#, elixir-autogen, elixir-format
+msgid "Instructions"
+msgstr "Instruktioner"
+
+#: lib/scullion_web/live/login_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "Invalid code"
+msgstr "Ogiltig kod"
+
+#: lib/scullion_web/live/settings_live.ex:46
+#, elixir-autogen, elixir-format
+msgid "Jobs"
+msgstr "Jobb"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:164
+#, elixir-autogen, elixir-format
+msgid "Join our Discord server"
+msgstr "Gå med i vår Discord-server"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:179
+#, elixir-autogen, elixir-format
+msgid "Join us on Slack"
+msgstr "Gå med oss på Slack"
+
+#: lib/scullion_web/live/settings_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Kitchen kiosk"
+msgstr "Köksläge"
+
+#: lib/scullion_web/live/recipe_live.ex:800
+#, elixir-autogen, elixir-format
+msgid "Last used"
+msgstr "Senast använd"
+
+#: lib/scullion_web/live/planner_live.ex:394
+#, elixir-autogen, elixir-format
+msgid "Leftovers"
+msgstr "Rester"
+
+#: lib/scullion_web/live/planner_live.ex:513
+#, elixir-autogen, elixir-format
+msgid "Leftovers for"
+msgstr "Rester från"
+
+#: lib/scullion_web/live/planner_live.ex:403
+#, elixir-autogen, elixir-format
+msgid "Leftovers for %{day}"
+msgstr "Rester från %{day}"
+
+#: lib/scullion_web/live/setup_live.ex:52
+#, elixir-autogen, elixir-format
+msgid "Let's create the first admin account."
+msgstr "Låt oss skapa det första administratörskontot."
+
+#: lib/scullion_web/live/cost_live.ex:175
+#, elixir-autogen, elixir-format
+msgid "Log dining"
+msgstr "Logga restaurangbesök"
+
+#: lib/scullion_web/live/cost_live.ex:46
+#, elixir-autogen, elixir-format
+msgid "Logged"
+msgstr "Loggat"
+
+#: lib/scullion_web/live/planner_live.ex:236
+#: lib/scullion_web/live/prep_live.ex:24
+#: lib/scullion_web/live/recipe_live.ex:773
+#, elixir-autogen, elixir-format
+msgid "Monthly LLM budget reached"
+msgstr "Månadens AI-budget uppnådd"
+
+#: lib/scullion_web/live/grocery_live.ex:104
+#, elixir-autogen, elixir-format
+msgid "More"
+msgstr "Mer"
+
+#: lib/scullion_web/live/recipe_live.ex:293
+#, elixir-autogen, elixir-format
+msgid "More filters"
+msgstr "Fler filter"
+
+#: lib/scullion_web/live/setup_live.ex:19
+#, elixir-autogen, elixir-format
+msgid "Name is required"
+msgstr "Namn krävs"
+
+#: lib/scullion_web/live/login_live.ex:169
+#, elixir-autogen, elixir-format
+msgid "Need help?"
+msgstr "Behöver du hjälp?"
+
+#: lib/scullion_web/live/recipe_live.ex:248
+#: lib/scullion_web/live/recipe_live.ex:551
+#, elixir-autogen, elixir-format
+msgid "New recipe"
+msgstr "Nytt recept"
+
+#: lib/scullion_web/live/planner_live.ex:283
+#, elixir-autogen, elixir-format
+msgid "Next week"
+msgstr "Nästa vecka"
+
+#: lib/scullion_web/live/prep_live.ex:96
+#, elixir-autogen, elixir-format
+msgid "No components"
+msgstr "Inga komponenter"
+
+#: lib/scullion_web/live/deals_live.ex:62
+#, elixir-autogen, elixir-format
+msgid "No current deals."
+msgstr "Inga aktuella erbjudanden."
+
+#: lib/scullion_web/live/prep_live.ex:108
+#, elixir-autogen, elixir-format
+msgid "No guide yet"
+msgstr "Ingen guide än"
+
+#: lib/scullion_web/live/grocery_live.ex:129
+#, elixir-autogen, elixir-format
+msgid "No items yet"
+msgstr "Inga varor än"
+
+#: lib/scullion_web/live/planner_live.ex:492
+#, elixir-autogen, elixir-format
+msgid "No meal chosen yet — tap Change recipe to pick one."
+msgstr "Ingen måltid vald än — tryck på Byt recept för att välja en."
+
+#: lib/scullion_web/live/prep_live.ex:99
+#, elixir-autogen, elixir-format
+msgid "No notes"
+msgstr "Inga anteckningar"
+
+#: lib/scullion_web/live/cost_live.ex:165
+#, elixir-autogen, elixir-format
+msgid "No receipts loaded"
+msgstr "Inga kvitton inlästa"
+
+#: lib/scullion_web/live/planner_live.ex:621
+#, elixir-autogen, elixir-format
+msgid "No recipes match."
+msgstr "Inga recept matchar."
+
+#: lib/scullion_web/live/recipe_live.ex:396
+#, elixir-autogen, elixir-format
+msgid "No recipes — add one or import from a URL"
+msgstr "Inga recept — lägg till ett eller importera från en URL"
+
+#: lib/scullion_web/live/prep_live.ex:85
+#, elixir-autogen, elixir-format
+msgid "No timeline yet"
+msgstr "Ingen tidslinje än"
+
+#: lib/scullion_web/live/prep_live.ex:38
+#, elixir-autogen, elixir-format
+msgid "Notes"
+msgstr "Anteckningar"
+
+#: lib/scullion_web/live/pantry_live.ex:40
+#, elixir-autogen, elixir-format
+msgid "Nothing in pantry yet"
+msgstr "Inget i skafferiet än"
+
+#: lib/scullion_web/live/recipe_live.ex:538
+#, elixir-autogen, elixir-format
+msgid "Original recipe"
+msgstr "Originalrecept"
+
+#: lib/scullion_web/live/cost_live.ex:85
+#, elixir-autogen, elixir-format
+msgid "Overview"
+msgstr "Översikt"
+
+#: lib/scullion_web/components/layouts.ex:15
+#: lib/scullion_web/live/pantry_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "Pantry"
+msgstr "Skafferi"
+
+#: lib/scullion_web/live/recipe_live.ex:90
+#, elixir-autogen, elixir-format
+msgid "Paste a URL or drop screenshots first"
+msgstr "Klistra in en URL eller dra och släpp skärmdumpar först"
+
+#: lib/scullion_web/live/recipe_live.ex:363
+#, elixir-autogen, elixir-format
+msgid "Paste a recipe URL or drop screenshots…"
+msgstr "Klistra in en recept-URL eller dra och släpp skärmdumpar…"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:59
+#, elixir-autogen, elixir-format
+msgid "Peace of mind from prototype to production."
+msgstr "Trygghet från prototyp till produktion."
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:51
+#, elixir-autogen, elixir-format
+msgid "Phoenix Framework"
+msgstr "Phoenix Framework"
+
+#: lib/scullion_web/live/prep_live.ex:27
+#, elixir-autogen, elixir-format
+msgid "Please wait a moment before generating again"
+msgstr "Vänta lite innan du genererar igen"
+
+#: lib/scullion_web/live/planner_live.ex:237
+#, elixir-autogen, elixir-format
+msgid "Please wait a moment before trying again"
+msgstr "Vänta lite innan du försöker igen"
+
+#: lib/scullion_web/live/planner_live.ex:498
+#, elixir-autogen, elixir-format
+msgid "Portions"
+msgstr "Portioner"
+
+#: lib/scullion_web/components/layouts.ex:14
+#, elixir-autogen, elixir-format
+msgid "Prep"
+msgstr "Förberedelse"
+
+#: lib/scullion_web/live/recipe_live.ex:576
+#, elixir-autogen, elixir-format
+msgid "Prep (min)"
+msgstr "Förberedelsetid (min)"
+
+#: lib/scullion_web/live/prep_live.ex:54
+#, elixir-autogen, elixir-format
+msgid "Prep Guide"
+msgstr "Förberedelseguide"
+
+#: lib/scullion_web/live/prep_live.ex:30
+#, elixir-autogen, elixir-format
+msgid "Prep guide generation failed"
+msgstr "Generering av förberedelseguide misslyckades"
+
+#: lib/scullion_web/live/planner_live.ex:267
+#, elixir-autogen, elixir-format
+msgid "Previous week"
+msgstr "Föregående vecka"
+
+#: lib/scullion_web/live/grocery_live.ex:158
+#: lib/scullion_web/live/recipe_live.ex:604
+#, elixir-autogen, elixir-format
+msgid "Qty"
+msgstr "Antal"
+
+#: lib/scullion_web/live/cost_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "Receipt saved"
+msgstr "Kvitto sparat"
+
+#: lib/scullion_web/live/cost_live.ex:86
+#: lib/scullion_web/live/cost_live.ex:142
+#, elixir-autogen, elixir-format
+msgid "Receipts"
+msgstr "Kvitton"
+
+#: lib/scullion_web/live/recipe_live.ex:799
+#, elixir-autogen, elixir-format
+msgid "Recent"
+msgstr "Senaste"
+
+#: lib/scullion_web/live/recipe_live.ex:788
+#, elixir-autogen, elixir-format
+msgid "Recipe extraction failed (API error %{status})"
+msgstr "Recepthämtning misslyckades (API-fel %{status})"
+
+#: lib/scullion_web/components/layouts.ex:12
+#: lib/scullion_web/live/recipe_live.ex:244
+#, elixir-autogen, elixir-format
+msgid "Recipes"
+msgstr "Recept"
+
+#: lib/scullion_web/live/grocery_live.ex:214
+#: lib/scullion_web/live/pantry_live.ex:57
+#, elixir-autogen, elixir-format
+msgid "Remove"
+msgstr "Ta bort"
+
+#: lib/scullion_web/live/cost_live.ex:173
+#, elixir-autogen, elixir-format
+msgid "Restaurant / occasion"
+msgstr "Restaurang / tillfälle"
+
+#: lib/scullion_web/live/planner_live.ex:613
+#, elixir-autogen, elixir-format
+msgid "Results"
+msgstr "Resultat"
+
+#: lib/scullion_web/live/settings_live.ex:41
+#, elixir-autogen, elixir-format
+msgid "Revoke"
+msgstr "Återkalla"
+
+#: lib/scullion_web/live/settings_live.ex:48
+#, elixir-autogen, elixir-format
+msgid "Run deal scrape"
+msgstr "Kör erbjudandeskanning"
+
+#: lib/scullion_web/live/recipe_live.ex:652
+#, elixir-autogen, elixir-format
+msgid "Save"
+msgstr "Spara"
+
+#: lib/scullion_web/live/cost_live.ex:162
+#, elixir-autogen, elixir-format
+msgid "Save receipt"
+msgstr "Spara kvitto"
+
+#: lib/scullion_web/live/setup_live.ex:37
+#, elixir-autogen, elixir-format
+msgid "Save this 16-digit code — it won't be shown again."
+msgstr "Spara den här 16-siffriga koden — den visas inte igen."
+
+#: lib/scullion_web/live/deals_live.ex:56
+#, elixir-autogen, elixir-format
+msgid "Scrape All"
+msgstr "Skanna alla"
+
+#: lib/scullion_web/live/deals_live.ex:22
+#, elixir-autogen, elixir-format
+msgid "Scrape failed"
+msgstr "Skanning misslyckades"
+
+#: lib/scullion_web/live/deals_live.ex:32
+#, elixir-autogen, elixir-format
+msgid "Scrape triggered"
+msgstr "Skanning startad"
+
+#: lib/scullion_web/live/login_live.ex:101
+#: lib/scullion_web/live/setup_live.ex:29
+#, elixir-autogen, elixir-format
+msgid "Scullion"
+msgstr "Scullion"
+
+#: lib/scullion_web/live/recipe_live.ex:260
+#, elixir-autogen, elixir-format
+msgid "Search recipes, ingredients, or meals…"
+msgstr "Sök recept, ingredienser eller måltider…"
+
+#: lib/scullion_web/live/planner_live.ex:576
+#, elixir-autogen, elixir-format
+msgid "Search recipes…"
+msgstr "Sök recept…"
+
+#: lib/scullion_web/live/recipe_live.ex:583
+#, elixir-autogen, elixir-format
+msgid "Servings"
+msgstr "Portioner"
+
+#: lib/scullion_web/components/layouts.ex:17
+#: lib/scullion_web/live/settings_live.ex:14
+#, elixir-autogen, elixir-format
+msgid "Settings"
+msgstr "Inställningar"
+
+#: lib/scullion_web/components/layouts.ex:40
+#, elixir-autogen, elixir-format
+msgid "Sign out"
+msgstr "Logga ut"
+
+#: lib/scullion_web/live/planner_live.ex:553
+#, elixir-autogen, elixir-format
+msgid "Skip dinner"
+msgstr "Hoppa över middagen"
+
+#: lib/scullion_web/live/planner_live.ex:396
+#: lib/scullion_web/live/planner_live.ex:553
+#, elixir-autogen, elixir-format
+msgid "Skipped"
+msgstr "Överhoppad"
+
+#: lib/scullion_web/components/layouts.ex:133
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr "Något gick fel!"
+
+#: lib/scullion_web/live/recipe_live.ex:328
+#, elixir-autogen, elixir-format
+msgid "Sort"
+msgstr "Sortera"
+
+#: lib/scullion_web/controllers/page_html/home.html.heex:102
+#, elixir-autogen, elixir-format
+msgid "Source Code"
+msgstr "Källkod"
+
+#: lib/scullion_web/live/recipe_live.ex:641
+#, elixir-autogen, elixir-format
+msgid "Source URL"
+msgstr "Käll-URL"
+
+#: lib/scullion_web/live/login_live.ex:161
+#, elixir-autogen, elixir-format
+msgid "Submit"
+msgstr "Skicka"
+
+#: lib/scullion_web/live/planner_live.ex:586
+#, elixir-autogen, elixir-format
+msgid "Suggested"
+msgstr "Föreslagna"
+
+#: lib/scullion_web/live/prep_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "Sunday Prep Plan"
+msgstr "Söndagsförberedelse"
+
+#: lib/scullion_web/live/planner_live.ex:594
+#, elixir-autogen, elixir-format
+msgid "Surprise me"
+msgstr "Överraska mig"
+
+#: lib/scullion_web/live/cost_live.ex:173
+#, elixir-autogen, elixir-format
+msgid "Sushi night"
+msgstr "Sushibjudning"
+
+#: lib/scullion_web/live/planner_live.ex:304
+#, elixir-autogen, elixir-format
+msgid "Swipe left to right to see other weeks"
+msgstr "Svep från vänster till höger för att se andra veckor"
+
+#: lib/scullion_web/live/recipe_live.ex:584
+#, elixir-autogen, elixir-format
+msgid "Tags"
+msgstr "Taggar"
+
+#: lib/scullion_web/live/cost_live.ex:109
+#, elixir-autogen, elixir-format
+msgid "This month"
+msgstr "Denna månad"
+
+#: lib/scullion_web/live/recipe_live.ex:785
+#, elixir-autogen, elixir-format
+msgid "This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead"
+msgstr "Den här sidan använder JavaScript för att ladda innehåll och kan inte skannas — prova att ladda upp ett foto istället"
+
+#: lib/scullion_web/live/planner_live.ex:273
+#, elixir-autogen, elixir-format
+msgid "This week"
+msgstr "Denna vecka"
+
+#: lib/scullion_web/live/recipe_live.ex:316
+#, elixir-autogen, elixir-format
+msgid "Time"
+msgstr "Tid"
+
+#: lib/scullion_web/live/prep_live.ex:36
+#, elixir-autogen, elixir-format
+msgid "Timeline"
+msgstr "Tidslinje"
+
+#: lib/scullion_web/live/recipe_live.ex:563
+#, elixir-autogen, elixir-format
+msgid "Title"
+msgstr "Titel"
+
+#: lib/scullion_web/live/planner_live.ex:365
+#, elixir-autogen, elixir-format
+msgid "Today"
+msgstr "Idag"
+
+#: lib/scullion_web/live/login_live.ex:54
+#, elixir-autogen, elixir-format
+msgid "Too many attempts. Try again in %{n}s"
+msgstr "För många försök. Försök igen om %{n} s"
+
+#: lib/scullion_web/live/login_live.ex:71
+#, elixir-autogen, elixir-format
+msgid "Too many attempts. Try again later."
+msgstr "För många försök. Försök igen senare."
+
+#: lib/scullion_web/live/recipe_live.ex:774
+#, elixir-autogen, elixir-format
+msgid "Too many requests — try again in a moment"
+msgstr "För många förfrågningar — försök igen om en stund"
+
+#: lib/scullion_web/live/cost_live.ex:150
+#, elixir-autogen, elixir-format
+msgid "Total"
+msgstr "Totalt"
+
+#: lib/scullion_web/live/cost_live.ex:114
+#, elixir-autogen, elixir-format
+msgid "Total spend"
+msgstr "Total utgift"
+
+#: lib/scullion_web/live/recipe_live.ex:566
+#, elixir-autogen, elixir-format
+msgid "Type"
+msgstr "Typ"
+
+#: lib/scullion_web/live/grocery_live.ex:166
+#: lib/scullion_web/live/recipe_live.ex:615
+#, elixir-autogen, elixir-format
+msgid "Unit"
+msgstr "Enhet"
+
+#: lib/scullion_web/live/settings_live.ex:18
+#, elixir-autogen, elixir-format
+msgid "Users"
+msgstr "Användare"
+
+#: lib/scullion_web/live/planner_live.ex:390
+#, elixir-autogen, elixir-format
+msgid "Uses leftovers"
+msgstr "Använder rester"
+
+#: lib/scullion_web/components/layouts.ex:121
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr "Vi kan inte hitta internet"
+
+#: lib/scullion_web/live/setup_live.ex:81
+#, elixir-autogen, elixir-format
+msgid "We'll generate a 16-digit code for you to save and use."
+msgstr "Vi genererar en 16-siffrig kod åt dig att spara och använda."
+
+#: lib/scullion_web/components/layouts.ex:11
+#, elixir-autogen, elixir-format
+msgid "Week"
+msgstr "Vecka"
+
+#: lib/scullion_web/live/setup_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "Welcome to Scullion!"
+msgstr "Välkommen till Scullion!"
+
+#: lib/scullion_web/live/recipe_live.ex:348
+#, elixir-autogen, elixir-format
+msgid "What can we cook tonight?"
+msgstr "Vad kan vi laga ikväll?"
+
+#: lib/scullion_web/live/setup_live.ex:58
+#, elixir-autogen, elixir-format
+msgid "What should we call you?"
+msgstr "Vad ska vi kalla dig?"
+
+#: lib/scullion_web/live/setup_live.ex:34
+#, elixir-autogen, elixir-format
+msgid "You're all set"
+msgstr "Allt är klart"
+
+#: lib/scullion_web/live/setup_live.ex:64
+#, elixir-autogen, elixir-format
+msgid "Your name"
+msgstr "Ditt namn"
+
+#: lib/scullion_web/live/settings_live.ex:39
+#, elixir-autogen, elixir-format
+msgid "active"
+msgstr "aktiv"
+
+#: lib/scullion_web/components/core_components.ex:74
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr "stäng"
+
+#: lib/scullion_web/live/pantry_live.ex:49
+#, elixir-autogen, elixir-format
+msgid "expires %{date}"
+msgstr "utgår %{date}"
+
+#: lib/scullion_web/live/deals_live.ex:45
+#, elixir-autogen, elixir-format
+msgid "https://www.ica.se/erbjudanden/..."
+msgstr "https://www.ica.se/erbjudanden/..."
+
+#: lib/scullion_web/live/planner_live.ex:398
+#, elixir-autogen, elixir-format
+msgid "— add a meal"
+msgstr "— lägg till en måltid"
+
+#: lib/scullion_web/live/recipe_live.ex:326
+#, elixir-autogen, elixir-format
+msgid "≤ %{n} min"
+msgstr "≤ %{n} min"
