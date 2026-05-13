@@ -35,13 +35,17 @@ defmodule ScullionWeb.Live.Auth do
   defp mount_current_user(socket, session) do
     case session["user_id"] do
       nil ->
+        Gettext.put_locale(ScullionWeb.Gettext, "sv")
         assign(socket, :current_user, nil)
 
       user_id ->
         user = Accounts.get_user!(user_id)
+        Gettext.put_locale(ScullionWeb.Gettext, user.locale || "sv")
         assign(socket, :current_user, user)
     end
   rescue
-    Ecto.NoResultsError -> assign(socket, :current_user, nil)
+    Ecto.NoResultsError ->
+      Gettext.put_locale(ScullionWeb.Gettext, "sv")
+      assign(socket, :current_user, nil)
   end
 end
