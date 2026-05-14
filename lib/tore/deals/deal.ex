@@ -11,6 +11,8 @@ defmodule Tore.Deals.Deal do
     field :price, :decimal
     field :price_unit, :string
     field :offer_condition, :string
+    field :regular_price, :string
+    field :comparison_price, :string
     field :valid_from, :date
     field :valid_until, :date
     field :source, Ecto.Enum, values: [:scraped, :vision, :manual]
@@ -21,7 +23,8 @@ defmodule Tore.Deals.Deal do
     deal
     |> cast(attrs, [
       :store, :store_location, :product_name, :brand, :size,
-      :price, :price_unit, :offer_condition, :valid_from, :valid_until, :source
+      :price, :price_unit, :offer_condition, :regular_price, :comparison_price,
+      :valid_from, :valid_until, :source
     ])
     |> validate_required([:store, :product_name, :source])
   end

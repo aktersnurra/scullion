@@ -29,9 +29,27 @@ defmodule Tore.Deals.Parsers.ICA do
   defp to_deal(offer) do
     details = offer["details"] || %{}
     mechanics = offer["parsedMechanics"] || %{}
+    store = List.first(offer["stores"] || []) || %{}
 
-    price_str = "#{mechanics["value2"]}#{mechanics["value4"]}"
     valid_until = parse_date(offer["validTo"])
+
+    # Build offer price label: prefer mechanicInfo ("3 för 42 kr", "35 kr/st"),
+    # fall back to composing from parsed mechanics
+    mechanic_label =
+      nilify(details["mechanicInfo"]) ||
+        nilify("#{mechanics["value1"]} #{mechanics["value2"]} kr#{mechanics["value4"]}" |> String.trim())
+
+    # Regular price comes from the store entry, e.g. "52,89-57,83" or "267"
+    regular_price = nilify(store["regularPrice"])
+
+    # Comparison price, e.g. "87:50/kg" — normalise colon separator to dot
+    comparison_price =
+      offer["comparisonPrice"]
+      |> nilify()
+      |> then(fn
+        nil -> nil
+        s -> Regex.replace(~r/(\d+):(\d+)/, s, "\\1.\\2")
+      end)
 
     %{
       store: "ica",
@@ -39,8 +57,10 @@ defmodule Tore.Deals.Parsers.ICA do
       brand: nilify(details["brand"]),
       size: nilify(details["packageInformation"]),
       price: parse_price(mechanics["value2"]),
-      price_unit: nilify(mechanics["unitSign"]),
-      offer_condition: nilify(details["mechanicInfo"] || price_str),
+      price_unit: nilify(mechanics["value4"]),
+      offer_condition: mechanic_label,
+      regular_price: regular_price,
+      comparison_price: comparison_price,
       valid_until: valid_until,
       source: :scraped
     }

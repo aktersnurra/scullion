@@ -237,18 +237,19 @@ defmodule ToreWeb.DealsLive do
           </div>
         <% else %>
           <ul class="border-t border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
-            <li :for={deal <- @deals} class="px-6 py-3 flex items-center gap-3">
+            <li :for={deal <- @deals} class="px-6 py-3 flex items-start gap-3">
               <div class="flex-1 min-w-0">
                 <p class="font-medium text-[var(--text)]" style="font-size: var(--t-body);">{deal.product_name}</p>
-                <p :if={deal.brand || deal.offer_condition} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
                   <span :if={deal.brand}>{deal.brand}</span>
-                  <span :if={deal.brand && deal.offer_condition}> · </span>
-                  <span :if={deal.offer_condition}>{deal.offer_condition}</span>
+                  <span :if={deal.brand && deal.size}> · </span>
+                  <span :if={deal.size}>{deal.size}</span>
                 </p>
+                <p :if={deal.comparison_price} class="text-[color:var(--subtle)]" style="font-size: var(--t-meta);">{deal.comparison_price}</p>
               </div>
-              <div :if={deal.price} class="shrink-0 text-right">
-                <span class="font-semibold text-[color:var(--accent)]" style="font-size: var(--t-body);">{deal.price} kr</span>
-                <span :if={deal.price_unit} class="ml-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">/{deal.price_unit}</span>
+              <div class="shrink-0 text-right">
+                <p :if={deal.offer_condition} class="font-semibold text-[color:var(--accent)]" style="font-size: var(--t-body);">{deal.offer_condition}</p>
+                <p :if={deal.regular_price} class="text-[color:var(--muted)] line-through" style="font-size: var(--t-meta);">{deal.regular_price} kr</p>
               </div>
             </li>
           </ul>
