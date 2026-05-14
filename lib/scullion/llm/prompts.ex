@@ -75,6 +75,56 @@ defmodule Scullion.LLM.Prompts do
   }
   """
 
+  @recipe_json_schema %{
+    type: "object",
+    required: ["title", "ingredients", "steps", "tags"],
+    additionalProperties: false,
+    properties: %{
+      title: %{type: "string"},
+      description: %{type: ["string", "null"]},
+      prep_time_minutes: %{type: ["integer", "null"]},
+      cook_time_minutes: %{type: ["integer", "null"]},
+      base_servings: %{type: ["integer", "null"]},
+      image_url: %{type: ["string", "null"]},
+      tags: %{type: "array", items: %{type: "string"}},
+      ingredients: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["item"],
+          additionalProperties: false,
+          properties: %{
+            item: %{type: "string"},
+            quantity: %{type: ["number", "null"]},
+            unit: %{type: ["string", "null"]}
+          }
+        }
+      },
+      steps: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["phase", "order", "action", "ingredients"],
+          additionalProperties: false,
+          properties: %{
+            phase: %{type: "string"},
+            order: %{type: "integer"},
+            action: %{type: "string"},
+            ingredients: %{type: "array", items: %{type: "string"}},
+            duration_minutes: %{type: ["integer", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def recipe_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "recipe", strict: true, schema: @recipe_json_schema}
+    }
+  end
+
   @recipe_rules """
   - title is required; steps and ingredients must always be arrays (empty if unknown)
   - CRITICAL: the steps array must be sorted in the exact order a cook performs them, start to finish
@@ -128,6 +178,35 @@ defmodule Scullion.LLM.Prompts do
       nil -> ""
       language -> "- Translate ALL text fields (title, description, tags, step phases, step actions, ingredient names) into #{language}. Keep units as-is (g, ml, msk, tsk, etc.)."
     end
+  end
+
+  @receipt_json_schema %{
+    type: "object",
+    required: ["line_items"],
+    additionalProperties: false,
+    properties: %{
+      line_items: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["product_name"],
+          additionalProperties: false,
+          properties: %{
+            product_name: %{type: "string"},
+            quantity: %{type: ["number", "null"]},
+            unit_price: %{type: ["number", "null"]},
+            total_price: %{type: ["number", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def receipt_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "receipt", strict: true, schema: @receipt_json_schema}
+    }
   end
 
   def parse_receipt do

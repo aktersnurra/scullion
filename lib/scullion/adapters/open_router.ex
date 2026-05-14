@@ -45,7 +45,7 @@ defmodule Scullion.Adapters.OpenRouter do
   def extract_recipe_from_html(html, locale \\ nil) do
     {system, user} = Scullion.LLM.Prompts.extract_recipe(html, locale)
 
-    case chat(system, user) do
+    case chat(system, user, Scullion.LLM.Prompts.recipe_json_schema()) do
       {:ok, data, _usage} -> {:ok, parse_recipe_attrs(data)}
       {:error, reason} -> {:error, reason}
     end
@@ -58,7 +58,7 @@ defmodule Scullion.Adapters.OpenRouter do
 
     body = %{
       model: vision_model(),
-      response_format: %{type: "json_object"},
+      response_format: Scullion.LLM.Prompts.receipt_json_schema(),
       messages: [
         %{role: "system", content: system},
         %{
@@ -135,7 +135,7 @@ defmodule Scullion.Adapters.OpenRouter do
 
     body = %{
       model: vision_model(),
-      response_format: %{type: "json_object"},
+      response_format: Scullion.LLM.Prompts.recipe_json_schema(),
       messages: [
         %{role: "system", content: system},
         %{role: "user", content: image_blocks}
@@ -213,10 +213,10 @@ defmodule Scullion.Adapters.OpenRouter do
     end
   end
 
-  defp chat(system_prompt, user_prompt) do
+  defp chat(system_prompt, user_prompt, response_format \\ %{type: "json_object"}) do
     body = %{
       model: model(),
-      response_format: %{type: "json_object"},
+      response_format: response_format,
       messages: [
         %{role: "system", content: system_prompt},
         %{role: "user", content: user_prompt}
