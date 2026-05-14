@@ -309,7 +309,7 @@ defmodule ScullionWeb.RecipeLive do
                 ]}
                 style="font-size: var(--t-meta);"
               >
-                {tag}
+                {tag_label(tag)}
               </button>
             </div>
             <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
@@ -808,4 +808,12 @@ defmodule ScullionWeb.RecipeLive do
   defp to_string_or_empty(v), do: to_string(v)
 
   defp common_tags, do: ["quick", "batch", "base-recipe", "vegetarian", "swedish", "asian"]
+
+  defp tag_label("quick"), do: gettext("Quick")
+  defp tag_label("batch"), do: gettext("Batch")
+  defp tag_label("base-recipe"), do: gettext("Base recipe")
+  defp tag_label("vegetarian"), do: gettext("Vegetarian")
+  defp tag_label("swedish"), do: gettext("Swedish")
+  defp tag_label("asian"), do: gettext("Asian")
+  defp tag_label(tag), do: String.capitalize(tag)
 end

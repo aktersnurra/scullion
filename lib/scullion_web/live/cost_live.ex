@@ -155,10 +155,10 @@ defmodule ScullionWeb.CostLive do
               <%= if @current_user && @current_user.role in [:member, :admin] do %>
                 <form phx-submit="save_manual_receipt" class="space-y-3 mb-4">
                   <div class="flex gap-3">
-                    <div class="flex-1"><.field name="date" type="date" label="Date" value={Date.to_iso8601(Date.utc_today())} required /></div>
-                    <div class="flex-1"><.field name="store_name" label="Store" placeholder="ICA Maxi" /></div>
+                    <div class="flex-1"><.field name="date" type="date" label={gettext("Date")} value={Date.to_iso8601(Date.utc_today())} required /></div>
+                    <div class="flex-1"><.field name="store_name" label={gettext("Store")} placeholder="ICA Maxi" /></div>
                   </div>
-                  <.field name="total_amount" type="number" label="Total (kr)" placeholder="0.00" required />
+                  <.field name="total_amount" type="number" label={gettext("Total (kr)")} placeholder="0.00" required />
                   <.button type="submit" variant={:primary} size={:lg} full>{gettext("Save receipt")}</.button>
                 </form>
               <% end %>
@@ -167,11 +167,11 @@ defmodule ScullionWeb.CostLive do
               <%= if @current_user && @current_user.role in [:member, :admin] do %>
                 <form phx-submit="log_dining_out" class="space-y-3 mb-4">
                   <div class="flex gap-3">
-                    <div class="flex-1"><.field name="date" type="date" label="Date" value={Date.to_iso8601(Date.utc_today())} required /></div>
-                    <div class="flex-1"><.field name="num_people" type="number" label="People" value="1" /></div>
+                    <div class="flex-1"><.field name="date" type="date" label={gettext("Date")} value={Date.to_iso8601(Date.utc_today())} required /></div>
+                    <div class="flex-1"><.field name="num_people" type="number" label={gettext("People")} value="1" /></div>
                   </div>
                   <.field name="description" label={gettext("Restaurant / occasion")} placeholder={gettext("Sushi night")} />
-                  <.field name="total_amount" type="number" label="Total (kr)" placeholder="0.00" required />
+                  <.field name="total_amount" type="number" label={gettext("Total (kr)")} placeholder="0.00" required />
                   <.button type="submit" variant={:primary} size={:lg} full>{gettext("Log dining")}</.button>
                 </form>
               <% end %>

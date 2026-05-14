@@ -349,7 +349,7 @@ defmodule ScullionWeb.PlannerLive do
             ]}
             style="font-size: 11px;"
           >
-            {Calendar.strftime(@date, "%a")}
+            {day_abbr(@date)}
           </div>
           <div
             class={[
@@ -677,19 +677,61 @@ defmodule ScullionWeb.PlannerLive do
   defp recipe_by_id(_recipes, nil), do: nil
   defp recipe_by_id(recipes, id), do: Enum.find(recipes, &(&1.id == id))
 
-  @full_day_names %{
-    "mon" => "Monday",
-    "tue" => "Tuesday",
-    "wed" => "Wednesday",
-    "thu" => "Thursday",
-    "fri" => "Friday",
-    "sat" => "Saturday",
-    "sun" => "Sunday"
-  }
+  defp day_abbr(date) do
+    case Date.day_of_week(date) do
+      1 -> gettext("Mon")
+      2 -> gettext("Tue")
+      3 -> gettext("Wed")
+      4 -> gettext("Thu")
+      5 -> gettext("Fri")
+      6 -> gettext("Sat")
+      7 -> gettext("Sun")
+    end
+  end
+
+  defp month_abbr(date) do
+    case date.month do
+      1 -> gettext("Jan")
+      2 -> gettext("Feb")
+      3 -> gettext("Mar")
+      4 -> gettext("Apr")
+      5 -> gettext("May")
+      6 -> gettext("Jun")
+      7 -> gettext("Jul")
+      8 -> gettext("Aug")
+      9 -> gettext("Sep")
+      10 -> gettext("Oct")
+      11 -> gettext("Nov")
+      12 -> gettext("Dec")
+    end
+  end
+
+  defp format_date(date), do: "#{month_abbr(date)} #{date.day}"
+
+  defp day_name(abbr) do
+    case abbr do
+      "mon" -> gettext("Monday")
+      "tue" -> gettext("Tuesday")
+      "wed" -> gettext("Wednesday")
+      "thu" -> gettext("Thursday")
+      "fri" -> gettext("Friday")
+      "sat" -> gettext("Saturday")
+      "sun" -> gettext("Sunday")
+      other -> String.capitalize(other)
+    end
+  end
+
+  defp meal_name(meal) do
+    case meal do
+      "lunch" -> gettext("Lunch")
+      "dinner" -> gettext("Dinner")
+      other -> String.capitalize(other)
+    end
+  end
 
   defp slot_label(slot_key) do
     [day, meal] = String.split(slot_key, "_", parts: 2)
-    "#{Map.get(@full_day_names, day, String.capitalize(day))} · #{String.capitalize(meal)}"
+    "#{day_name(day)} · #{meal_name(meal)}"
   end
 
   defp days_after(slot_key) do
@@ -717,7 +759,7 @@ defmodule ScullionWeb.PlannerLive do
   end
 
   defp plan_subtitle(plan_state, week_start, week_end) do
-    range = "#{Calendar.strftime(week_start, "%b %-d")} – #{Calendar.strftime(week_end, "%b %-d")}"
+    range = "#{format_date(week_start)} – #{format_date(week_end)}"
 
     meals =
       plan_state.slots

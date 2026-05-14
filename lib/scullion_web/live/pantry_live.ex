@@ -65,14 +65,14 @@ defmodule ScullionWeb.PantryLive do
         <%= if @current_user && @current_user.role in [:member, :admin] do %>
           <form phx-submit="add_item" class="px-6 py-5 mt-2 border-t border-[color:var(--hairline)] space-y-4">
             <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Add to pantry")}</h2>
-            <.field name="name" label="Item" placeholder="e.g. Pasta" required />
+            <.field name="name" label={gettext("Item")} placeholder={gettext("e.g. Pasta")} required />
             <div class="grid grid-cols-2 gap-3">
-              <.field name="quantity" label="Quantity" placeholder="500" />
-              <.field name="unit" label="Unit" placeholder="g" />
+              <.field name="quantity" label={gettext("Quantity")} placeholder="500" />
+              <.field name="unit" label={gettext("Unit")} placeholder="g" />
             </div>
             <div class="grid grid-cols-2 gap-3">
-              <.field name="category" label="Category" placeholder="dairy" />
-              <.field name="expires_at" label="Expires" type="date" />
+              <.field name="category" label={gettext("Category")} placeholder={gettext("dairy")} />
+              <.field name="expires_at" label={gettext("Expires")} type="date" />
             </div>
             <.button type="submit" variant={:primary} size={:lg} full>{gettext("Add")}</.button>
           </form>

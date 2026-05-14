@@ -29,7 +29,7 @@ defmodule ScullionWeb.PlannerLiveTest do
 
       html = render_click(lv, "open_slot", %{"slot_key" => "mon_dinner"})
       # modal title
-      assert html =~ "Monday · Dinner"
+      assert html =~ "Måndag · Middag"
 
       # eventually the recipe shows up either in suggested or all-recipes list
       :timer.sleep(150)

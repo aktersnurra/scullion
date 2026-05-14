@@ -42,7 +42,7 @@ msgstr ""
 msgid "%{n} unchecked · Week %{week}"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:728
+#: lib/scullion_web/live/planner_live.ex:770
 #, elixir-autogen, elixir-format
 msgid "%{range} · %{meals} meals planned"
 msgstr ""
@@ -881,6 +881,7 @@ msgid "Type"
 msgstr ""
 
 #: lib/scullion_web/live/grocery_live.ex:166
+#: lib/scullion_web/live/pantry_live.ex:71
 #: lib/scullion_web/live/recipe_live.ex:615
 #, elixir-autogen, elixir-format
 msgid "Unit"
@@ -964,4 +965,226 @@ msgstr ""
 #: lib/scullion_web/live/recipe_live.ex:326
 #, elixir-autogen, elixir-format
 msgid "≤ %{n} min"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:817
+#, elixir-autogen, elixir-format
+msgid "Asian"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:814
+#, elixir-autogen, elixir-format
+msgid "Base recipe"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:813
+#, elixir-autogen, elixir-format
+msgid "Batch"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "Category"
+msgstr ""
+
+#: lib/scullion_web/live/cost_live.ex:158
+#: lib/scullion_web/live/cost_live.ex:170
+#, elixir-autogen, elixir-format
+msgid "Date"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:75
+#, elixir-autogen, elixir-format
+msgid "Expires"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "Item"
+msgstr ""
+
+#: lib/scullion_web/live/cost_live.ex:171
+#, elixir-autogen, elixir-format
+msgid "People"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:70
+#, elixir-autogen, elixir-format
+msgid "Quantity"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:812
+#, elixir-autogen, elixir-format
+msgid "Quick"
+msgstr ""
+
+#: lib/scullion_web/live/cost_live.ex:159
+#, elixir-autogen, elixir-format
+msgid "Store"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:816
+#, elixir-autogen, elixir-format
+msgid "Swedish"
+msgstr ""
+
+#: lib/scullion_web/live/cost_live.ex:161
+#: lib/scullion_web/live/cost_live.ex:174
+#, elixir-autogen, elixir-format
+msgid "Total (kr)"
+msgstr ""
+
+#: lib/scullion_web/live/recipe_live.ex:815
+#, elixir-autogen, elixir-format
+msgid "Vegetarian"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:74
+#, elixir-autogen, elixir-format
+msgid "dairy"
+msgstr ""
+
+#: lib/scullion_web/live/pantry_live.ex:68
+#, elixir-autogen, elixir-format
+msgid "e.g. Pasta"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:697
+#, elixir-autogen, elixir-format
+msgid "Apr"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:701
+#, elixir-autogen, elixir-format
+msgid "Aug"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:705
+#, elixir-autogen, elixir-format
+msgid "Dec"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:727
+#, elixir-autogen, elixir-format
+msgid "Dinner"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:695
+#, elixir-autogen, elixir-format
+msgid "Feb"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:686
+#, elixir-autogen, elixir-format
+msgid "Fri"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:717
+#, elixir-autogen, elixir-format
+msgid "Friday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:694
+#, elixir-autogen, elixir-format
+msgid "Jan"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:700
+#, elixir-autogen, elixir-format
+msgid "Jul"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:699
+#, elixir-autogen, elixir-format
+msgid "Jun"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:726
+#, elixir-autogen, elixir-format
+msgid "Lunch"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:696
+#, elixir-autogen, elixir-format
+msgid "Mar"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:698
+#, elixir-autogen, elixir-format
+msgid "May"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:682
+#, elixir-autogen, elixir-format
+msgid "Mon"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:713
+#, elixir-autogen, elixir-format
+msgid "Monday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:704
+#, elixir-autogen, elixir-format
+msgid "Nov"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:703
+#, elixir-autogen, elixir-format
+msgid "Oct"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:687
+#, elixir-autogen, elixir-format
+msgid "Sat"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:718
+#, elixir-autogen, elixir-format
+msgid "Saturday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:702
+#, elixir-autogen, elixir-format
+msgid "Sep"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:688
+#, elixir-autogen, elixir-format
+msgid "Sun"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:719
+#, elixir-autogen, elixir-format
+msgid "Sunday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:685
+#, elixir-autogen, elixir-format
+msgid "Thu"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:716
+#, elixir-autogen, elixir-format
+msgid "Thursday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:683
+#, elixir-autogen, elixir-format
+msgid "Tue"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:714
+#, elixir-autogen, elixir-format
+msgid "Tuesday"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:684
+#, elixir-autogen, elixir-format
+msgid "Wed"
+msgstr ""
+
+#: lib/scullion_web/live/planner_live.ex:715
+#, elixir-autogen, elixir-format
+msgid "Wednesday"
 msgstr ""
