@@ -28,10 +28,20 @@ defmodule Tore.Deals do
     Repo.all(from d in Deal, where: is_nil(d.valid_until) or d.valid_until >= ^today)
   end
 
+  @ttl_days 14
+
   @spec clear_expired() :: :ok
   def clear_expired do
     today = Date.utc_today()
-    Repo.delete_all(from d in Deal, where: not is_nil(d.valid_until) and d.valid_until < ^today)
+    cutoff = NaiveDateTime.utc_now() |> NaiveDateTime.add(-@ttl_days * 86_400) |> NaiveDateTime.truncate(:second)
+
+    Repo.delete_all(
+      from d in Deal,
+        where:
+          (not is_nil(d.valid_until) and d.valid_until < ^today) or
+            (is_nil(d.valid_until) and d.inserted_at < ^cutoff)
+    )
+
     :ok
   end
 
