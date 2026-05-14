@@ -1,0 +1,23 @@
+Extract all food and household items visible in this photo.
+
+The photo may show a fridge, pantry shelf, grocery bag, or any collection of food items.
+
+Return a JSON object with this exact structure:
+{
+  "items": [
+    {
+      "name": "string — item name in Swedish",
+      "quantity": 1,
+      "unit": "string or null — e.g. g, kg, ml, dl, st, förp",
+      "category": "string or null — e.g. mejeri, kött, grönsaker, frys, skafferi, dryck"
+    }
+  ]
+}
+
+Rules:
+- Include every distinct food or household item you can identify
+- Estimate quantity if visible (e.g. "3" eggs, "500" for a 500g pack); use null if unclear
+- Use null for unit when it cannot be determined
+- name must be in Swedish (translate if needed)
+- category should be one of: mejeri, kött, fisk, grönsaker, frukt, frys, skafferi, dryck, övrigt
+- Return only the JSON object, no prose

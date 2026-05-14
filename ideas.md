@@ -16,6 +16,8 @@ Parse the image of the recipe and extract each line item as a pantry item
 
 # Image to Pantry
 
+> **DONE** — photo upload → vision LLM → editable preview → confirm adds to pantry
+
 Take an image -> image to text model -> pantry entries (editable)
 
 # Stored recipe format
@@ -235,6 +237,9 @@ this should be injected into the system prompt of that flow
 Add this in the settings page?
 
 # Add stuff to the pantry via photo
+
+> **DONE** — same as Image to Pantry above; camera button on pantry page
+
 Upload a photo on the pantry page -> vision llm -> pantry items (editable)
 
 # Run scraping of custom url for deals

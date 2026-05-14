@@ -2,11 +2,25 @@ defmodule ToreWeb.PantryLive do
   use ToreWeb, :live_view
 
   alias Tore.Pantry
+  alias Tore.Handlers.PantryHandler
 
+  @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, items: Pantry.list_inventory())}
+    socket =
+      socket
+      |> assign(items: Pantry.list_inventory(), scanning: false, preview: nil, scan_error: nil)
+      |> allow_upload(:pantry_photo,
+        accept: ~w(.jpg .jpeg .png .webp .heic),
+        max_entries: 1,
+        max_file_size: 10_000_000,
+        auto_upload: true,
+        progress: &handle_progress/3
+      )
+
+    {:ok, socket}
   end
 
+  @impl true
   def handle_event("add_item", params, socket) do
     attrs = %{
       name: params["name"],
@@ -22,19 +36,205 @@ defmodule ToreWeb.PantryLive do
     end
   end
 
+  @impl true
   def handle_event("remove_item", %{"id" => id}, socket) do
     Pantry.remove_item(String.to_integer(id))
     {:noreply, assign(socket, items: Pantry.list_inventory())}
   end
 
+  @impl true
+  def handle_event("discard_scan", _params, socket) do
+    {:noreply, assign(socket, preview: nil, scan_error: nil)}
+  end
+
+  @impl true
+  def handle_event("confirm_scan", _params, socket) do
+    items = socket.assigns.preview || []
+
+    case PantryHandler.confirm_items(items) do
+      {:ok, _inserted} ->
+        {:noreply,
+         socket
+         |> assign(preview: nil, items: Pantry.list_inventory())
+         |> put_flash(:info, gettext("Items added to pantry"))}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, gettext("Failed to save some items"))}
+    end
+  end
+
+  @impl true
+  def handle_event("update_preview_item", %{"key" => key, "field" => field, "value" => value}, socket) do
+    key = String.to_integer(key)
+
+    preview =
+      Enum.map(socket.assigns.preview, fn item ->
+        if item.key == key do
+          case field do
+            "name" -> %{item | name: value}
+            "quantity" -> %{item | quantity: parse_decimal(value)}
+            "unit" -> %{item | unit: nilify(value)}
+            "category" -> %{item | category: nilify(value)}
+            _ -> item
+          end
+        else
+          item
+        end
+      end)
+
+    {:noreply, assign(socket, preview: preview)}
+  end
+
+  @impl true
+  def handle_event("remove_preview_item", %{"key" => key}, socket) do
+    key = String.to_integer(key)
+    preview = Enum.reject(socket.assigns.preview, &(&1.key == key))
+    {:noreply, assign(socket, preview: preview)}
+  end
+
+  @impl true
+  def handle_event("validate_upload", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_progress(:pantry_photo, entry, socket) do
+    if entry.done? do
+      [{binary, _}] =
+        consume_uploaded_entries(socket, :pantry_photo, fn %{path: path}, e ->
+          {:ok, {File.read!(path), e}}
+        end)
+
+      pid = self()
+      Task.start(fn -> send(pid, {:pantry_scan_result, PantryHandler.parse_image(binary)}) end)
+
+      {:noreply, assign(socket, scanning: true, scan_error: nil)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:pantry_scan_result, {:ok, items, _usage}}, socket) do
+    preview =
+      Enum.with_index(items, fn item, i ->
+        Map.put(item, :key, i)
+      end)
+
+    {:noreply, assign(socket, scanning: false, preview: preview)}
+  end
+
+  @impl true
+  def handle_info({:pantry_scan_result, {:error, reason}}, socket) do
+    require Logger
+    Logger.error("pantry_scan_result error: #{inspect(reason)}")
+    {:noreply,
+     assign(socket,
+       scanning: false,
+       scan_error: gettext("Could not read image. Try a clearer photo.")
+     )}
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/pantry"}>
     <.page max_width={:md}>
+
+      <%!-- ── Scan preview ─────────────────────────────────────────────── --%>
+      <%= if @preview do %>
+        <.card padded={false} class="mb-4">
+          <header class="px-6 pt-6 pb-3 flex items-center justify-between">
+            <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Review scanned items")}</h2>
+            <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{length(@preview)} {gettext("items")}</span>
+          </header>
+
+          <ul class="border-t border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
+            <li :for={item <- @preview} class="px-6 py-3 flex items-start gap-3">
+              <div class="flex-1 grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={item.name}
+                  placeholder={gettext("Name")}
+                  phx-blur="update_preview_item"
+                  phx-value-key={item.key}
+                  phx-value-field="name"
+                  class="col-span-2 w-full rounded-[var(--r-md)] border border-[color:var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[var(--text)] focus:outline-none focus:border-[color:var(--accent)]"
+                  style="font-size: var(--t-meta);"
+                />
+                <input
+                  type="text"
+                  value={item.quantity && Decimal.to_string(item.quantity)}
+                  placeholder={gettext("Qty")}
+                  phx-blur="update_preview_item"
+                  phx-value-key={item.key}
+                  phx-value-field="quantity"
+                  class="w-full rounded-[var(--r-md)] border border-[color:var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[var(--text)] focus:outline-none focus:border-[color:var(--accent)]"
+                  style="font-size: var(--t-meta);"
+                />
+                <input
+                  type="text"
+                  value={item.unit}
+                  placeholder={gettext("Unit")}
+                  phx-blur="update_preview_item"
+                  phx-value-key={item.key}
+                  phx-value-field="unit"
+                  class="w-full rounded-[var(--r-md)] border border-[color:var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[var(--text)] focus:outline-none focus:border-[color:var(--accent)]"
+                  style="font-size: var(--t-meta);"
+                />
+                <input
+                  type="text"
+                  value={item.category}
+                  placeholder={gettext("Category")}
+                  phx-blur="update_preview_item"
+                  phx-value-key={item.key}
+                  phx-value-field="category"
+                  class="col-span-2 w-full rounded-[var(--r-md)] border border-[color:var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[var(--text)] focus:outline-none focus:border-[color:var(--accent)]"
+                  style="font-size: var(--t-meta);"
+                />
+              </div>
+              <button
+                phx-click="remove_preview_item"
+                phx-value-key={item.key}
+                class="mt-1 size-8 inline-flex items-center justify-center text-[color:var(--subtle)] hover:text-[color:var(--danger)]"
+                aria-label={gettext("Remove")}
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </li>
+          </ul>
+
+          <div class="px-6 py-4 flex gap-3 border-t border-[color:var(--hairline)]">
+            <.button phx-click="confirm_scan" variant={:primary} size={:lg} full>{gettext("Add to pantry")}</.button>
+            <.button phx-click="discard_scan" variant={:ghost} size={:lg}>{gettext("Discard")}</.button>
+          </div>
+        </.card>
+      <% end %>
+
+      <%!-- ── Main pantry card ──────────────────────────────────────────── --%>
       <.card padded={false}>
-        <header class="px-6 pt-6 pb-3">
+        <header class="px-6 pt-6 pb-3 flex items-center justify-between">
           <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Pantry")}</h1>
+          <%= if @current_user && @current_user.role in [:member, :admin] && !@preview do %>
+            <%= if @scanning do %>
+              <span class="text-[color:var(--muted)] inline-flex items-center gap-1.5" style="font-size: var(--t-meta);">
+                <.icon name="hero-arrow-path" class="size-4 animate-spin" /> {gettext("Scanning…")}
+              </span>
+            <% else %>
+              <form phx-change="validate_upload">
+                <.live_file_input upload={@uploads.pantry_photo} class="hidden" />
+                <label
+                  for={@uploads.pantry_photo.ref}
+                  class="cursor-pointer h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+                  style="font-size: var(--t-meta);"
+                >
+                  <.icon name="hero-camera" class="size-4" /> {gettext("Scan photo")}
+                </label>
+              </form>
+            <% end %>
+          <% end %>
         </header>
+
+        <p :if={@scan_error} class="mx-6 mb-3 text-[color:var(--danger)] bg-red-50 rounded-[var(--r-lg)] py-2 px-3" style="font-size: var(--t-meta);">{@scan_error}</p>
 
         <%= if @items == [] do %>
           <div class="px-6 py-8 border-t border-[color:var(--hairline)]"><.empty message={gettext("Nothing in pantry yet")} /></div>
@@ -110,5 +310,4 @@ defmodule ToreWeb.PantryLive do
 
   defp format_date(nil), do: ""
   defp format_date(d), do: Date.to_iso8601(d)
-
 end

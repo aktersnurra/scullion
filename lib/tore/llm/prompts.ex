@@ -223,6 +223,45 @@ defmodule Tore.LLM.Prompts do
     {system, user}
   end
 
+  @pantry_json_schema %{
+    type: "object",
+    required: ["items"],
+    additionalProperties: false,
+    properties: %{
+      items: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["name"],
+          additionalProperties: false,
+          properties: %{
+            name: %{type: "string"},
+            quantity: %{type: ["number", "null"]},
+            unit: %{type: ["string", "null"]},
+            category: %{type: ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def pantry_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "pantry_items", strict: true, schema: @pantry_json_schema}
+    }
+  end
+
+  def parse_pantry_image do
+    system = """
+    You are a kitchen inventory assistant. Identify food and household items from photos.
+    Respond with a JSON object only. No prose.
+    """
+
+    user = File.read!(Path.join(@prompts_dir, "parse_pantry_image.eex"))
+    {system, user}
+  end
+
   def parse_receipt do
     system = """
     You are a receipt parser. Extract line items from receipt images precisely.
