@@ -6,7 +6,7 @@ defmodule ToreWeb.Endpoint do
   # Set :encryption_salt if you would also like to encrypt it.
   @session_options [
     store: :cookie,
-    key: "_scullion_key",
+    key: "_tore_key",
     signing_salt: "vfJMDfcz",
     same_site: "Lax"
   ]

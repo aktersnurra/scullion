@@ -53,23 +53,23 @@ defmodule ToreWeb.Telemetry do
       ),
 
       # Database Metrics
-      summary("scullion.repo.query.total_time",
+      summary("tore.repo.query.total_time",
         unit: {:native, :millisecond},
         description: "The sum of the other measurements"
       ),
-      summary("scullion.repo.query.decode_time",
+      summary("tore.repo.query.decode_time",
         unit: {:native, :millisecond},
         description: "The time spent decoding the data received from the database"
       ),
-      summary("scullion.repo.query.query_time",
+      summary("tore.repo.query.query_time",
         unit: {:native, :millisecond},
         description: "The time spent executing the query"
       ),
-      summary("scullion.repo.query.queue_time",
+      summary("tore.repo.query.queue_time",
         unit: {:native, :millisecond},
         description: "The time spent waiting for a database connection"
       ),
-      summary("scullion.repo.query.idle_time",
+      summary("tore.repo.query.idle_time",
         unit: {:native, :millisecond},
         description:
           "The time the connection spent waiting before being checked out for the query"

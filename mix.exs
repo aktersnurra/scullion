@@ -85,10 +85,10 @@ defmodule Tore.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind scullion", "esbuild scullion"],
+      "assets.build": ["compile", "tailwind tore", "esbuild tore"],
       "assets.deploy": [
-        "tailwind scullion --minify",
-        "esbuild scullion --minify",
+        "tailwind tore --minify",
+        "esbuild tore --minify",
         "phx.digest"
       ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
