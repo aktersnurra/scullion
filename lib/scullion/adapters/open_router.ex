@@ -42,8 +42,8 @@ defmodule Scullion.Adapters.OpenRouter do
   end
 
   @impl Scullion.LLM
-  def extract_recipe_from_html(html) do
-    {system, user} = Scullion.LLM.Prompts.extract_recipe(html)
+  def extract_recipe_from_html(html, locale \\ nil) do
+    {system, user} = Scullion.LLM.Prompts.extract_recipe(html, locale)
 
     case chat(system, user) do
       {:ok, data, _usage} -> {:ok, parse_recipe_attrs(data)}
@@ -124,8 +124,8 @@ defmodule Scullion.Adapters.OpenRouter do
   def parse_deals_image(_image), do: {:error, :not_implemented}
 
   @impl Scullion.LLM
-  def parse_recipe_images(images) do
-    system = Scullion.LLM.Prompts.parse_recipe_images()
+  def parse_recipe_images(images, locale \\ nil) do
+    system = Scullion.LLM.Prompts.parse_recipe_images(locale)
 
     image_blocks =
       Enum.map(images, fn binary ->

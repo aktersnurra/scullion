@@ -93,16 +93,16 @@ defmodule Scullion.Recipes do
     :ok
   end
 
-  @spec scrape_from_url(String.t()) :: {:ok, Recipe.t()} | {:error, term()}
-  def scrape_from_url(url) do
-    Scullion.Handlers.RecipeHandler.scrape_and_create(url)
+  @spec scrape_from_url(String.t(), String.t() | nil) :: {:ok, Recipe.t()} | {:error, term()}
+  def scrape_from_url(url, locale \\ nil) do
+    Scullion.Handlers.RecipeHandler.scrape_and_create(url, locale)
   end
 
   @llm Application.compile_env(:scullion, :llm_client)
 
-  @spec extract_from_images([binary()]) :: {:ok, map()} | {:error, term()}
-  def extract_from_images(binaries) do
-    @llm.parse_recipe_images(binaries)
+  @spec extract_from_images([binary()], String.t() | nil) :: {:ok, map()} | {:error, term()}
+  def extract_from_images(binaries, locale \\ nil) do
+    @llm.parse_recipe_images(binaries, locale)
   end
 
   # ── Private helpers ────────────────────────────────────────────────────────

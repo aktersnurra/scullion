@@ -79,11 +79,13 @@ defmodule ScullionWeb.RecipeLive do
           consume_uploaded_entries(socket, :recipe_images, fn %{path: path}, _entry ->
             {:ok, File.read!(path)}
           end)
-        send(self(), {:extract_images, binaries})
+        locale = socket.assigns.current_user && socket.assigns.current_user.locale
+        send(self(), {:extract_images, binaries, locale})
         {:noreply, assign(socket, image_extract_state: :loading, error: nil)}
 
       String.trim(url) != "" ->
-        send(self(), {:scrape, String.trim(url)})
+        locale = socket.assigns.current_user && socket.assigns.current_user.locale
+        send(self(), {:scrape, String.trim(url), locale})
         {:noreply, assign(socket, scrape_state: :loading, error: nil)}
 
       true ->
@@ -191,8 +193,8 @@ defmodule ScullionWeb.RecipeLive do
 
 
 
-  def handle_info({:extract_images, binaries}, socket) do
-    case Recipes.extract_from_images(binaries) do
+  def handle_info({:extract_images, binaries, locale}, socket) do
+    case Recipes.extract_from_images(binaries, locale) do
       {:ok, attrs} ->
         form = %{
           title: attrs[:title] || "",
@@ -219,8 +221,8 @@ defmodule ScullionWeb.RecipeLive do
     end
   end
 
-  def handle_info({:scrape, url}, socket) do
-    case Recipes.scrape_from_url(url) do
+  def handle_info({:scrape, url, locale}, socket) do
+    case Recipes.scrape_from_url(url, locale) do
       {:ok, recipe} ->
         {:noreply,
          assign(socket, scrape_state: :idle)

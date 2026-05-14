@@ -95,28 +95,39 @@ defmodule Scullion.LLM.Prompts do
   - Respond with a JSON object only. No prose.
   """
 
-  def extract_recipe(html) do
+  def extract_recipe(html, locale \\ nil) do
     system = """
     You are a recipe extractor. Given raw HTML from a recipe webpage, extract the recipe.
     Return a JSON object matching this exact structure:
     #{@recipe_schema}
     Rules:
     #{@recipe_rules}
+    #{translation_instruction(locale)}
     """
 
     {system, html}
   end
 
-  def parse_recipe_images do
-    system = """
+  def parse_recipe_images(locale \\ nil) do
+    """
     You are a recipe extractor. The user has photographed one or more pages of a recipe — ingredients may be on one image, instructions on another.
     Combine all images into a single complete recipe and return a JSON object matching this exact structure:
     #{@recipe_schema}
     Rules:
     #{@recipe_rules}
+    #{translation_instruction(locale)}
     """
+  end
 
-    system
+  @locale_names %{"sv" => "Swedish", "en" => "English", "de" => "German", "fr" => "French", "es" => "Spanish", "no" => "Norwegian", "da" => "Danish", "fi" => "Finnish"}
+
+  defp translation_instruction(nil), do: ""
+
+  defp translation_instruction(locale) do
+    case Map.get(@locale_names, locale) do
+      nil -> ""
+      language -> "- Translate ALL text fields (title, description, tags, step phases, step actions, ingredient names) into #{language}. Keep units as-is (g, ml, msk, tsk, etc.)."
+    end
   end
 
   def parse_receipt do

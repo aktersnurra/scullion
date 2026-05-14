@@ -30,7 +30,7 @@ defmodule Scullion.Handlers.RecipeHandlerTest do
       |> expect(:fetch, fn "https://example.com/plain" -> {:ok, @plain_html} end)
 
       Scullion.MockLLM
-      |> expect(:extract_recipe_from_html, fn _html ->
+      |> expect(:extract_recipe_from_html, fn _html, _locale ->
         {:ok, %{title: "LLM Recipe", ingredients: []}}
       end)
 

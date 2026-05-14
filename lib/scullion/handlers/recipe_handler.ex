@@ -6,10 +6,11 @@ defmodule Scullion.Handlers.RecipeHandler do
 
   @uploads_dir Path.join([:code.priv_dir(:scullion), "static", "uploads", "recipes"])
 
-  @spec scrape_and_create(String.t()) :: {:ok, Scullion.Recipes.Recipe.t()} | {:error, term()}
-  def scrape_and_create(url) do
+  @spec scrape_and_create(String.t(), String.t() | nil) ::
+          {:ok, Scullion.Recipes.Recipe.t()} | {:error, term()}
+  def scrape_and_create(url, locale \\ nil) do
     with {:ok, html} <- @http.fetch(url),
-         {:ok, attrs} <- parse_or_extract(html) do
+         {:ok, attrs} <- parse_or_extract(html, locale) do
       Scullion.Recipes.create(Map.put(attrs, :source_url, url))
     end
   end
@@ -32,9 +33,9 @@ defmodule Scullion.Handlers.RecipeHandler do
 
   # ── Private ────────────────────────────────────────────────────────────────
 
-  defp parse_or_extract(html) do
+  defp parse_or_extract(html, locale \\ nil) do
     with {:error, :not_found} <- Scullion.Recipes.Parser.parse_html(html) do
-      @llm.extract_recipe_from_html(html)
+      @llm.extract_recipe_from_html(html, locale)
     end
   end
 
