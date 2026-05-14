@@ -185,3 +185,18 @@ Canonicalize:
 Do NOT canonicalize:
 
 > human-readable content.
+
+# Parsing recipe url
+
+Add a prestep with a cheap model to verify that the parsed content actually contain the recipe, otherwise
+just return information about the page using js to display the recipe, hence screenshots are needed
+instead.
+
+I want to avoid spending api credits on an expensive model if the parse html does not 
+contain the recipe, i.e.:
+
+url -> html content -> cheap llm recipe parsable? y/n -> if y -> extract recipe with expensive llm
+
+Investigation:
+1. how is it implemented now? html sent to llm regardless?
+2. should this step be introduced for all parsers?

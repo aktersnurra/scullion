@@ -31,6 +31,10 @@ if config_env() == :prod do
     System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
   config :scullion, :openrouter_image_model,
     System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
+  config :scullion, :openrouter_check_model,
+    System.get_env("OPENROUTER_CHECK_MODEL", "openai/gpt-oss-120b:free")
+  config :scullion, :openrouter_check_model_fallback,
+    System.get_env("OPENROUTER_CHECK_MODEL_FALLBACK", "openai/gpt-oss-120b")
 
   database_path =
     System.get_env("DATABASE_PATH") ||

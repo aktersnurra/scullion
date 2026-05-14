@@ -43,11 +43,13 @@ defmodule Scullion.Adapters.OpenRouter do
 
   @impl Scullion.LLM
   def extract_recipe_from_html(html, locale \\ nil) do
-    {system, user} = Scullion.LLM.Prompts.extract_recipe(html, locale)
+    with :ok <- check_parseable(html) do
+      {system, user} = Scullion.LLM.Prompts.extract_recipe(html, locale)
 
-    case chat(system, user, Scullion.LLM.Prompts.recipe_json_schema()) do
-      {:ok, data, _usage} -> {:ok, parse_recipe_attrs(data)}
-      {:error, reason} -> {:error, reason}
+      case chat(system, user, Scullion.LLM.Prompts.recipe_json_schema()) do
+        {:ok, data, _usage} -> {:ok, parse_recipe_attrs(data)}
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -213,6 +215,57 @@ defmodule Scullion.Adapters.OpenRouter do
     end
   end
 
+  defp check_parseable(html) do
+    {system, user} = Scullion.LLM.Prompts.check_recipe_html(html)
+
+    result =
+      case cheap_chat(system, user, check_model()) do
+        {:ok, %{"parseable" => true}, _} -> :ok
+        {:ok, %{"parseable" => false}, _} -> {:error, :not_a_recipe}
+        {:error, _} -> cheap_chat(system, user, check_model_fallback())
+      end
+
+    case result do
+      :ok -> :ok
+      {:ok, %{"parseable" => true}, _} -> :ok
+      {:ok, %{"parseable" => false}, _} -> {:error, :not_a_recipe}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp cheap_chat(system_prompt, user_prompt, model_name) do
+    body = %{
+      model: model_name,
+      response_format: %{type: "json_object"},
+      messages: [
+        %{role: "system", content: system_prompt},
+        %{role: "user", content: user_prompt}
+      ]
+    }
+
+    case Req.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+             {"X-Title", "Scullion"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        content = get_in(resp, ["choices", Access.at(0), "message", "content"])
+        usage = extract_usage(resp)
+
+        with {:ok, parsed} <- Jason.decode(content) do
+          {:ok, parsed, usage}
+        end
+
+      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
+      {:ok, %{status: 429}} -> {:error, :rate_limited}
+      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
+      {:error, reason} -> {:error, {:http_error, reason}}
+    end
+  end
+
   defp chat(system_prompt, user_prompt, response_format \\ %{type: "json_object"}) do
     body = %{
       model: model(),
@@ -308,4 +361,6 @@ defmodule Scullion.Adapters.OpenRouter do
   defp model, do: Application.get_env(:scullion, :openrouter_model, "openai/gpt-5-mini")
   defp vision_model, do: Application.get_env(:scullion, :openrouter_vision_model, "google/gemini-2.5-flash-lite")
   defp image_model, do: Application.get_env(:scullion, :openrouter_image_model, "google/gemini-3.1-flash-image-preview")
+  defp check_model, do: Application.get_env(:scullion, :openrouter_check_model, "openai/gpt-oss-120b:free")
+  defp check_model_fallback, do: Application.get_env(:scullion, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
 end

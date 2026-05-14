@@ -209,6 +209,16 @@ defmodule Scullion.LLM.Prompts do
     }
   end
 
+  def check_recipe_html(html) do
+    system = """
+    You are a recipe detector. Does the provided HTML contain a parseable recipe with ingredients and instructions?
+    Respond ONLY with JSON: {"parseable": true} or {"parseable": false}.
+    """
+
+    user = String.slice(html, 0, 2000)
+    {system, user}
+  end
+
   def parse_receipt do
     system = """
     You are a receipt parser. Extract line items from receipt images precisely.
