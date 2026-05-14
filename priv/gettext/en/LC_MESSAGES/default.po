@@ -16,23 +16,23 @@ msgstr ""
 msgid "%{duration} total"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:662
+#: lib/scullion_web/live/planner_live.ex:665
 #, elixir-autogen, elixir-format
 msgid "%{n} min"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:662
+#: lib/scullion_web/live/planner_live.ex:665
 #, elixir-autogen, elixir-format
 msgid "%{n} portions"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:805
+#: lib/scullion_web/live/recipe_live.ex:807
 #, elixir-autogen, elixir-format
 msgid "%{n} recipes"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:387
-#: lib/scullion_web/live/recipe_live.ex:490
+#: lib/scullion_web/live/planner_live.ex:390
+#: lib/scullion_web/live/recipe_live.ex:492
 #, elixir-autogen, elixir-format
 msgid "%{n} servings"
 msgstr ""
@@ -42,12 +42,12 @@ msgstr ""
 msgid "%{n} unchecked · Week %{week}"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:770
+#: lib/scullion_web/live/planner_live.ex:773
 #, elixir-autogen, elixir-format
 msgid "%{range} · %{meals} meals planned"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:804
+#: lib/scullion_web/live/recipe_live.ex:806
 #, elixir-autogen, elixir-format
 msgid "1 recipe"
 msgstr ""
@@ -62,7 +62,7 @@ msgstr ""
 msgid "Add"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:638
+#: lib/scullion_web/live/recipe_live.ex:640
 #, elixir-autogen, elixir-format
 msgid "Add ingredient"
 msgstr ""
@@ -77,12 +77,12 @@ msgstr ""
 msgid "Add to pantry"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:613
+#: lib/scullion_web/live/planner_live.ex:616
 #, elixir-autogen, elixir-format
 msgid "All recipes"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:326
+#: lib/scullion_web/live/recipe_live.ex:328
 #, elixir-autogen, elixir-format
 msgid "Any"
 msgstr ""
@@ -98,7 +98,7 @@ msgstr ""
 msgid "Attempting to reconnect"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:801
+#: lib/scullion_web/live/recipe_live.ex:803
 #, elixir-autogen, elixir-format
 msgid "A–Z"
 msgstr ""
@@ -118,12 +118,12 @@ msgstr ""
 msgid "Build rich, interactive web applications quickly, with less code and fewer moving parts. Join our growing community of developers using Phoenix to craft APIs, HTML5 apps and more, for fun or at scale."
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:653
+#: lib/scullion_web/live/recipe_live.ex:655
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:539
+#: lib/scullion_web/live/planner_live.ex:542
 #, elixir-autogen, elixir-format
 msgid "Change recipe"
 msgstr ""
@@ -133,7 +133,7 @@ msgstr ""
 msgid "Changelog"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:565
+#: lib/scullion_web/live/planner_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Choose a recipe"
 msgstr ""
@@ -153,7 +153,7 @@ msgstr ""
 msgid "Components"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:579
+#: lib/scullion_web/live/recipe_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "Cook (min)"
 msgstr ""
@@ -169,32 +169,32 @@ msgstr ""
 msgid "Costs"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:152
+#: lib/scullion_web/live/recipe_live.ex:154
 #, elixir-autogen, elixir-format
 msgid "Could not delete recipe"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:791
+#: lib/scullion_web/live/recipe_live.ex:793
 #, elixir-autogen, elixir-format
 msgid "Could not extract a recipe from this page"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:776
+#: lib/scullion_web/live/recipe_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Could not extract recipe from the images"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:779
+#: lib/scullion_web/live/recipe_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Could not fetch page (HTTP %{status})"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:782
+#: lib/scullion_web/live/recipe_live.ex:784
 #, elixir-autogen, elixir-format
 msgid "Could not reach the URL — check your connection or the address"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:238
+#: lib/scullion_web/live/planner_live.ex:241
 #, elixir-autogen, elixir-format
 msgid "Couldn't fetch a new suggestion"
 msgstr ""
@@ -209,7 +209,7 @@ msgstr ""
 msgid "Current Deals"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:472
+#: lib/scullion_web/live/recipe_live.ex:474
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
@@ -219,7 +219,7 @@ msgstr ""
 msgid "Deploy your application"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:34
+#: lib/scullion_web/live/settings_live.ex:74
 #, elixir-autogen, elixir-format
 msgid "Device tokens"
 msgstr ""
@@ -250,17 +250,17 @@ msgstr ""
 msgid "Done · %{n}"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:469
+#: lib/scullion_web/live/recipe_live.ex:471
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:341
+#: lib/scullion_web/live/planner_live.ex:344
 #, elixir-autogen, elixir-format
 msgid "Edit %{label}"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:551
+#: lib/scullion_web/live/recipe_live.ex:553
 #, elixir-autogen, elixir-format
 msgid "Edit recipe"
 msgstr ""
@@ -280,12 +280,12 @@ msgstr ""
 msgid "Export"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:379
+#: lib/scullion_web/live/recipe_live.ex:381
 #, elixir-autogen, elixir-format
 msgid "Extracting…"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:775
+#: lib/scullion_web/live/recipe_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Extraction failed (API error %{status})"
 msgstr ""
@@ -305,7 +305,7 @@ msgstr ""
 msgid "Failed to save"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:599
+#: lib/scullion_web/live/planner_live.ex:602
 #, elixir-autogen, elixir-format
 msgid "Finding suggestions…"
 msgstr ""
@@ -315,22 +315,22 @@ msgstr ""
 msgid "Generate guide"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:28
+#: lib/scullion_web/live/settings_live.ex:68
 #, elixir-autogen, elixir-format
 msgid "Generate new code"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:49
+#: lib/scullion_web/live/settings_live.ex:108
 #, elixir-autogen, elixir-format
 msgid "Generate plan"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:352
+#: lib/scullion_web/live/recipe_live.ex:354
 #, elixir-autogen, elixir-format
 msgid "Get ideas"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:349
+#: lib/scullion_web/live/recipe_live.ex:351
 #, elixir-autogen, elixir-format
 msgid "Get ideas based on your pantry and this week's deals"
 msgstr ""
@@ -362,7 +362,7 @@ msgstr ""
 msgid "ICA"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:380
+#: lib/scullion_web/live/recipe_live.ex:382
 #, elixir-autogen, elixir-format
 msgid "Import"
 msgstr ""
@@ -372,24 +372,24 @@ msgstr ""
 msgid "Imported %{count} deals"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:378
+#: lib/scullion_web/live/recipe_live.ex:380
 #, elixir-autogen, elixir-format
 msgid "Importing…"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:593
+#: lib/scullion_web/live/recipe_live.ex:595
 #, elixir-autogen, elixir-format
 msgid "Ingredient"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:500
-#: lib/scullion_web/live/recipe_live.ex:586
+#: lib/scullion_web/live/recipe_live.ex:502
+#: lib/scullion_web/live/recipe_live.ex:588
 #, elixir-autogen, elixir-format
 msgid "Ingredients"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:514
-#: lib/scullion_web/live/recipe_live.ex:644
+#: lib/scullion_web/live/recipe_live.ex:516
+#: lib/scullion_web/live/recipe_live.ex:646
 #, elixir-autogen, elixir-format
 msgid "Instructions"
 msgstr ""
@@ -399,7 +399,7 @@ msgstr ""
 msgid "Invalid code"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:46
+#: lib/scullion_web/live/settings_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Jobs"
 msgstr ""
@@ -414,27 +414,27 @@ msgstr ""
 msgid "Join us on Slack"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:38
+#: lib/scullion_web/live/settings_live.ex:78
 #, elixir-autogen, elixir-format
 msgid "Kitchen kiosk"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:800
+#: lib/scullion_web/live/recipe_live.ex:802
 #, elixir-autogen, elixir-format
 msgid "Last used"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:394
+#: lib/scullion_web/live/planner_live.ex:397
 #, elixir-autogen, elixir-format
 msgid "Leftovers"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:513
+#: lib/scullion_web/live/planner_live.ex:516
 #, elixir-autogen, elixir-format
 msgid "Leftovers for"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:403
+#: lib/scullion_web/live/planner_live.ex:406
 #, elixir-autogen, elixir-format
 msgid "Leftovers for %{day}"
 msgstr ""
@@ -454,9 +454,9 @@ msgstr ""
 msgid "Logged"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:236
+#: lib/scullion_web/live/planner_live.ex:239
 #: lib/scullion_web/live/prep_live.ex:24
-#: lib/scullion_web/live/recipe_live.ex:773
+#: lib/scullion_web/live/recipe_live.ex:775
 #, elixir-autogen, elixir-format
 msgid "Monthly LLM budget reached"
 msgstr ""
@@ -466,7 +466,7 @@ msgstr ""
 msgid "More"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:293
+#: lib/scullion_web/live/recipe_live.ex:295
 #, elixir-autogen, elixir-format
 msgid "More filters"
 msgstr ""
@@ -481,13 +481,13 @@ msgstr ""
 msgid "Need help?"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:248
-#: lib/scullion_web/live/recipe_live.ex:551
+#: lib/scullion_web/live/recipe_live.ex:250
+#: lib/scullion_web/live/recipe_live.ex:553
 #, elixir-autogen, elixir-format
 msgid "New recipe"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:283
+#: lib/scullion_web/live/planner_live.ex:286
 #, elixir-autogen, elixir-format
 msgid "Next week"
 msgstr ""
@@ -512,7 +512,7 @@ msgstr ""
 msgid "No items yet"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:492
+#: lib/scullion_web/live/planner_live.ex:495
 #, elixir-autogen, elixir-format
 msgid "No meal chosen yet — tap Change recipe to pick one."
 msgstr ""
@@ -527,12 +527,12 @@ msgstr ""
 msgid "No receipts loaded"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:621
+#: lib/scullion_web/live/planner_live.ex:624
 #, elixir-autogen, elixir-format
 msgid "No recipes match."
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:396
+#: lib/scullion_web/live/recipe_live.ex:398
 #, elixir-autogen, elixir-format
 msgid "No recipes — add one or import from a URL"
 msgstr ""
@@ -552,7 +552,7 @@ msgstr ""
 msgid "Nothing in pantry yet"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:538
+#: lib/scullion_web/live/recipe_live.ex:540
 #, elixir-autogen, elixir-format
 msgid "Original recipe"
 msgstr ""
@@ -568,12 +568,12 @@ msgstr ""
 msgid "Pantry"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:90
+#: lib/scullion_web/live/recipe_live.ex:92
 #, elixir-autogen, elixir-format
 msgid "Paste a URL or drop screenshots first"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:363
+#: lib/scullion_web/live/recipe_live.ex:365
 #, elixir-autogen, elixir-format
 msgid "Paste a recipe URL or drop screenshots…"
 msgstr ""
@@ -593,12 +593,12 @@ msgstr ""
 msgid "Please wait a moment before generating again"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:237
+#: lib/scullion_web/live/planner_live.ex:240
 #, elixir-autogen, elixir-format
 msgid "Please wait a moment before trying again"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:498
+#: lib/scullion_web/live/planner_live.ex:501
 #, elixir-autogen, elixir-format
 msgid "Portions"
 msgstr ""
@@ -608,7 +608,7 @@ msgstr ""
 msgid "Prep"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:576
+#: lib/scullion_web/live/recipe_live.ex:578
 #, elixir-autogen, elixir-format
 msgid "Prep (min)"
 msgstr ""
@@ -623,13 +623,13 @@ msgstr ""
 msgid "Prep guide generation failed"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:267
+#: lib/scullion_web/live/planner_live.ex:270
 #, elixir-autogen, elixir-format
 msgid "Previous week"
 msgstr ""
 
 #: lib/scullion_web/live/grocery_live.ex:158
-#: lib/scullion_web/live/recipe_live.ex:604
+#: lib/scullion_web/live/recipe_live.ex:606
 #, elixir-autogen, elixir-format
 msgid "Qty"
 msgstr ""
@@ -645,18 +645,18 @@ msgstr ""
 msgid "Receipts"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:799
+#: lib/scullion_web/live/recipe_live.ex:801
 #, elixir-autogen, elixir-format
 msgid "Recent"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:788
+#: lib/scullion_web/live/recipe_live.ex:790
 #, elixir-autogen, elixir-format
 msgid "Recipe extraction failed (API error %{status})"
 msgstr ""
 
 #: lib/scullion_web/components/layouts.ex:12
-#: lib/scullion_web/live/recipe_live.ex:244
+#: lib/scullion_web/live/recipe_live.ex:246
 #, elixir-autogen, elixir-format
 msgid "Recipes"
 msgstr ""
@@ -672,22 +672,23 @@ msgstr ""
 msgid "Restaurant / occasion"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:613
+#: lib/scullion_web/live/planner_live.ex:616
 #, elixir-autogen, elixir-format
 msgid "Results"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:41
+#: lib/scullion_web/live/settings_live.ex:81
 #, elixir-autogen, elixir-format
 msgid "Revoke"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:48
+#: lib/scullion_web/live/settings_live.ex:107
 #, elixir-autogen, elixir-format
 msgid "Run deal scrape"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:652
+#: lib/scullion_web/live/recipe_live.ex:654
+#: lib/scullion_web/live/settings_live.ex:97
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr ""
@@ -723,23 +724,23 @@ msgstr ""
 msgid "Scullion"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:260
+#: lib/scullion_web/live/recipe_live.ex:262
 #, elixir-autogen, elixir-format
 msgid "Search recipes, ingredients, or meals…"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:576
+#: lib/scullion_web/live/planner_live.ex:579
 #, elixir-autogen, elixir-format
 msgid "Search recipes…"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:583
+#: lib/scullion_web/live/recipe_live.ex:585
 #, elixir-autogen, elixir-format
 msgid "Servings"
 msgstr ""
 
 #: lib/scullion_web/components/layouts.ex:17
-#: lib/scullion_web/live/settings_live.ex:14
+#: lib/scullion_web/live/settings_live.ex:54
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr ""
@@ -749,13 +750,13 @@ msgstr ""
 msgid "Sign out"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:553
+#: lib/scullion_web/live/planner_live.ex:556
 #, elixir-autogen, elixir-format
 msgid "Skip dinner"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:396
-#: lib/scullion_web/live/planner_live.ex:553
+#: lib/scullion_web/live/planner_live.ex:399
+#: lib/scullion_web/live/planner_live.ex:556
 #, elixir-autogen, elixir-format
 msgid "Skipped"
 msgstr ""
@@ -765,7 +766,7 @@ msgstr ""
 msgid "Something went wrong!"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:328
+#: lib/scullion_web/live/recipe_live.ex:330
 #, elixir-autogen, elixir-format
 msgid "Sort"
 msgstr ""
@@ -775,7 +776,7 @@ msgstr ""
 msgid "Source Code"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:641
+#: lib/scullion_web/live/recipe_live.ex:643
 #, elixir-autogen, elixir-format
 msgid "Source URL"
 msgstr ""
@@ -785,7 +786,7 @@ msgstr ""
 msgid "Submit"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:586
+#: lib/scullion_web/live/planner_live.ex:589
 #, elixir-autogen, elixir-format
 msgid "Suggested"
 msgstr ""
@@ -795,7 +796,7 @@ msgstr ""
 msgid "Sunday Prep Plan"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:594
+#: lib/scullion_web/live/planner_live.ex:597
 #, elixir-autogen, elixir-format
 msgid "Surprise me"
 msgstr ""
@@ -805,12 +806,12 @@ msgstr ""
 msgid "Sushi night"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:304
+#: lib/scullion_web/live/planner_live.ex:307
 #, elixir-autogen, elixir-format
 msgid "Swipe left to right to see other weeks"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:584
+#: lib/scullion_web/live/recipe_live.ex:586
 #, elixir-autogen, elixir-format
 msgid "Tags"
 msgstr ""
@@ -820,17 +821,17 @@ msgstr ""
 msgid "This month"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:785
+#: lib/scullion_web/live/recipe_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:273
+#: lib/scullion_web/live/planner_live.ex:276
 #, elixir-autogen, elixir-format
 msgid "This week"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:316
+#: lib/scullion_web/live/recipe_live.ex:318
 #, elixir-autogen, elixir-format
 msgid "Time"
 msgstr ""
@@ -840,12 +841,12 @@ msgstr ""
 msgid "Timeline"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:563
+#: lib/scullion_web/live/recipe_live.ex:565
 #, elixir-autogen, elixir-format
 msgid "Title"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:365
+#: lib/scullion_web/live/planner_live.ex:368
 #, elixir-autogen, elixir-format
 msgid "Today"
 msgstr ""
@@ -860,7 +861,7 @@ msgstr ""
 msgid "Too many attempts. Try again later."
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:774
+#: lib/scullion_web/live/recipe_live.ex:776
 #, elixir-autogen, elixir-format
 msgid "Too many requests — try again in a moment"
 msgstr ""
@@ -875,24 +876,24 @@ msgstr ""
 msgid "Total spend"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:566
+#: lib/scullion_web/live/recipe_live.ex:568
 #, elixir-autogen, elixir-format
 msgid "Type"
 msgstr ""
 
 #: lib/scullion_web/live/grocery_live.ex:166
 #: lib/scullion_web/live/pantry_live.ex:71
-#: lib/scullion_web/live/recipe_live.ex:615
+#: lib/scullion_web/live/recipe_live.ex:617
 #, elixir-autogen, elixir-format
 msgid "Unit"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:18
+#: lib/scullion_web/live/settings_live.ex:58
 #, elixir-autogen, elixir-format
 msgid "Users"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:390
+#: lib/scullion_web/live/planner_live.ex:393
 #, elixir-autogen, elixir-format
 msgid "Uses leftovers"
 msgstr ""
@@ -917,7 +918,7 @@ msgstr ""
 msgid "Welcome to Scullion!"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:348
+#: lib/scullion_web/live/recipe_live.ex:350
 #, elixir-autogen, elixir-format
 msgid "What can we cook tonight?"
 msgstr ""
@@ -937,7 +938,7 @@ msgstr ""
 msgid "Your name"
 msgstr ""
 
-#: lib/scullion_web/live/settings_live.ex:39
+#: lib/scullion_web/live/settings_live.ex:79
 #, elixir-autogen, elixir-format
 msgid "active"
 msgstr ""
@@ -957,27 +958,27 @@ msgstr ""
 msgid "https://www.ica.se/erbjudanden/..."
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:398
+#: lib/scullion_web/live/planner_live.ex:401
 #, elixir-autogen, elixir-format
 msgid "— add a meal"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:326
+#: lib/scullion_web/live/recipe_live.ex:328
 #, elixir-autogen, elixir-format
 msgid "≤ %{n} min"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:817
+#: lib/scullion_web/live/recipe_live.ex:819
 #, elixir-autogen, elixir-format
 msgid "Asian"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:814
+#: lib/scullion_web/live/recipe_live.ex:816
 #, elixir-autogen, elixir-format
 msgid "Base recipe"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:813
+#: lib/scullion_web/live/recipe_live.ex:815
 #, elixir-autogen, elixir-format
 msgid "Batch"
 msgstr ""
@@ -1013,7 +1014,7 @@ msgstr ""
 msgid "Quantity"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:812
+#: lib/scullion_web/live/recipe_live.ex:814
 #, elixir-autogen, elixir-format
 msgid "Quick"
 msgstr ""
@@ -1023,7 +1024,7 @@ msgstr ""
 msgid "Store"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:816
+#: lib/scullion_web/live/recipe_live.ex:818
 #, elixir-autogen, elixir-format
 msgid "Swedish"
 msgstr ""
@@ -1034,7 +1035,7 @@ msgstr ""
 msgid "Total (kr)"
 msgstr ""
 
-#: lib/scullion_web/live/recipe_live.ex:815
+#: lib/scullion_web/live/recipe_live.ex:817
 #, elixir-autogen, elixir-format
 msgid "Vegetarian"
 msgstr ""
@@ -1049,142 +1050,167 @@ msgstr ""
 msgid "e.g. Pasta"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:697
+#: lib/scullion_web/live/planner_live.ex:700
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:701
+#: lib/scullion_web/live/planner_live.ex:704
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:705
+#: lib/scullion_web/live/planner_live.ex:708
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:727
+#: lib/scullion_web/live/planner_live.ex:730
 #, elixir-autogen, elixir-format
 msgid "Dinner"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:695
+#: lib/scullion_web/live/planner_live.ex:698
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:686
+#: lib/scullion_web/live/planner_live.ex:689
 #, elixir-autogen, elixir-format
 msgid "Fri"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:717
+#: lib/scullion_web/live/planner_live.ex:720
 #, elixir-autogen, elixir-format
 msgid "Friday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:694
+#: lib/scullion_web/live/planner_live.ex:697
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:700
+#: lib/scullion_web/live/planner_live.ex:703
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:699
+#: lib/scullion_web/live/planner_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:726
+#: lib/scullion_web/live/planner_live.ex:729
 #, elixir-autogen, elixir-format
 msgid "Lunch"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:696
+#: lib/scullion_web/live/planner_live.ex:699
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:698
+#: lib/scullion_web/live/planner_live.ex:701
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:682
+#: lib/scullion_web/live/planner_live.ex:685
 #, elixir-autogen, elixir-format
 msgid "Mon"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:713
+#: lib/scullion_web/live/planner_live.ex:716
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Monday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:704
+#: lib/scullion_web/live/planner_live.ex:707
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:703
+#: lib/scullion_web/live/planner_live.ex:706
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:687
+#: lib/scullion_web/live/planner_live.ex:690
 #, elixir-autogen, elixir-format
 msgid "Sat"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:718
+#: lib/scullion_web/live/planner_live.ex:721
 #, elixir-autogen, elixir-format
 msgid "Saturday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:702
+#: lib/scullion_web/live/planner_live.ex:705
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:688
+#: lib/scullion_web/live/planner_live.ex:691
 #, elixir-autogen, elixir-format
 msgid "Sun"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:719
+#: lib/scullion_web/live/planner_live.ex:722
 #, elixir-autogen, elixir-format
 msgid "Sunday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:685
+#: lib/scullion_web/live/planner_live.ex:688
 #, elixir-autogen, elixir-format
 msgid "Thu"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:716
+#: lib/scullion_web/live/planner_live.ex:719
 #, elixir-autogen, elixir-format
 msgid "Thursday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:683
+#: lib/scullion_web/live/planner_live.ex:686
 #, elixir-autogen, elixir-format
 msgid "Tue"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:714
+#: lib/scullion_web/live/planner_live.ex:717
 #, elixir-autogen, elixir-format
 msgid "Tuesday"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:684
+#: lib/scullion_web/live/planner_live.ex:687
 #, elixir-autogen, elixir-format
 msgid "Wed"
 msgstr ""
 
-#: lib/scullion_web/live/planner_live.ex:715
+#: lib/scullion_web/live/planner_live.ex:718
 #, elixir-autogen, elixir-format
 msgid "Wednesday"
+msgstr ""
+
+#: lib/scullion_web/live/settings_live.ex:98
+#, elixir-autogen, elixir-format
+msgid "Clear"
+msgstr ""
+
+#: lib/scullion_web/live/settings_live.ex:87
+#, elixir-autogen, elixir-format
+msgid "Dietary guidance injected into plan and recipe suggestion prompts."
+msgstr ""
+
+#: lib/scullion_web/live/settings_live.ex:86
+#, elixir-autogen, elixir-format
+msgid "Recipe generation"
+msgstr ""
+
+#: lib/scullion_web/live/settings_live.ex:99
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Saved"
+msgstr ""
+
+#: lib/scullion_web/live/settings_live.ex:92
+#, elixir-autogen, elixir-format
+msgid "e.g. low carb, high protein, no gluten"
 msgstr ""

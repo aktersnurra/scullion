@@ -221,4 +221,7 @@ Upload a photo on the pantry page -> vision llm -> pantry items (editable)
 
 # Run scraping of custom url for deals
 
-Add feature to input custom url for parsing of deals
+Add feature to input custom url for parsing of deals to run once
+
+# Add urls for recurring scraping of deals
+add urls for recurring scraping of deals. Maybe unify with run scraping once
