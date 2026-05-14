@@ -67,7 +67,8 @@ defmodule Scullion.MixProject do
       {:argon2_elixir, "~> 3.2"},
       {:floki, "~> 0.37"},
       {:quantum, "~> 3.5"},
-      {:mox, "~> 1.2", only: :test}
+      {:mox, "~> 1.2", only: :test},
+      {:mdex, "~> 0.2"}
     ]
   end
 

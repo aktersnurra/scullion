@@ -200,3 +200,18 @@ url -> html content -> cheap llm recipe parsable? y/n -> if y -> extract recipe 
 Investigation:
 1. how is it implemented now? html sent to llm regardless?
 2. should this step be introduced for all parsers?
+
+
+# Rename project
+
+Rename the project from scullion to tore (homage to Tore Wretman)
+
+# Update README
+
+Update readme after name change, include all the interesting stuff about the project, tree overview etc
+
+# Add system prompt config in settings
+
+I want to be able to add custom dietary guidance to the recipe generation prompt. E.g. `generate recipes that uses less carbs, high protein`
+this should be injected into the system prompt of that flow
+Add this in the settings page?

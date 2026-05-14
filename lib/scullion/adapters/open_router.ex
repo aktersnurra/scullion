@@ -328,7 +328,7 @@ defmodule Scullion.Adapters.OpenRouter do
       |> Enum.map(fn phase_steps ->
         phase = hd(phase_steps)["phase"]
         lines = Enum.map(phase_steps, fn s -> "#{s["order"]}. #{s["action"]}" end) |> Enum.join("\n")
-        "#{phase}:\n#{lines}"
+        "## #{phase}\n\n#{lines}"
       end)
       |> Enum.join("\n\n")
 

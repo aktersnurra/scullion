@@ -528,7 +528,7 @@ defmodule ScullionWeb.RecipeLive do
               </ol>
             </div>
           <% else %>
-            <p class="whitespace-pre-wrap text-[var(--text)] leading-relaxed" style="font-size: var(--t-body);">{@selected.instructions}</p>
+            <div class="prose prose-sm max-w-none text-[var(--text)]">{raw(MDEx.to_html!(@selected.instructions || ""))}</div>
           <% end %>
         </div>
 
