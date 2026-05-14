@@ -1,6 +1,7 @@
 defmodule Scullion.RecipesTest do
   use Scullion.DataCase, async: false
   alias Scullion.Recipes
+  alias Scullion.Recipes.Ingredient
 
   defp recipe_attrs(overrides \\ %{}) do
     Map.merge(%{title: "Test Recipe", recipe_type: :meal}, overrides)
@@ -239,6 +240,48 @@ defmodule Scullion.RecipesTest do
       {:ok, recipe} = Recipes.create(recipe_attrs())
       {:ok, _} = Recipes.delete(recipe)
       assert_raise Ecto.NoResultsError, fn -> Recipes.get!(recipe.id) end
+    end
+  end
+
+  describe "Ingredient.to_key/1" do
+    test "lowercases and replaces spaces with underscores" do
+      assert Ingredient.to_key("Gul Lök") == "gul_lok"
+    end
+
+    test "normalises Swedish characters" do
+      assert Ingredient.to_key("lök") == "lok"
+      assert Ingredient.to_key("räkor") == "rakor"
+      assert Ingredient.to_key("grädde") == "gradde"
+      assert Ingredient.to_key("åkerbär") == "akerbar"
+    end
+
+    test "strips punctuation" do
+      assert Ingredient.to_key("salt & peppar") == "salt__peppar"
+      assert Ingredient.to_key("mjöl (vetemjöl)") == "mjol_vetemjol"
+    end
+
+    test "collapses separators" do
+      assert Ingredient.to_key("olja/fett") == "olja_fett"
+      assert Ingredient.to_key("smör - till stekning") == "smor_till_stekning"
+    end
+  end
+
+  describe "ingredient key on create" do
+    test "key is auto-derived from name" do
+      {:ok, recipe} =
+        Recipes.create(recipe_attrs(%{ingredients: [%{name: "Gul Lök"}]}))
+
+      ingredient = hd(recipe.recipe_ingredients).ingredient
+      assert ingredient.key == "gul_lok"
+    end
+
+    test "two recipes sharing an ingredient share the same key" do
+      {:ok, _} = Recipes.create(recipe_attrs(%{ingredients: [%{name: "vitlök"}]}))
+      {:ok, _} = Recipes.create(recipe_attrs(%{title: "Recipe 2", ingredients: [%{name: "vitlök"}]}))
+
+      ingredients = Repo.all(Ingredient)
+      keys = Enum.map(ingredients, & &1.key)
+      assert keys == ["vitlok"]
     end
   end
 end
