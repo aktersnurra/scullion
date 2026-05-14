@@ -53,6 +53,7 @@ defmodule Tore.Deals.Parsers.ICA do
 
     %{
       store: "ica",
+      store_location: nilify(store["storeMarketingName"]),
       product_name: details["name"] || "",
       brand: nilify(details["brand"]),
       size: nilify(details["packageInformation"]),
