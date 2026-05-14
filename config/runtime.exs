@@ -12,38 +12,38 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/scullion start
+#     PHX_SERVER=true bin/tore start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :scullion, ScullionWeb.Endpoint, server: true
+  config :tore, ToreWeb.Endpoint, server: true
 end
 
-config :scullion, ScullionWeb.Endpoint,
+config :tore, ToreWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
-  config :scullion, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
-  config :scullion, :openrouter_model,
+  config :tore, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
+  config :tore, :openrouter_model,
     System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
-  config :scullion, :openrouter_vision_model,
+  config :tore, :openrouter_vision_model,
     System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
-  config :scullion, :openrouter_image_model,
+  config :tore, :openrouter_image_model,
     System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
-  config :scullion, :openrouter_check_model,
+  config :tore, :openrouter_check_model,
     System.get_env("OPENROUTER_CHECK_MODEL", "openai/gpt-oss-120b:free")
-  config :scullion, :openrouter_check_model_fallback,
+  config :tore, :openrouter_check_model_fallback,
     System.get_env("OPENROUTER_CHECK_MODEL_FALLBACK", "openai/gpt-oss-120b")
 
   database_path =
     System.get_env("DATABASE_PATH") ||
       raise """
       environment variable DATABASE_PATH is missing.
-      For example: /etc/scullion/scullion.db
+      For example: /etc/tore/scullion.db
       """
 
-  config :scullion, Scullion.Repo,
+  config :tore, Tore.Repo,
     database: database_path,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
 
@@ -61,9 +61,9 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
-  config :scullion, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :tore, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
-  config :scullion, ScullionWeb.Endpoint,
+  config :tore, ToreWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -79,7 +79,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :scullion, ScullionWeb.Endpoint,
+  #     config :tore, ToreWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -101,7 +101,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :scullion, ScullionWeb.Endpoint,
+  #     config :tore, ToreWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.

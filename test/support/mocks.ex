@@ -1,2 +1,2 @@
-Mox.defmock(Scullion.MockHTTP, for: Scullion.HTTP)
-Mox.defmock(Scullion.MockLLM, for: Scullion.LLM)
+Mox.defmock(Tore.MockHTTP, for: Tore.HTTP)
+Mox.defmock(Tore.MockLLM, for: Tore.LLM)

@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreatePrepGuides do
+defmodule Tore.Repo.Migrations.CreatePrepGuides do
   use Ecto.Migration
 
   def change do

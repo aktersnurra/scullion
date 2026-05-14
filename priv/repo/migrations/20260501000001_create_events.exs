@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateEvents do
+defmodule Tore.Repo.Migrations.CreateEvents do
   use Ecto.Migration
 
   def change do

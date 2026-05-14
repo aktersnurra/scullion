@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateTags do
+defmodule Tore.Repo.Migrations.CreateTags do
   use Ecto.Migration
 
   def change do

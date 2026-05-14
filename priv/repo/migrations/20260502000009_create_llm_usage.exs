@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateLLMUsage do
+defmodule Tore.Repo.Migrations.CreateLLMUsage do
   use Ecto.Migration
 
   def change do

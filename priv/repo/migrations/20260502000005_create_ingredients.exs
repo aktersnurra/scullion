@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateIngredients do
+defmodule Tore.Repo.Migrations.CreateIngredients do
   use Ecto.Migration
 
   def change do

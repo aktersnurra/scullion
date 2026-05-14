@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.AddKeyToIngredients do
+defmodule Tore.Repo.Migrations.AddKeyToIngredients do
   use Ecto.Migration
 
   @doc """

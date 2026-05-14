@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.AddLocaleToUsers do
+defmodule Tore.Repo.Migrations.AddLocaleToUsers do
   use Ecto.Migration
 
   def change do

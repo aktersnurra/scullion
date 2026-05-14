@@ -7,25 +7,25 @@
 # General application configuration
 import Config
 
-config :scullion,
-  ecto_repos: [Scullion.Repo],
+config :tore,
+  ecto_repos: [Tore.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint
-config :scullion, ScullionWeb.Endpoint,
+config :tore, ToreWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: ScullionWeb.ErrorHTML, json: ScullionWeb.ErrorJSON],
+    formats: [html: ToreWeb.ErrorHTML, json: ToreWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Scullion.PubSub,
+  pubsub_server: Tore.PubSub,
   live_view: [signing_salt: "pmbdTG6E"]
 
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.25.4",
-  scullion: [
+  tore: [
     args:
       ~w(js/app.js --bundle --target=es2022 --outdir=../priv/static/assets/js --external:/fonts/* --external:/images/* --alias:@=.),
     cd: Path.expand("../assets", __DIR__),
@@ -35,7 +35,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "4.1.12",
-  scullion: [
+  tore: [
     args: ~w(
       --input=assets/css/app.css
       --output=priv/static/assets/css/app.css
@@ -52,19 +52,19 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 # Port injection — adapters injected per environment
-config :scullion, :llm_client, Scullion.Adapters.OpenRouter
-config :scullion, :http_client, Scullion.Adapters.ReqHTTP
+config :tore, :llm_client, Tore.Adapters.OpenRouter
+config :tore, :http_client, Tore.Adapters.ReqHTTP
 
-config :scullion, Scullion.Scheduler,
+config :tore, Tore.Scheduler,
   jobs: [
-    {"0 8 * * 6", {Scullion.Handlers.DealsHandler, :scrape_all, []}},
+    {"0 8 * * 6", {Tore.Handlers.DealsHandler, :scrape_all, []}},
     {"0 18 * * 6",
      fn ->
-       Scullion.Handlers.PlanningHandler.generate_plan("plan:current", Date.utc_today())
+       Tore.Handlers.PlanningHandler.generate_plan("plan:current", Date.utc_today())
      end},
     {"30 18 * * 6",
      fn ->
-       Scullion.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today())
+       Tore.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today())
      end}
   ]
 

@@ -1,9 +1,9 @@
-defmodule Scullion.MixProject do
+defmodule Tore.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :scullion,
+      app: :tore,
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -20,7 +20,7 @@ defmodule Scullion.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Scullion.Application, []},
+      mod: {Tore.Application, []},
       extra_applications: [:logger, :runtime_tools]
     ]
   end

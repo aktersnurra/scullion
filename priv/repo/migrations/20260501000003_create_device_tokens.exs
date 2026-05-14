@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateDeviceTokens do
+defmodule Tore.Repo.Migrations.CreateDeviceTokens do
   use Ecto.Migration
 
   def change do

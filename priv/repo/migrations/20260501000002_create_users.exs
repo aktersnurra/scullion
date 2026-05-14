@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateUsers do
+defmodule Tore.Repo.Migrations.CreateUsers do
   use Ecto.Migration
 
   def change do

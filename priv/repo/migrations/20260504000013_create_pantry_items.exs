@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreatePantryItems do
+defmodule Tore.Repo.Migrations.CreatePantryItems do
   use Ecto.Migration
 
   def change do

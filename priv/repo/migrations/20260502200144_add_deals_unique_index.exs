@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.AddDealsUniqueIndex do
+defmodule Tore.Repo.Migrations.AddDealsUniqueIndex do
   use Ecto.Migration
 
   def change do

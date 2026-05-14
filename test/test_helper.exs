@@ -1,2 +1,2 @@
 ExUnit.start(exclude: [:integration])
-Ecto.Adapters.SQL.Sandbox.mode(Scullion.Repo, :manual)
+Ecto.Adapters.SQL.Sandbox.mode(Tore.Repo, :manual)

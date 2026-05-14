@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateDiningOut do
+defmodule Tore.Repo.Migrations.CreateDiningOut do
   use Ecto.Migration
 
   def change do

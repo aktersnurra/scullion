@@ -1,8 +1,8 @@
 import Config
 
 # Configure your database
-config :scullion, Scullion.Repo,
-  database: Path.expand("../scullion_dev.db", __DIR__),
+config :tore, Tore.Repo,
+  database: Path.expand("../tore_dev.db", __DIR__),
   pool_size: 5,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
@@ -13,7 +13,7 @@ config :scullion, Scullion.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :scullion, ScullionWeb.Endpoint,
+config :tore, ToreWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}],
@@ -22,8 +22,8 @@ config :scullion, ScullionWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "prDr/r0DTeXC10UBQFTbDA0FaIYa6D/5hwAENJIPSzn6sEcjl4uqRwN9pux/2wUf",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:scullion, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:scullion, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:tore, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:tore, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -50,7 +50,7 @@ config :scullion, ScullionWeb.Endpoint,
 # different ports.
 
 # Reload browser tabs when matching files change.
-config :scullion, ScullionWeb.Endpoint,
+config :tore, ToreWeb.Endpoint,
   live_reload: [
     web_console_logger: true,
     patterns: [
@@ -59,21 +59,21 @@ config :scullion, ScullionWeb.Endpoint,
       # Gettext translations
       ~r"priv/gettext/.*\.po$"E,
       # Router, Controllers, LiveViews and LiveComponents
-      ~r"lib/scullion_web/router\.ex$"E,
-      ~r"lib/scullion_web/(controllers|live|components)/.*\.(ex|heex)$"E
+      ~r"lib/tore_web/router\.ex$"E,
+      ~r"lib/tore_web/(controllers|live|components)/.*\.(ex|heex)$"E
     ]
   ]
 
-config :scullion, :http_client, Scullion.Adapters.ReqHTTP
-config :scullion, :llm_client, Scullion.Adapters.OpenRouter
-config :scullion, :image_gen_client, Scullion.Adapters.OpenRouter
-config :scullion, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
-config :scullion, :openrouter_model, System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
-config :scullion, :openrouter_vision_model, System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
-config :scullion, :openrouter_image_model, System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
+config :tore, :http_client, Tore.Adapters.ReqHTTP
+config :tore, :llm_client, Tore.Adapters.OpenRouter
+config :tore, :image_gen_client, Tore.Adapters.OpenRouter
+config :tore, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
+config :tore, :openrouter_model, System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
+config :tore, :openrouter_vision_model, System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
+config :tore, :openrouter_image_model, System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
 
 # Enable dev routes for dashboard and mailbox
-config :scullion, dev_routes: true
+config :tore, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"

@@ -1,4 +1,4 @@
-defmodule ScullionWeb.ConnCase do
+defmodule ToreWeb.ConnCase do
   @moduledoc """
   This module defines the test case to be used by
   tests that require setting up a connection.
@@ -11,7 +11,7 @@ defmodule ScullionWeb.ConnCase do
   we enable the SQL sandbox, so changes done to the database
   are reverted at the end of every test. If you are using
   PostgreSQL, you can even run database tests asynchronously
-  by setting `use ScullionWeb.ConnCase, async: true`, although
+  by setting `use ToreWeb.ConnCase, async: true`, although
   this option is not recommended for other databases.
   """
 
@@ -20,19 +20,19 @@ defmodule ScullionWeb.ConnCase do
   using do
     quote do
       # The default endpoint for testing
-      @endpoint ScullionWeb.Endpoint
+      @endpoint ToreWeb.Endpoint
 
-      use ScullionWeb, :verified_routes
+      use ToreWeb, :verified_routes
 
       # Import conveniences for testing with connections
       import Plug.Conn
       import Phoenix.ConnTest
-      import ScullionWeb.ConnCase
+      import ToreWeb.ConnCase
     end
   end
 
   setup tags do
-    Scullion.DataCase.setup_sandbox(tags)
+    Tore.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateLineItems do
+defmodule Tore.Repo.Migrations.CreateLineItems do
   use Ecto.Migration
 
   def change do

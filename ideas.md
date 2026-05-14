@@ -1,5 +1,7 @@
 # Image generation pipeline
 
+> **DONE** (`3d6a982c`)
+
 Recipe
   → LLM visual prompt generator
   → Image prompt
@@ -18,14 +20,20 @@ Take an image -> image to text model -> pantry entries (editable)
 
 # Stored recipe format
 
+> **DONE** (`11689d6d`) — recipe instructions rendered as markdown via MDEx
+
 Free text (instructions) should be stored with markdown syntax
 
 # Stored recipes in the locale/language of the user
+
+> **DONE** (`edeab03a`) — parsed recipes are translated into user locale at extraction time
 
 When parsing recipes from external sources, url/images, update the prompt to 
 instruct the llm to translate the recipe into the users locale/language
 
 # use open router structured outputs
+
+> **DONE** (`64e9bb0e`) — json_schema structured outputs used for recipe and receipt parsing
 
 Use structured outputs for recipe parsing, pantry item parsing, cost parsing, etc (if not already implemented)
 
@@ -53,6 +61,8 @@ The model is constrained to return JSON matching the schema exactly — no parsi
 3. You'll want to move the API key to a backend call rather than the client in production
 
 # Normalized pantry items etc
+
+> **DONE** (`4ed4e166`) — canonical ingredient keys added with auto-derivation from name
 
 ## Use canonical keys for entities, not for full content
 
@@ -94,9 +104,9 @@ Example:
 
 Now:
 
-* “gul lök”
-* “gul lökar”
-* “yellow onion”
+* "gul lök"
+* "gul lökar"
+* "yellow onion"
 
 can all map to:
 
@@ -122,7 +132,7 @@ Examples:
 
 ---
 
-## Don’t canonicalize user-facing prose
+## Don't canonicalize user-facing prose
 
 Store directly:
 
@@ -188,6 +198,8 @@ Do NOT canonicalize:
 
 # Parsing recipe url
 
+> **DONE** (`22b4d2437f`) — cheap pre-flight check added before expensive LLM extraction
+
 Add a prestep with a cheap model to verify that the parsed content actually contain the recipe, otherwise
 just return information about the page using js to display the recipe, hence screenshots are needed
 instead.
@@ -204,13 +216,19 @@ Investigation:
 
 # Rename project
 
+> **DONE** — renamed from scullion to tore (homage to Tore Wretman)
+
 Rename the project from scullion to tore (homage to Tore Wretman)
 
 # Update README
 
+> **DONE** — full README with architecture, tech stack, patterns, and getting started
+
 Update readme after name change, include all the interesting stuff about the project, tree overview etc
 
 # Add system prompt config in settings
+
+> **DONE** (`94b078b2`, `be44275e`) — dietary guidance saved in user preferences and injected into plan/suggestion prompts; Swedish translations included
 
 I want to be able to add custom dietary guidance to the recipe generation prompt. E.g. `generate recipes that uses less carbs, high protein`
 this should be injected into the system prompt of that flow

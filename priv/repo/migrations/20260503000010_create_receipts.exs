@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateReceipts do
+defmodule Tore.Repo.Migrations.CreateReceipts do
   use Ecto.Migration
 
   def change do

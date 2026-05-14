@@ -1,4 +1,4 @@
-defmodule Scullion.Repo.Migrations.CreateStoreConfigs do
+defmodule Tore.Repo.Migrations.CreateStoreConfigs do
   use Ecto.Migration
 
   def change do
