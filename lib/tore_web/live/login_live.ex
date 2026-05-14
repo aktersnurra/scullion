@@ -105,23 +105,22 @@ defmodule ToreWeb.LoginLive do
           {gettext("Enter your 16-digit code")}
         </h1>
 
-        <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] py-3 px-4 mb-5 shadow-[0_1px_2px_rgba(17,24,39,0.04)]">
-          <div class="flex items-center justify-center gap-3 font-mono tabular-nums" style="font-size: 18px; letter-spacing: 0.18em;">
-            <div :for={{group, gi} <- Enum.with_index(@slots)} class="flex gap-2">
+        <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] py-3 px-4 mb-5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] w-full overflow-hidden">
+          <div class="flex items-center justify-between font-mono tabular-nums w-full" style="font-size: 16px;">
+            <div :for={{group, gi} <- Enum.with_index(@slots)} class="flex gap-1">
               <span
                 :for={{d, di} <- Enum.with_index(group)}
                 class={[
-                  "inline-flex items-center justify-center w-5 h-7 rounded",
-                  d == :cursor && "border border-[color:var(--accent)]",
-                  d == :empty && "text-[color:var(--subtle)]",
+                  "inline-flex items-center justify-center w-4 h-7",
+                  (d == :cursor or d == :empty) && "text-[color:var(--subtle)]",
                   is_binary(d) && "text-[var(--text)]"
                 ]}
                 data-pos={"#{gi}-#{di}"}
                 data-digit-filled={if is_binary(d), do: "true"}
               >
                 {cond do
-                  is_binary(d) -> d
-                  d == :cursor -> ""
+                  is_binary(d) -> "*"
+                  d == :cursor -> "·"
                   true -> "·"
                 end}
               </span>

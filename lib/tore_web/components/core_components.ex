@@ -56,23 +56,22 @@ defmodule ToreWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="toast toast-top toast-end z-50"
+      class="fixed top-4 right-4 z-50 w-80 sm:w-96"
       {@rest}
     >
       <div class={[
-        "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
+        "flex items-start gap-3 rounded-[var(--r-lg)] border px-4 py-3 shadow-[var(--shadow-pop)]",
+        @kind == :info && "bg-[var(--surface)] border-[color:var(--hairline)] text-[var(--text)]",
+        @kind == :error && "bg-red-50 border-red-200 text-red-800"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
-        <div>
-          <p :if={@title} class="font-semibold">{@title}</p>
+        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0 mt-0.5 text-[color:var(--accent)]" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0 mt-0.5 text-red-500" />
+        <div class="flex-1 min-w-0" style="font-size: var(--t-meta);">
+          <p :if={@title} class="font-semibold mb-0.5">{@title}</p>
           <p>{msg}</p>
         </div>
-        <div class="flex-1" />
-        <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+        <button type="button" class="group shrink-0 cursor-pointer" aria-label={gettext("close")}>
+          <.icon name="hero-x-mark" class="size-4 opacity-40 group-hover:opacity-70" />
         </button>
       </div>
     </div>
