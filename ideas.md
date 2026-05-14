@@ -215,3 +215,10 @@ Update readme after name change, include all the interesting stuff about the pro
 I want to be able to add custom dietary guidance to the recipe generation prompt. E.g. `generate recipes that uses less carbs, high protein`
 this should be injected into the system prompt of that flow
 Add this in the settings page?
+
+# Add stuff to the pantry via photo
+Upload a photo on the pantry page -> vision llm -> pantry items (editable)
+
+# Run scraping of custom url for deals
+
+Add feature to input custom url for parsing of deals

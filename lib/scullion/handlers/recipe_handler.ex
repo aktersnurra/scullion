@@ -33,7 +33,7 @@ defmodule Scullion.Handlers.RecipeHandler do
 
   # ── Private ────────────────────────────────────────────────────────────────
 
-  defp parse_or_extract(html, locale \\ nil) do
+  defp parse_or_extract(html, locale) do
     with {:error, :not_found} <- Scullion.Recipes.Parser.parse_html(html) do
       @llm.extract_recipe_from_html(html, locale)
     end

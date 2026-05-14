@@ -12,10 +12,11 @@ defmodule Scullion.Handlers.PlanningHandler do
 
   def generate_plan(plan_id, week_start, opts \\ []) do
     mode = Keyword.get(opts, :mode, :from_catalog)
+    dietary_guidance = Keyword.get(opts, :dietary_guidance)
 
     with :ok <- SpendGuard.allow?(:generate_plan),
          {:ok, state} <- EventStore.load(plan_id, Decider) do
-      context = build_plan_context(state, week_start, mode)
+      context = build_plan_context(state, week_start, mode, dietary_guidance)
 
       with {:ok, llm_result, usage} <- @llm.generate_plan(context),
            :ok <- SpendGuard.log_usage(:generate_plan, usage),
@@ -128,6 +129,7 @@ defmodule Scullion.Handlers.PlanningHandler do
   def suggest_recipes_for_slot(plan_id, slot_key, opts \\ []) do
     limit = Keyword.get(opts, :limit, 5)
     include_llm = Keyword.get(opts, :include_llm, false)
+    dietary_guidance = Keyword.get(opts, :dietary_guidance)
 
     with {:ok, state} <- EventStore.load(plan_id, Decider) do
       recipes =
@@ -156,7 +158,7 @@ defmodule Scullion.Handlers.PlanningHandler do
         |> Enum.take(limit)
 
       if include_llm do
-        case llm_extra_suggestion(state, slot_key, recipes, ranked, pantry_names, deals_names, recent_ids) do
+        case llm_extra_suggestion(state, slot_key, recipes, ranked, pantry_names, deals_names, recent_ids, dietary_guidance) do
           {:ok, extra} -> {:ok, [extra | ranked] |> Enum.uniq_by(& &1.recipe.id) |> Enum.take(limit + 1)}
           {:error, _} -> {:ok, ranked}
         end
@@ -301,7 +303,7 @@ defmodule Scullion.Handlers.PlanningHandler do
     |> MapSet.new()
   end
 
-  defp llm_extra_suggestion(state, slot_key, recipes, ranked, pantry, deals, recent_ids) do
+  defp llm_extra_suggestion(state, slot_key, recipes, ranked, pantry, deals, recent_ids, dietary_guidance) do
     excluded_ids = Enum.map(ranked, & &1.recipe.id)
     candidate_ids = Enum.map(recipes, & &1.id)
 
@@ -331,7 +333,8 @@ defmodule Scullion.Handlers.PlanningHandler do
       pantry: MapSet.to_list(pantry),
       deals: MapSet.to_list(deals),
       recent_recipe_ids: MapSet.to_list(recent_ids),
-      excluded_recipe_ids: excluded_ids
+      excluded_recipe_ids: excluded_ids,
+      dietary_guidance: dietary_guidance
     }
 
     with :ok <- SpendGuard.allow?(:suggest_recipe),
@@ -346,7 +349,7 @@ defmodule Scullion.Handlers.PlanningHandler do
     end
   end
 
-  defp build_plan_context(state, week_start, mode) do
+  defp build_plan_context(state, week_start, mode, dietary_guidance) do
     recipes =
       Recipes.list(sort: :alphabetical)
       |> Enum.map(fn r ->
@@ -375,7 +378,8 @@ defmodule Scullion.Handlers.PlanningHandler do
       end),
       recent_recipes: [],
       week_start: week_start,
-      mode: mode
+      mode: mode,
+      dietary_guidance: dietary_guidance
     }
   end
 

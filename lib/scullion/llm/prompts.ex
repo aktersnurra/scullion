@@ -2,6 +2,8 @@ defmodule Scullion.LLM.Prompts do
   @prompts_dir Path.join(:code.priv_dir(:scullion), "llm/prompts")
 
   def suggest_slot_recipe(context) do
+    dietary = dietary_guidance_instruction(context[:dietary_guidance])
+
     system = """
     You are a meal planner suggesting one recipe for a single dinner slot.
     Goal: pick the best fit from the candidate recipes given week context.
@@ -9,7 +11,7 @@ defmodule Scullion.LLM.Prompts do
     - Reuse ingredients from neighboring meals
     - Prefer pantry items and current deals
     - Avoid recipes already cooked this week
-    - Match the day's available time and energy
+    - Match the day's available time and energy#{dietary}
     You MUST pick a recipe_id from the provided candidate list.
     Respond ONLY with JSON: {"recipe_id": <int>, "reasoning": "<one short sentence>"}.
     """
@@ -19,6 +21,8 @@ defmodule Scullion.LLM.Prompts do
   end
 
   def plan_weekly(constraints) do
+    dietary = dietary_guidance_instruction(constraints[:dietary_guidance])
+
     system = """
     You are a meal planner. Think like a prep cook.
     Goal: assign recipes to meal slots for the week.
@@ -27,7 +31,7 @@ defmodule Scullion.LLM.Prompts do
     - Prefer ingredient reuse over variety
     - Respect pinned slots as hard constraints
     - Prefer pantry items and deals when available
-    - Weeknight slots need recipes with total time ≤45 min
+    - Weeknight slots need recipes with total time ≤45 min#{dietary}
     Respond with a JSON object only. No prose.
     """
 
@@ -228,6 +232,10 @@ defmodule Scullion.LLM.Prompts do
     user = File.read!(Path.join(@prompts_dir, "parse_receipt.eex"))
     {system, user}
   end
+
+  defp dietary_guidance_instruction(nil), do: ""
+  defp dietary_guidance_instruction(""), do: ""
+  defp dietary_guidance_instruction(guidance), do: "\n- Dietary guidance: #{String.trim(guidance)}"
 
   defp render(template, assigns) do
     path = Path.join(@prompts_dir, template)

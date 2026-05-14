@@ -67,9 +67,10 @@ defmodule ScullionWeb.PlannerLive do
 
     parent = self()
     plan_id = socket.assigns.plan_id
+    dietary_guidance = get_in(socket.assigns.current_user.preferences || %{}, ["dietary_guidance"])
 
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5) do
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, dietary_guidance: dietary_guidance) do
         {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
         _ -> send(parent, {:suggestions_loaded, sk, []})
       end
@@ -143,8 +144,10 @@ defmodule ScullionWeb.PlannerLive do
     parent = self()
     sk = s.slot_key
 
+    dietary_guidance = get_in(socket.assigns.current_user.preferences || %{}, ["dietary_guidance"])
+
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, include_llm: true) do
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, include_llm: true, dietary_guidance: dietary_guidance) do
         {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
         {:error, reason} -> send(parent, {:suggestion_error, sk, reason})
       end

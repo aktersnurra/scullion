@@ -1,8 +1,48 @@
 defmodule ScullionWeb.SettingsLive do
   use ScullionWeb, :live_view
 
+  alias Scullion.{Accounts, Handlers.PlanningHandler}
+
   def mount(_params, _session, socket) do
-    {:ok, socket}
+    user = socket.assigns.current_user
+    guidance = get_in(user.preferences || %{}, ["dietary_guidance"]) || ""
+    {:ok, assign(socket, dietary_guidance: guidance, saved: false)}
+  end
+
+  def handle_event("save_guidance", %{"dietary_guidance" => value}, socket) do
+    user = socket.assigns.current_user
+    prefs = Map.put(user.preferences || %{}, "dietary_guidance", String.trim(value))
+
+    case Accounts.update_preferences(user, %{preferences: prefs}) do
+      {:ok, _updated} -> {:noreply, assign(socket, dietary_guidance: String.trim(value), saved: true)}
+      {:error, _} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("clear_guidance", _params, socket) do
+    user = socket.assigns.current_user
+    prefs = Map.put(user.preferences || %{}, "dietary_guidance", "")
+
+    case Accounts.update_preferences(user, %{preferences: prefs}) do
+      {:ok, _updated} -> {:noreply, assign(socket, dietary_guidance: "", saved: false)}
+      {:error, _} -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("generate_plan", _params, socket) do
+    user = socket.assigns.current_user
+    guidance = get_in(user.preferences || %{}, ["dietary_guidance"])
+    plan_id = "default"
+    week_start = Date.utc_today() |> Date.beginning_of_week()
+
+    Task.start(fn ->
+      PlanningHandler.generate_plan(plan_id, week_start,
+        mode: :from_catalog,
+        dietary_guidance: guidance
+      )
+    end)
+
+    {:noreply, socket}
   end
 
   def render(assigns) do
@@ -42,11 +82,30 @@ defmodule ScullionWeb.SettingsLive do
           </div>
         </section>
 
+        <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
+          <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Recipe generation")}</h2>
+          <p class="text-[color:var(--muted)] mb-3" style="font-size: var(--t-meta);">{gettext("Dietary guidance injected into plan and recipe suggestion prompts.")}</p>
+          <form phx-submit="save_guidance" class="flex flex-col gap-3">
+            <textarea
+              name="dietary_guidance"
+              rows="3"
+              placeholder={gettext("e.g. low carb, high protein, no gluten")}
+              class="w-full rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2 text-[var(--text)] placeholder:text-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
+              style="font-size: var(--t-body);"
+            >{@dietary_guidance}</textarea>
+            <div class="flex items-center gap-2">
+              <.button type="submit" variant={:primary}>{gettext("Save")}</.button>
+              <.button type="button" variant={:secondary} phx-click="clear_guidance">{gettext("Clear")}</.button>
+              <span :if={@saved} class="text-[color:var(--accent)]" style="font-size: var(--t-meta);">{gettext("Saved")}</span>
+            </div>
+          </form>
+        </section>
+
         <section class="px-6 pt-5 pb-6 border-t border-[color:var(--hairline)]">
           <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Jobs")}</h2>
           <div class="flex flex-wrap gap-2">
             <.button variant={:secondary}>{gettext("Run deal scrape")}</.button>
-            <.button variant={:secondary}>{gettext("Generate plan")}</.button>
+            <.button variant={:secondary} phx-click="generate_plan">{gettext("Generate plan")}</.button>
           </div>
         </section>
       </.card>
