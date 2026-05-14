@@ -14,17 +14,17 @@ defmodule ScullionWeb.RecipeLiveTest do
   describe "page render" do
     test "shows recipe grid and single control card", %{conn: conn, user: user, recipe: recipe} do
       {:ok, _lv, html} = live(authed(conn, user), "/recipes")
-      assert html =~ "Recipes"
+      assert html =~ "Recept"
       assert html =~ recipe.title
-      assert html =~ "Search recipes"
-      assert html =~ "What can we cook tonight?"
-      assert html =~ "Paste a recipe URL"
+      assert html =~ "Sök recept"
+      assert html =~ "Vad kan vi laga ikväll?"
+      assert html =~ "Klistra in en recept-URL"
     end
 
     test "more filters hidden by default", %{conn: conn, user: user} do
       {:ok, _lv, html} = live(authed(conn, user), "/recipes")
       refute html =~ "quick"
-      refute html =~ "Any"
+      refute html =~ "Alla"
     end
   end
 
@@ -33,9 +33,9 @@ defmodule ScullionWeb.RecipeLiveTest do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       html = render_click(lv, "toggle_more_filters")
       assert html =~ "quick"
-      assert html =~ "Any"
+      assert html =~ "Alla"
       html = render_click(lv, "toggle_more_filters")
-      refute html =~ "quick"
+      refute html =~ "Alla"
     end
   end
 
@@ -43,7 +43,7 @@ defmodule ScullionWeb.RecipeLiveTest do
     test "shows coming soon flash", %{conn: conn, user: user} do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       html = render_click(lv, "get_ideas")
-      assert html =~ "Coming soon"
+      assert html =~ "Kommer snart"
     end
   end
 
@@ -51,7 +51,7 @@ defmodule ScullionWeb.RecipeLiveTest do
     test "shows error when url and uploads are both empty", %{conn: conn, user: user} do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       html = render_submit(lv, "import_action", %{"url" => ""})
-      assert html =~ "Paste a URL or drop screenshots first"
+      assert html =~ "Klistra in en URL eller dra och släpp skärmdumpar först"
     end
   end
 
@@ -98,7 +98,7 @@ defmodule ScullionWeb.RecipeLiveTest do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       render_click(lv, "new_recipe")
       html = render_click(lv, "add_ingredient_row")
-      assert html =~ ~s(placeholder="Ingredient")
+      assert html =~ ~s(placeholder="Ingrediens")
     end
 
     test "remove_ingredient_row removes a row", %{conn: conn, user: user} do

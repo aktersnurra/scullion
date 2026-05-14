@@ -11,8 +11,8 @@ defmodule ScullionWeb.PantryLiveTest do
 
   test "renders empty pantry", %{conn: conn} do
     {:ok, _lv, html} = live(conn, "/pantry")
-    assert html =~ "Pantry"
-    assert html =~ "Nothing in pantry"
+    assert html =~ "Skafferi"
+    assert html =~ "Inget i skafferiet"
   end
 
   test "renders existing items", %{conn: conn} do
