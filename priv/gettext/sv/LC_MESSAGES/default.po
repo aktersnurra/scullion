@@ -94,8 +94,8 @@ msgstr "Alla"
 msgid "Assign recipes in the planner, then generate your prep guide."
 msgstr "Tilldela recept i planeraren och generera sedan din förberedelseguide."
 
-#: lib/tore_web/components/layouts.ex:126
-#: lib/tore_web/components/layouts.ex:138
+#: lib/tore_web/components/layouts.ex:127
+#: lib/tore_web/components/layouts.ex:139
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr "Försöker återansluta"
@@ -161,7 +161,7 @@ msgstr "Komponenter"
 msgid "Cook (min)"
 msgstr "Tillagningstid (min)"
 
-#: lib/tore_web/components/layouts.ex:16
+#: lib/tore_web/components/layouts.ex:17
 #: lib/tore_web/live/cost_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "Costs"
@@ -709,13 +709,13 @@ msgstr "Sök recept…"
 msgid "Servings"
 msgstr "Portioner"
 
-#: lib/tore_web/components/layouts.ex:17
+#: lib/tore_web/components/layouts.ex:18
 #: lib/tore_web/live/settings_live.ex:54
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr "Inställningar"
 
-#: lib/tore_web/components/layouts.ex:40
+#: lib/tore_web/components/layouts.ex:41
 #, elixir-autogen, elixir-format
 msgid "Sign out"
 msgstr "Logga ut"
@@ -731,7 +731,7 @@ msgstr "Hoppa över middagen"
 msgid "Skipped"
 msgstr "Överhoppad"
 
-#: lib/tore_web/components/layouts.ex:133
+#: lib/tore_web/components/layouts.ex:134
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr "Något gick fel!"
@@ -869,7 +869,7 @@ msgstr "Användare"
 msgid "Uses leftovers"
 msgstr "Använder rester"
 
-#: lib/tore_web/components/layouts.ex:121
+#: lib/tore_web/components/layouts.ex:122
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr "Vi kan inte hitta internet"
@@ -1324,3 +1324,8 @@ msgstr "Växla hämtning"
 #, elixir-autogen, elixir-format
 msgid "URL"
 msgstr "URL"
+
+#: lib/tore_web/components/layouts.ex:16
+#, elixir-autogen, elixir-format
+msgid "Deals"
+msgstr "Erbjudanden"

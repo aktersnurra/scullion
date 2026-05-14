@@ -94,8 +94,8 @@ msgstr ""
 msgid "Assign recipes in the planner, then generate your prep guide."
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:126
-#: lib/tore_web/components/layouts.ex:138
+#: lib/tore_web/components/layouts.ex:127
+#: lib/tore_web/components/layouts.ex:139
 #, elixir-autogen, elixir-format
 msgid "Attempting to reconnect"
 msgstr ""
@@ -161,7 +161,7 @@ msgstr ""
 msgid "Cook (min)"
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:16
+#: lib/tore_web/components/layouts.ex:17
 #: lib/tore_web/live/cost_live.ex:103
 #, elixir-autogen, elixir-format
 msgid "Costs"
@@ -709,13 +709,13 @@ msgstr ""
 msgid "Servings"
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:17
+#: lib/tore_web/components/layouts.ex:18
 #: lib/tore_web/live/settings_live.ex:54
 #, elixir-autogen, elixir-format
 msgid "Settings"
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:40
+#: lib/tore_web/components/layouts.ex:41
 #, elixir-autogen, elixir-format
 msgid "Sign out"
 msgstr ""
@@ -731,7 +731,7 @@ msgstr ""
 msgid "Skipped"
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:133
+#: lib/tore_web/components/layouts.ex:134
 #, elixir-autogen, elixir-format
 msgid "Something went wrong!"
 msgstr ""
@@ -869,7 +869,7 @@ msgstr ""
 msgid "Uses leftovers"
 msgstr ""
 
-#: lib/tore_web/components/layouts.ex:121
+#: lib/tore_web/components/layouts.ex:122
 #, elixir-autogen, elixir-format
 msgid "We can't find the internet"
 msgstr ""
@@ -1323,4 +1323,9 @@ msgstr ""
 #: lib/tore_web/live/deals_live.ex:213
 #, elixir-autogen, elixir-format
 msgid "URL"
+msgstr ""
+
+#: lib/tore_web/components/layouts.ex:16
+#, elixir-autogen, elixir-format
+msgid "Deals"
 msgstr ""

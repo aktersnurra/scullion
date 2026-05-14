@@ -13,6 +13,7 @@ defmodule ToreWeb.Layouts do
       {"/groceries", gettext("Groceries"), "hero-shopping-cart"},
       {"/prep", gettext("Prep"), "hero-fire"},
       {"/pantry", gettext("Pantry"), "hero-archive-box"},
+      {"/deals", gettext("Deals"), "hero-tag"},
       {"/costs", gettext("Costs"), "hero-banknotes"},
       {"/settings", gettext("Settings"), "hero-cog-6-tooth"}
     ]
