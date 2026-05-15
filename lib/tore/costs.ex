@@ -67,17 +67,14 @@ defmodule Tore.Costs do
         from r in Receipt,
           where: r.date >= ^week_start and r.date <= ^week_end,
           select: coalesce(sum(r.total_amount), 0)
-      )
+      ) |> to_decimal()
 
     dining =
       Repo.one(
         from d in DiningOut,
           where: d.date >= ^week_start and d.date <= ^week_end,
           select: coalesce(sum(d.total_amount), 0)
-      )
-
-    grocery = grocery || Decimal.new(0)
-    dining = dining || Decimal.new(0)
+      ) |> to_decimal()
 
     {:ok, %{grocery_total: grocery, dining_total: dining, total: Decimal.add(grocery, dining)}}
   end
@@ -92,7 +89,7 @@ defmodule Tore.Costs do
         from r in Receipt,
           where: r.date >= ^month_start and r.date <= ^month_end,
           select: coalesce(sum(r.total_amount), 0)
-      ) || Decimal.new(0)
+      ) |> to_decimal()
 
     receipt_count =
       Repo.one(
@@ -106,7 +103,7 @@ defmodule Tore.Costs do
         from d in DiningOut,
           where: d.date >= ^month_start and d.date <= ^month_end,
           select: coalesce(sum(d.total_amount), 0)
-      ) || Decimal.new(0)
+      ) |> to_decimal()
 
     dining_count =
       Repo.one(
@@ -124,6 +121,11 @@ defmodule Tore.Costs do
        dining_count: dining_count
      }}
   end
+
+  defp to_decimal(nil), do: Decimal.new(0)
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
 
   @spec cost_per_meal(map()) :: {:ok, Decimal.t()} | {:error, term()}
   def cost_per_meal(%{week_start: week_start, meal_count: meal_count}) when meal_count > 0 do
