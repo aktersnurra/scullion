@@ -25,11 +25,13 @@ defmodule Tore.Handlers.CostsHandler do
   end
 
   def confirm_receipt(%{total: total, store_name: store_name, items: items, date: date}, user_id) do
+    total_decimal = to_decimal(total)
+
     with {:ok, _receipt} <-
            Tore.Costs.log_receipt(%{
              date: date,
              store_name: store_name,
-             total_amount: total,
+             total_amount: total_decimal,
              user_id: user_id,
              line_items: []
            }) do
@@ -40,6 +42,12 @@ defmodule Tore.Handlers.CostsHandler do
   def log_dining_out(attrs, user_id) do
     Tore.Costs.log_dining_out(Map.put(attrs, :user_id, user_id))
   end
+
+  defp to_decimal(nil), do: nil
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   defp store_image(binary) do
     filename = "#{System.unique_integer([:positive])}.jpg"

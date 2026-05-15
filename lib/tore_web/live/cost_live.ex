@@ -282,7 +282,7 @@ defmodule ToreWeb.CostLive do
             <div class="flex items-center gap-2">
               <input
                 type="number"
-                value={@receipt_preview.total && Decimal.to_string(@receipt_preview.total)}
+                value={@receipt_preview.total && decimal_display(@receipt_preview.total)}
                 placeholder={gettext("Total (kr)")}
                 phx-blur="update_receipt_field"
                 phx-value-field="total"
@@ -310,7 +310,7 @@ defmodule ToreWeb.CostLive do
                 />
                 <input
                   type="text"
-                  value={item.quantity && Decimal.to_string(item.quantity)}
+                  value={item.quantity && decimal_display(item.quantity)}
                   placeholder={gettext("Qty")}
                   phx-blur="update_receipt_item"
                   phx-value-key={item.key}
@@ -475,6 +475,7 @@ defmodule ToreWeb.CostLive do
 
   defp decimal_to_int(%Decimal{} = d), do: Decimal.to_integer(Decimal.round(d, 0))
   defp decimal_to_int(n) when is_integer(n), do: n
+  defp decimal_to_int(n) when is_float(n), do: trunc(n)
   defp decimal_to_int(_), do: 0
 
   defp format_money(n) when is_integer(n) do
@@ -486,6 +487,11 @@ defmodule ToreWeb.CostLive do
     |> Enum.map_join(" ", &Enum.join/1)
     |> String.reverse()
   end
+
+  defp decimal_display(%Decimal{} = d), do: Decimal.to_string(d)
+  defp decimal_display(n) when is_float(n), do: to_string(n)
+  defp decimal_display(n) when is_integer(n), do: to_string(n)
+  defp decimal_display(_), do: ""
 
   defp parse_decimal(""), do: nil
   defp parse_decimal(nil), do: nil
