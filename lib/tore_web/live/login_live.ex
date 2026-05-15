@@ -96,9 +96,8 @@ defmodule ToreWeb.LoginLive do
     ~H"""
     <div class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8" phx-window-keydown="keydown">
       <div class="w-full max-w-sm">
-        <div class="flex items-center justify-center gap-2 mb-6">
-          <.icon name="hero-cake" class="size-5 text-[color:var(--accent)]" />
-          <span class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Tore")}</span>
+        <div class="flex items-center justify-center mb-6">
+          <img src="/images/logo.svg" alt="Tore" class="h-24 w-auto" />
         </div>
 
         <h1 class="text-center font-semibold text-[var(--text)] mb-5" style="font-size: var(--t-h1); line-height: 1.2;">
