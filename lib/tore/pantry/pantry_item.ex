@@ -17,5 +17,8 @@ defmodule Tore.Pantry.PantryItem do
     item
     |> cast(attrs, [:name, :quantity, :unit, :category, :ingredient_id, :added_at, :expires_at])
     |> validate_required([:name, :added_at])
+    |> update_change(:name, &normalize_name/1)
   end
+
+  defp normalize_name(name), do: name |> String.trim() |> String.downcase()
 end
