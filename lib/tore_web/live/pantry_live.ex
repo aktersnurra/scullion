@@ -242,7 +242,7 @@ defmodule ToreWeb.PantryLive do
           <ul class="px-6 pt-2 border-t border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
             <li :for={item <- @items} class={["flex items-center gap-3 py-3", expiring_soon?(item.expires_at) && "text-[color:var(--danger)]"]}>
               <div class="flex-1 min-w-0">
-                <p class="font-medium" style="font-size: var(--t-body);">{item.name}</p>
+                <p class="font-medium" style="font-size: var(--t-body);">{String.capitalize(item.name)}</p>
                 <p :if={item.category || item.expires_at} class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
                   <span :if={item.category}>{item.category}</span>
                   <span :if={item.category && item.expires_at}> · </span>
