@@ -1,7 +1,7 @@
 defmodule Tore.Handlers.DealsHandler do
   require Logger
 
-  alias Tore.{Deals, Deals.StoreConfig, Repo}
+  alias Tore.{Alerts, Deals, Deals.StoreConfig, Repo}
 
   @http Application.compile_env(:tore, :http_client)
 
@@ -28,6 +28,7 @@ defmodule Tore.Handlers.DealsHandler do
             chain: chain
           )
 
+          Alerts.scrape_zero_results(url, chain)
           {:ok, 0}
 
         _ ->

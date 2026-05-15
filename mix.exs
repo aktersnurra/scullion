@@ -67,6 +67,8 @@ defmodule Tore.MixProject do
       {:argon2_elixir, "~> 3.2"},
       {:floki, "~> 0.37"},
       {:quantum, "~> 3.5"},
+      {:swoosh, "~> 1.16"},
+      {:gen_smtp, "~> 1.2"},
       {:mox, "~> 1.2", only: :test},
       {:mdex, "~> 0.2"}
     ]

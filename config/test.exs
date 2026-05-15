@@ -31,6 +31,8 @@ config :phoenix_live_view,
 config :phoenix,
   sort_verified_routes_query_params: true
 
+config :tore, Tore.Mailer, adapter: Swoosh.Adapters.Test
+
 config :tore, :image_gen_client, Tore.Adapters.StubImageGen
 config :tore, :http_client, Tore.MockHTTP
 config :tore, :llm_client, Tore.MockLLM
