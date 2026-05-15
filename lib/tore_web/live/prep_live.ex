@@ -103,7 +103,7 @@ defmodule ToreWeb.PrepLive do
         <% else %>
           <div class="px-6 py-14 flex flex-col items-center text-center border-t border-[color:var(--hairline)]">
             <div class="size-14 rounded-full bg-[color:var(--accent-soft)] inline-flex items-center justify-center mb-5">
-              <.icon name="hero-fire" class="size-7 text-[color:var(--accent)]" />
+              <.icon name="custom-prep" class="size-8" />
             </div>
             <h3 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("No guide yet")}</h3>
             <p class="mt-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">

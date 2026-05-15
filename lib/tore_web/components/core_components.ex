@@ -384,6 +384,12 @@ defmodule ToreWeb.CoreComponents do
     """
   end
 
+  def icon(%{name: "custom-prep"} = assigns) do
+    ~H"""
+    <img src="/images/prep_icon.svg" class={@class} aria-hidden="true" />
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
