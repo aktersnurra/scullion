@@ -30,6 +30,9 @@ defmodule ToreWeb.Layouts do
     ~H"""
     <header class="sticky top-0 z-40 hidden md:block h-[var(--nav-height)] px-6 bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
       <div class="relative h-full flex items-center justify-center">
+        <a href="/" class="absolute left-0 top-1/2 -translate-y-1/2">
+          <img src="/images/logo.svg" alt="Tore" class="h-8 w-auto" />
+        </a>
         <nav class="flex items-center gap-1">
           <.nav_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} label={label} />
         </nav>

@@ -10,6 +10,8 @@ Recipe
 
 # Receipt from image
 
+> **DONE** — photo → vision LLM → total cost saved to receipts + pantry items (editable preview before confirm)
+
 Parse the image of the recipe and extract each line item as a pantry item
 
 1. image -> image to text model -> total cost + pantry entries (should be able to edit)
