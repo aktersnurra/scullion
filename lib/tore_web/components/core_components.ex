@@ -390,6 +390,12 @@ defmodule ToreWeb.CoreComponents do
     """
   end
 
+  def icon(%{name: "custom-pantry"} = assigns) do
+    ~H"""
+    <img src="/images/pantry_icon.svg" class={@class} aria-hidden="true" />
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
