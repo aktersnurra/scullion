@@ -1,4 +1,6 @@
 defmodule Tore.Handlers.DealsHandler do
+  require Logger
+
   alias Tore.{Deals, Deals.StoreConfig, Repo}
 
   @http Application.compile_env(:tore, :http_client)
@@ -19,12 +21,29 @@ defmodule Tore.Handlers.DealsHandler do
 
     with {:ok, html} <- @http.fetch(url),
          {:ok, deals} <- parser.parse(html) do
-      Deals.upsert_deals(deals)
+      case deals do
+        [] ->
+          Logger.warning("scrape returned 0 deals — parser may be broken",
+            url: url,
+            chain: chain
+          )
+
+          {:ok, 0}
+
+        _ ->
+          Deals.upsert_deals(deals)
+      end
     end
   end
 
   defp scrape_store(store_config) do
-    scrape_url(store_config.url, store_config.chain)
+    case scrape_url(store_config.url, store_config.chain) do
+      {:ok, count} ->
+        Logger.info("scraped #{count} deals", store: store_config.name, url: store_config.url)
+
+      {:error, reason} ->
+        Logger.error("scrape failed", store: store_config.name, url: store_config.url, reason: inspect(reason))
+    end
   end
 
   defp parser_for(:ica), do: Tore.Deals.Parsers.ICA
