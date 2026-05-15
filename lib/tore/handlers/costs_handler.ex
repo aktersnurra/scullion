@@ -1,6 +1,10 @@
 defmodule Tore.Handlers.CostsHandler do
   @llm Application.compile_env(:tore, :llm_client)
 
+  def parse_receipt_image(image_binary) do
+    @llm.parse_receipt_for_pantry(image_binary)
+  end
+
   def parse_and_log_receipt(image_binary, user_id) do
     image_path = store_image(image_binary)
 
@@ -17,6 +21,19 @@ defmodule Tore.Handlers.CostsHandler do
         user_id: user_id,
         line_items: line_items
       })
+    end
+  end
+
+  def confirm_receipt(%{total: total, store_name: store_name, items: items, date: date}, user_id) do
+    with {:ok, _receipt} <-
+           Tore.Costs.log_receipt(%{
+             date: date,
+             store_name: store_name,
+             total_amount: total,
+             user_id: user_id,
+             line_items: []
+           }) do
+      Tore.Handlers.PantryHandler.confirm_items(items)
     end
   end
 

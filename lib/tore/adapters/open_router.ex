@@ -167,6 +167,65 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   @impl Tore.LLM
+  def parse_receipt_for_pantry(image_binary) do
+    {system, user_text} = Tore.LLM.Prompts.parse_receipt_for_pantry()
+    b64 = Base.encode64(image_binary)
+
+    body = %{
+      model: vision_model(),
+      response_format: Tore.LLM.Prompts.receipt_pantry_json_schema(),
+      messages: [
+        %{role: "system", content: system},
+        %{
+          role: "user",
+          content: [
+            %{type: "text", text: user_text},
+            %{type: "image_url", image_url: %{url: "data:image/jpeg;base64,#{b64}"}}
+          ]
+        }
+      ]
+    }
+
+    case Req.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+             {"X-Title", "Tore"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        content = get_in(resp, ["choices", Access.at(0), "message", "content"])
+        usage = extract_usage(resp)
+
+        with {:ok, parsed} <- Jason.decode(content) do
+          items =
+            Enum.map(parsed["items"] || [], fn item ->
+              %{
+                name: item["name"],
+                quantity: parse_decimal(item["quantity"]),
+                unit: item["unit"],
+                category: item["category"]
+              }
+            end)
+
+          result = %{
+            total: parse_decimal(parsed["total"]),
+            store_name: parsed["store_name"],
+            items: items
+          }
+
+          {:ok, result, usage}
+        end
+
+      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
+      {:ok, %{status: 429}} -> {:error, :rate_limited}
+      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
+      {:error, reason} -> {:error, {:http_error, reason}}
+    end
+  end
+
+  @impl Tore.LLM
   def estimate_nutrition(%{title: title, ingredients: ingredients}) do
     {system, _} = Tore.LLM.Prompts.estimate_nutrition()
     user = "Recipe: #{title}\nIngredients: #{Enum.join(ingredients, ", ")}"

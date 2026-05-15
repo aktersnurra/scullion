@@ -26,6 +26,11 @@ defmodule Tore.Costs do
     )
   end
 
+  @spec list_receipts() :: [Receipt.t()]
+  def list_receipts do
+    Repo.all(from r in Receipt, order_by: [desc: r.date], limit: 50)
+  end
+
   @spec log_receipt(map()) :: {:ok, Receipt.t()} | {:error, term()}
   def log_receipt(attrs) do
     line_items = Map.get(attrs, :line_items, [])

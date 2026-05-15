@@ -11,4 +11,8 @@ defmodule Tore.LLM do
   @callback generate_prep_guide(plan :: map()) :: {:ok, map(), map()} | {:error, term()}
   @callback estimate_nutrition(recipe :: map()) :: {:ok, map(), map()} | {:error, term()}
   @callback parse_pantry_image(image :: binary()) :: {:ok, [map()], map()} | {:error, term()}
+  @callback parse_receipt_for_pantry(image :: binary()) ::
+              {:ok, %{total: Decimal.t() | nil, store_name: String.t() | nil, items: [map()]},
+               map()}
+              | {:error, term()}
 end

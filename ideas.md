@@ -249,6 +249,10 @@ Add feature to input custom url for parsing of deals to run once
 # Add urls for recurring scraping of deals
 add urls for recurring scraping of deals. Maybe unify with run scraping once
 
+# Scrap pdf deals
+
+Be able to upload a pdf with deals
+
 # Fix logo
 
 Create svg from logo.png, add it somewhere on the site

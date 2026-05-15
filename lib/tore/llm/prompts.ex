@@ -272,6 +272,53 @@ defmodule Tore.LLM.Prompts do
     {system, user}
   end
 
+  @receipt_pantry_json_schema %{
+    type: "object",
+    required: ["total", "store_name", "items"],
+    additionalProperties: false,
+    properties: %{
+      total: %{type: ["number", "null"]},
+      store_name: %{type: ["string", "null"]},
+      items: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["name"],
+          additionalProperties: false,
+          properties: %{
+            name: %{type: "string"},
+            quantity: %{type: ["number", "null"]},
+            unit: %{type: ["string", "null"]},
+            category: %{type: ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def receipt_pantry_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "receipt_pantry", strict: true, schema: @receipt_pantry_json_schema}
+    }
+  end
+
+  def parse_receipt_for_pantry do
+    system = """
+    You are a receipt parser. Given a photo of a grocery receipt:
+    1. Extract the store name (if visible).
+    2. Extract the total amount paid (the final total, in the receipt's currency).
+    3. Extract each purchased grocery item as a pantry entry with name, quantity, and unit.
+       - Omit non-food items like bags, fees, or deposits unless clearly a food product.
+       - Use standard Swedish units where appropriate (g, kg, ml, dl, l, st, förp).
+       - quantity and unit are null when not determinable from the receipt.
+    Respond with a JSON object only. No prose.
+    """
+
+    user = "Extract the store name, total, and grocery items from this receipt."
+    {system, user}
+  end
+
   defp dietary_guidance_instruction(nil), do: ""
   defp dietary_guidance_instruction(""), do: ""
   defp dietary_guidance_instruction(guidance), do: "\n- Dietary guidance: #{String.trim(guidance)}"
