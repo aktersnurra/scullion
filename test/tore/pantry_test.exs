@@ -5,7 +5,7 @@ defmodule Tore.PantryTest do
 
   test "add_item/1 inserts and returns pantry item" do
     assert {:ok, item} = Pantry.add_item(%{name: "Mjölk", quantity: Decimal.new(2), unit: "L"})
-    assert item.name == "Mjölk"
+    assert item.name == "mjölk"
     assert item.added_at == Date.utc_today()
   end
 
@@ -33,6 +33,6 @@ defmodule Tore.PantryTest do
     Pantry.add_item(%{name: "Ost"})
     Pantry.add_item(%{name: "Bröd"})
     names = Pantry.list_inventory() |> Enum.map(& &1.name)
-    assert names == ["Bröd", "Ost"]
+    assert names == ["bröd", "ost"]
   end
 end

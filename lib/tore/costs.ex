@@ -26,6 +26,32 @@ defmodule Tore.Costs do
     )
   end
 
+  def llm_spend_last_30_days do
+    threshold = NaiveDateTime.add(NaiveDateTime.utc_now(), -30 * 24 * 3600)
+
+    Repo.one(
+      from u in LLMUsage,
+        where: u.inserted_at >= ^threshold,
+        select: coalesce(sum(u.cost_usd), 0.0)
+    )
+  end
+
+  def llm_spend_total do
+    Repo.one(from u in LLMUsage, select: coalesce(sum(u.cost_usd), 0.0))
+  end
+
+  def llm_calls_this_month_by_feature do
+    month_start = Date.beginning_of_month(Date.utc_today())
+    threshold = NaiveDateTime.new!(month_start, ~T[00:00:00])
+
+    Repo.all(
+      from u in LLMUsage,
+        where: u.inserted_at >= ^threshold,
+        group_by: u.feature,
+        select: {u.feature, count(u.id), coalesce(sum(u.cost_usd), 0.0)}
+    )
+  end
+
   @spec list_receipts() :: [Receipt.t()]
   def list_receipts do
     Repo.all(from r in Receipt, order_by: [desc: r.date], limit: 50)

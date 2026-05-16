@@ -520,3 +520,7 @@ But it should never be the primary UX.
 
 This separation will make the app feel dramatically more intentional.
 ```
+
+# Fix tests
+
+Test became broken after fixing the ica scraping, fix broken tests!

@@ -15,6 +15,7 @@ defmodule ToreWeb.Layouts do
       {"/pantry", gettext("Pantry"), "nav-pantry"},
       {"/deals", gettext("Deals"), "nav-deals"},
       {"/costs", gettext("Costs"), "nav-costs"},
+      {"/cooking", gettext("Cooking"), "nav-cooking"},
       {"/settings", gettext("Settings"), "nav-settings"}
     ]
   end
@@ -28,32 +29,18 @@ defmodule ToreWeb.Layouts do
     assigns = assign(assigns, :nav_items, nav_items())
 
     ~H"""
-    <header class="sticky top-0 z-40 hidden md:block h-[var(--nav-height)] px-6 bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
-      <div class="relative h-full flex items-center justify-center">
-        <a href="/" class="absolute left-0 top-1/2 -translate-y-1/2">
-          <img src="/images/logo.svg" alt="Tore" class="h-8 w-auto" />
-        </a>
-        <nav class="flex items-center gap-1">
-          <.nav_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} label={label} />
-        </nav>
-        <a
-          href="/logout"
-          class="absolute right-0 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[var(--text)]"
-          style="font-size: var(--t-meta);"
-        >
-          {gettext("Sign out")}
-        </a>
-      </div>
+    <header class="sticky top-0 z-40 hidden md:flex h-[var(--nav-height)] items-center justify-center bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
+      <nav class="flex items-center gap-1">
+        <.nav_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} label={label} />
+      </nav>
     </header>
 
     <main class="min-h-[calc(100vh-var(--nav-height))] px-4 py-4 md:px-6 md:py-6 pb-24 md:pb-6">
       {render_slot(@inner_block)}
     </main>
 
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-8 bg-[var(--surface)] border-t border-[color:var(--border)]">
-      <.bottom_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon}>
-        {label}
-      </.bottom_link>
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-9 bg-[var(--surface)] border-t border-[color:var(--border)]">
+      <.bottom_link :for={{path, _label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} />
     </nav>
 
     <.flash_group flash={@flash} />
@@ -88,7 +75,6 @@ defmodule ToreWeb.Layouts do
   attr :path, :string, required: true
   attr :current, :string, required: true
   attr :icon, :string, required: true
-  slot :inner_block, required: true
 
   defp bottom_link(assigns) do
     assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
@@ -98,13 +84,12 @@ defmodule ToreWeb.Layouts do
       href={@path}
       data-active={if @active?, do: "true"}
       class={[
-        "flex flex-col items-center justify-center gap-0.5 h-14",
+        "flex items-center justify-center h-14",
         @active? && "text-[color:var(--accent)]",
         !@active? && "text-[color:var(--muted)]"
       ]}
     >
       <.icon name={@icon} class="size-5" />
-      <span style="font-size: 11px; font-weight: 500;">{render_slot(@inner_block)}</span>
     </a>
     """
   end

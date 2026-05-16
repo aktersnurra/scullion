@@ -36,6 +36,20 @@ defmodule Tore.Accounts do
     end)
   end
 
+  @spec regenerate_code(User.t()) :: {:ok, {User.t(), String.t()}} | {:error, Ecto.Changeset.t()}
+  def regenerate_code(user) do
+    code = generate_code()
+    hash = Argon2.hash_pwd_salt(code)
+
+    user
+    |> User.registration_changeset(%{name: user.name, role: user.role, account_code_hash: hash})
+    |> Repo.update()
+    |> case do
+      {:ok, updated} -> {:ok, {updated, code}}
+      {:error, cs} -> {:error, cs}
+    end
+  end
+
   @spec update_preferences(User.t(), map()) :: {:ok, User.t()} | {:error, Ecto.Changeset.t()}
   def update_preferences(user, attrs) do
     user

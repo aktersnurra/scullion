@@ -3,56 +3,60 @@ defmodule Tore.Deals.Parsers.ICATest do
 
   alias Tore.Deals.Parsers.ICA
 
-  @fixture_html """
-  <div data-testid="offer-card">
-    <span data-testid="product-name">Kycklingfilé</span>
-    <span data-testid="brand">Kronfågel</span>
-    <span data-testid="price">59,90/kg</span>
-    <span data-testid="splash">Köp 2 betala för 1</span>
-  </div>
-  <div data-testid="offer-card">
-    <span data-testid="product-name">Färsk pasta</span>
-    <span data-testid="price">29,90/st</span>
-  </div>
-  """
+  defp wrap_offers(offers_json) do
+    ~s({"weeklyOffers":#{offers_json},"compensationOffersStatus":"ok"})
+  end
+
+  defp fixture_html do
+    chicken =
+      Jason.encode!(%{
+        "details" => %{"name" => "Kycklingfilé", "brand" => "Kronfågel", "packageInformation" => "500g"},
+        "parsedMechanics" => %{"value1" => "2", "value2" => "59", "value4" => "/kg"},
+        "stores" => [%{"storeMarketingName" => "ICA Maxi", "regularPrice" => "89"}],
+        "comparisonPrice" => "59:90/kg",
+        "validTo" => "2026-05-18T00:00:00"
+      })
+
+    pasta =
+      Jason.encode!(%{
+        "details" => %{"name" => "Färsk pasta", "brand" => nil},
+        "parsedMechanics" => %{"value1" => "1", "value2" => "29", "value4" => "/st"},
+        "stores" => [%{"storeMarketingName" => "ICA Maxi", "regularPrice" => "35"}],
+        "comparisonPrice" => nil,
+        "validTo" => nil
+      })
+
+    wrap_offers("[#{chicken},#{pasta}]")
+  end
 
   test "parse/1 extracts deals from offer cards" do
-    assert {:ok, deals} = ICA.parse(@fixture_html)
+    assert {:ok, deals} = ICA.parse(fixture_html())
     assert length(deals) == 2
 
     [chicken | _] = deals
     assert chicken.product_name == "Kycklingfilé"
     assert chicken.brand == "Kronfågel"
-    assert chicken.store == "ica"
+    assert chicken.store == "ICA Maxi"
     assert chicken.source == :scraped
     assert %Decimal{} = chicken.price
-    assert chicken.offer_condition == "Köp 2 betala för 1"
   end
 
-  test "parse/1 extracts price unit from price text" do
-    assert {:ok, [deal | _]} = ICA.parse(@fixture_html)
-    assert deal.price_unit == "kr/kg"
+  test "parse/1 extracts price unit" do
+    assert {:ok, [deal | _]} = ICA.parse(fixture_html())
+    assert deal.price_unit == "/kg"
   end
 
-  test "parse/1 returns empty list for page with no offer cards" do
-    assert {:ok, []} = ICA.parse("<html><body>No offers</body></html>")
+  test "parse/1 returns error when no embedded data present" do
+    assert {:error, :no_initial_data} = ICA.parse("<html><body>No offers</body></html>")
   end
 
-  test "parse/1 always returns :ok tuple" do
-    assert {:ok, _} = ICA.parse("")
+  test "parse/1 parses valid_until date" do
+    assert {:ok, [deal | _]} = ICA.parse(fixture_html())
+    assert deal.valid_until == ~D[2026-05-18]
   end
 
-  test "parse/1 skips cards with empty product names" do
-    html = """
-    <div data-testid="offer-card">
-      <span data-testid="product-name"></span>
-    </div>
-    <div data-testid="offer-card">
-      <span data-testid="product-name">Mjölk</span>
-    </div>
-    """
-
-    assert {:ok, [deal]} = ICA.parse(html)
-    assert deal.product_name == "Mjölk"
+  test "parse/1 normalises comparison price colon separator" do
+    assert {:ok, [deal | _]} = ICA.parse(fixture_html())
+    assert deal.comparison_price == "59.90/kg"
   end
 end

@@ -8,12 +8,7 @@ defmodule Tore.Handlers.DealsHandlerTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tore.Repo)
   end
 
-  @ica_html """
-  <div data-testid="offer-card">
-    <span data-testid="product-name">Kycklingfilé</span>
-    <span data-testid="price">59,90/kg</span>
-  </div>
-  """
+  @ica_html ~s({"weeklyOffers":[{"details":{"name":"Kycklingfilé","brand":"Kronfågel"},"parsedMechanics":{"value1":"1","value2":"59","value4":"/kg"},"stores":[{"storeMarketingName":"ICA Maxi","regularPrice":"89"}],"comparisonPrice":null,"validTo":null}],"compensationOffersStatus":"ok"})
 
   test "scrape_url fetches HTML, parses deals, and upserts" do
     Tore.MockHTTP

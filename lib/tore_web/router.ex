@@ -41,15 +41,7 @@ defmodule ToreWeb.Router do
       live "/deals", DealsLive
       live "/pantry", PantryLive
       live "/costs", CostLive
-    end
-  end
-
-  # Admin only
-  scope "/", ToreWeb do
-    pipe_through [:browser, :require_auth]
-
-    live_session :admin,
-      on_mount: [{ToreWeb.Live.Auth, :require_admin}] do
+      live "/cooking", CookingLive
       live "/settings", SettingsLive
     end
   end

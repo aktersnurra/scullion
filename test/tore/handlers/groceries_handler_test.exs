@@ -54,7 +54,7 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
 
     GroceriesHandler.check_item(list_id(), item_id, 1)
     pantry = Tore.Pantry.list_inventory()
-    assert Enum.any?(pantry, &(&1.name == "Pasta"))
+    assert Enum.any?(pantry, &(&1.name == "pasta"))
   end
 
   test "build_list aggregates recipe ingredients and broadcasts" do

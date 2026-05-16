@@ -14,8 +14,7 @@ defmodule ToreWeb.PrepLive do
   def handle_event("set_tab", %{"tab" => tab}, socket), do: {:noreply, assign(socket, tab: tab)}
 
   def handle_event("generate_plan", _params, socket) do
-    user = socket.assigns.current_user
-    guidance = get_in(user.preferences || %{}, ["dietary_guidance"])
+    guidance = Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
     week_start = socket.assigns.week_start
 
     Task.start(fn ->
