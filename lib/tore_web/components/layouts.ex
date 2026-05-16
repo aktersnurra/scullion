@@ -8,14 +8,14 @@ defmodule ToreWeb.Layouts do
 
   defp nav_items do
     [
-      {"/", gettext("Week"), "hero-calendar-days"},
-      {"/recipes", gettext("Recipes"), "hero-book-open"},
-      {"/groceries", gettext("Groceries"), "hero-shopping-cart"},
-      {"/prep", gettext("Prep"), "hero-fire"},
-      {"/pantry", gettext("Pantry"), "hero-archive-box"},
-      {"/deals", gettext("Deals"), "hero-tag"},
-      {"/costs", gettext("Costs"), "hero-banknotes"},
-      {"/settings", gettext("Settings"), "hero-cog-6-tooth"}
+      {"/", gettext("Week"), "nav-week"},
+      {"/recipes", gettext("Recipes"), "nav-recipes"},
+      {"/groceries", gettext("Groceries"), "nav-groceries"},
+      {"/prep", gettext("Prep"), "nav-prep"},
+      {"/pantry", gettext("Pantry"), "nav-pantry"},
+      {"/deals", gettext("Deals"), "nav-deals"},
+      {"/costs", gettext("Costs"), "nav-costs"},
+      {"/settings", gettext("Settings"), "nav-settings"}
     ]
   end
 
@@ -50,7 +50,7 @@ defmodule ToreWeb.Layouts do
       {render_slot(@inner_block)}
     </main>
 
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-7 bg-[var(--surface)] border-t border-[color:var(--border)]">
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-8 bg-[var(--surface)] border-t border-[color:var(--border)]">
       <.bottom_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon}>
         {label}
       </.bottom_link>
@@ -73,6 +73,7 @@ defmodule ToreWeb.Layouts do
       href={@path}
       title={@label}
       aria-label={@label}
+      data-active={if @active?, do: "true"}
       class={[
         "px-3 h-[var(--nav-height)] inline-flex items-center justify-center border-b-2 transition-colors",
         @active? && "text-[color:var(--accent)] border-[color:var(--accent)]",
@@ -95,6 +96,7 @@ defmodule ToreWeb.Layouts do
     ~H"""
     <a
       href={@path}
+      data-active={if @active?, do: "true"}
       class={[
         "flex flex-col items-center justify-center gap-0.5 h-14",
         @active? && "text-[color:var(--accent)]",

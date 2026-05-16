@@ -114,3 +114,19 @@ html, body {
   opacity: 1;
   pointer-events: auto;
 }
+
+/* Nav icons: tint traced SVGs to match active/muted nav colors */
+/* Active (accent #355E3B) */
+a[data-active="true"] .nav-icon {
+  filter: invert(27%) sepia(22%) saturate(700%) hue-rotate(95deg) brightness(75%);
+  transition: filter 0.15s;
+}
+/* Inactive (muted #6B7280) */
+a:not([data-active]) .nav-icon {
+  filter: invert(47%) sepia(5%) saturate(400%) hue-rotate(180deg) brightness(95%);
+  transition: filter 0.15s;
+}
+/* Hover: brighten toward accent */
+a:not([data-active]):hover .nav-icon {
+  filter: invert(27%) sepia(22%) saturate(700%) hue-rotate(95deg) brightness(85%);
+}

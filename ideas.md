@@ -264,6 +264,259 @@ Be able to upload a pdf with deals
 
 # Fix logo
 
+> **DONE** — SVG created from logo.png, placed on site
+
 Create svg from logo.png, add it somewhere on the site
 
 # Add/managed users
+
+Admin needs to be able to create users and manage them. E.g. if the user forgets their code, generate a new one.
+
+# Update nav icons
+
+create svg icons for each icon in the icons.png image 
+
+# Refactor settings page
+
+Here is a settings refactor suggestion
+```md
+Dietary settings should not live in global settings.
+
+Right now that section feels too:
+
+* technical
+* system-oriented
+* prompt-engineering-y
+
+especially:
+
+```text
+Kostråd som injiceras i planeringsfrågorna
+```
+
+That sounds like:
+
+* admin console
+* AI middleware
+* developer tooling
+
+—not a kitchen app.
+
+---
+
+# Better mental model
+
+Dietary preferences are:
+
+* personal
+* culinary
+* household identity
+
+not:
+
+* application configuration
+
+So they should live either:
+
+## Option A — User profile page (best)
+
+Under:
+
+```text
+Gurra
+Admin
+```
+
+Tap user →
+
+Profile sheet/page:
+
+* dietary preferences
+* dislikes
+* allergies
+* favorite cuisines
+* portion defaults
+* spice tolerance
+* lunch habits
+* vegetarian frequency
+
+This is ideal because:
+
+* preferences belong to a person
+* planner consumes them naturally
+* scales to your girlfriend cleanly later
+
+---
+
+# Recommended structure
+
+Settings page becomes purely:
+
+* infrastructure
+* devices
+* stores
+* maintenance
+
+Very calm.
+
+Like:
+
+* device tokens
+* store configs
+* scheduled jobs
+* OpenRouter key
+* exports
+* backups
+
+---
+
+# Then create:
+
+## “Preferences”
+
+or
+
+## “Cooking profile”
+
+inside profile.
+
+This fits the vibe MUCH better.
+
+---
+
+# The planner prompt section should disappear entirely
+
+Never expose:
+
+```text
+prompt injection
+```
+
+or:
+
+```text
+recipe generation instructions
+```
+
+to the normal UI.
+
+That breaks immersion instantly.
+
+---
+
+Instead:
+
+Use human-language chips/toggles.
+
+Example:
+
+## Cooking profile
+
+Diet:
+
+* Low carb
+* High protein
+* Vegetarian occasionally
+
+Avoid:
+
+* Cilantro
+* Blue cheese
+
+Cooking style:
+
+* Batch cooking
+* Cheap weekday dinners
+* Swedish comfort food
+
+Store preference:
+
+* Coop Bondegatan
+
+This is:
+
+* understandable
+* emotionally resonant
+* much easier to use
+
+while still compiling into your planner prompt internally.
+
+---
+
+# Important architecture insight
+
+Your planner prompt should be:
+
+> a compiled artifact
+
+not:
+
+> directly user editable text
+
+Meaning:
+
+UI state:
+
+```elixir
+%Preferences{
+  dislikes: [...],
+  cuisines: [...],
+  budget: ...,
+  batch_cooking: true
+}
+```
+
+Then:
+
+```elixir
+PlannerPrompt.build(preferences, pantry, deals)
+```
+
+creates the actual prompt.
+
+This is MUCH cleaner long-term.
+
+---
+
+# Exception
+
+You *can* keep an advanced raw-text field somewhere hidden:
+
+```text
+Advanced planner notes
+```
+
+collapsed under:
+
+```text
+Advanced
+```
+
+for weird custom constraints.
+
+But it should never be the primary UX.
+
+---
+
+# Ideal IA (information architecture)
+
+## Settings
+
+* Users
+* Device tokens
+* Stores
+* Jobs
+* Backups
+
+## Profile / Cooking profile
+
+* Dietary preferences
+* Allergies
+* Cuisine preferences
+* Batch cooking
+* Budget preferences
+* Lunch habits
+* Favorite recipes
+
+This separation will make the app feel dramatically more intentional.
+```

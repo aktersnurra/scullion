@@ -396,6 +396,14 @@ defmodule ToreWeb.CoreComponents do
     """
   end
 
+  def icon(%{name: "nav-" <> icon_name} = assigns) do
+    assigns = assign(assigns, :src, "/images/nav_#{icon_name}.svg")
+
+    ~H"""
+    <img src={@src} class={["nav-icon", @class]} aria-hidden="true" />
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do
