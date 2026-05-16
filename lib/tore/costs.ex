@@ -57,6 +57,62 @@ defmodule Tore.Costs do
     Repo.all(from r in Receipt, order_by: [desc: r.date], limit: 50)
   end
 
+  @spec recent_receipts(integer()) :: [Receipt.t()]
+  def recent_receipts(n) do
+    Repo.all(from r in Receipt, order_by: [desc: r.date], limit: ^n)
+  end
+
+  @spec receipts_by_store(integer(), integer()) :: [
+          %{store: String.t(), count: integer(), total: Decimal.t()}
+        ]
+  def receipts_by_store(year, month) do
+    {:ok, month_start} = Date.new(year, month, 1)
+    month_end = Date.end_of_month(month_start)
+
+    Repo.all(
+      from r in Receipt,
+        where: r.date >= ^month_start and r.date <= ^month_end,
+        group_by: r.store_name,
+        select: %{
+          store: r.store_name,
+          count: count(r.id),
+          total: coalesce(sum(r.total_amount), 0)
+        },
+        order_by: [desc: coalesce(sum(r.total_amount), 0)]
+    )
+  end
+
+  @spec weekly_spend_this_month(Date.t()) :: [%{week: integer(), total: Decimal.t()}]
+  def weekly_spend_this_month(today) do
+    month_start = Date.beginning_of_month(today)
+    month_end = Date.end_of_month(today)
+
+    rows =
+      Repo.all(
+        from r in Receipt,
+          where: r.date >= ^month_start and r.date <= ^month_end,
+          select: {r.date, r.total_amount}
+      )
+
+    rows
+    |> Enum.group_by(fn {date, _} ->
+      week_of_month(date, month_start)
+    end)
+    |> Enum.map(fn {week, entries} ->
+      total =
+        Enum.reduce(entries, Decimal.new(0), fn {_, amt}, acc ->
+          Decimal.add(acc, amt || Decimal.new(0))
+        end)
+
+      %{week: week, total: total}
+    end)
+    |> Enum.sort_by(& &1.week)
+  end
+
+  defp week_of_month(date, month_start) do
+    div(Date.diff(date, month_start), 7) + 1
+  end
+
   @spec log_receipt(map()) :: {:ok, Receipt.t()} | {:error, term()}
   def log_receipt(attrs) do
     line_items = Map.get(attrs, :line_items, [])
@@ -84,6 +140,49 @@ defmodule Tore.Costs do
     %DiningOut{} |> DiningOut.changeset(attrs) |> Repo.insert()
   end
 
+  @spec list_dining_out() :: [DiningOut.t()]
+  def list_dining_out do
+    Repo.all(from d in DiningOut, order_by: [desc: d.date], limit: 50)
+  end
+
+  @spec dining_by_place() :: [%{place: String.t(), count: integer(), total: Decimal.t()}]
+  def dining_by_place do
+    Repo.all(
+      from d in DiningOut,
+        group_by: d.description,
+        select: %{
+          place: d.description,
+          count: count(d.id),
+          total: coalesce(sum(d.total_amount), 0)
+        },
+        order_by: [desc: count(d.id)]
+    )
+  end
+
+  @spec monthly_total(integer(), integer()) :: Decimal.t()
+  def monthly_total(year, month) do
+    {:ok, month_start} = Date.new(year, month, 1)
+    month_end = Date.end_of_month(month_start)
+
+    grocery =
+      Repo.one(
+        from r in Receipt,
+          where: r.date >= ^month_start and r.date <= ^month_end,
+          select: coalesce(sum(r.total_amount), 0)
+      )
+      |> to_decimal()
+
+    dining =
+      Repo.one(
+        from d in DiningOut,
+          where: d.date >= ^month_start and d.date <= ^month_end,
+          select: coalesce(sum(d.total_amount), 0)
+      )
+      |> to_decimal()
+
+    Decimal.add(grocery, dining)
+  end
+
   @spec weekly_summary(Date.t()) :: {:ok, map()}
   def weekly_summary(week_start) do
     week_end = Date.add(week_start, 6)
@@ -93,14 +192,16 @@ defmodule Tore.Costs do
         from r in Receipt,
           where: r.date >= ^week_start and r.date <= ^week_end,
           select: coalesce(sum(r.total_amount), 0)
-      ) |> to_decimal()
+      )
+      |> to_decimal()
 
     dining =
       Repo.one(
         from d in DiningOut,
           where: d.date >= ^week_start and d.date <= ^week_end,
           select: coalesce(sum(d.total_amount), 0)
-      ) |> to_decimal()
+      )
+      |> to_decimal()
 
     {:ok, %{grocery_total: grocery, dining_total: dining, total: Decimal.add(grocery, dining)}}
   end
@@ -115,7 +216,8 @@ defmodule Tore.Costs do
         from r in Receipt,
           where: r.date >= ^month_start and r.date <= ^month_end,
           select: coalesce(sum(r.total_amount), 0)
-      ) |> to_decimal()
+      )
+      |> to_decimal()
 
     receipt_count =
       Repo.one(
@@ -129,7 +231,8 @@ defmodule Tore.Costs do
         from d in DiningOut,
           where: d.date >= ^month_start and d.date <= ^month_end,
           select: coalesce(sum(d.total_amount), 0)
-      ) |> to_decimal()
+      )
+      |> to_decimal()
 
     dining_count =
       Repo.one(

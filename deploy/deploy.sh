@@ -4,8 +4,8 @@
 set -euo pipefail
 
 TARGET="${1:?usage: $0 user@host}"
-DEPLOY_DIR=/opt/scullion
-APP=scullion
+DEPLOY_DIR=/opt/tore
+APP=tore
 
 echo "==> Building assets"
 MIX_ENV=prod mix assets.deploy
@@ -26,8 +26,8 @@ rsync -az --delete "$RELEASE_SRC/" "${TARGET}:${DEPLOY_DIR}/"
 
 echo "==> Running migrations"
 ssh "$TARGET" "
-  set -a && source /etc/scullion/env && set +a
-  ${DEPLOY_DIR}/bin/${APP} eval 'Scullion.Release.migrate()'
+  set -a && source /etc/tore/env && set +a
+  ${DEPLOY_DIR}/bin/${APP} eval 'Tore.Release.migrate()'
 "
 
 echo "==> Restarting service"

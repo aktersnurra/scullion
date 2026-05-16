@@ -26,7 +26,10 @@ defmodule Tore.DealsTest do
   end
 
   test "list_current returns deals without valid_until" do
-    Tore.Deals.upsert_deals([%{chain: "ica", store: "ICA Maxi", product_name: "Bröd", source: :scraped}])
+    Tore.Deals.upsert_deals([
+      %{chain: "ica", store: "ICA Maxi", product_name: "Bröd", source: :scraped}
+    ])
+
     deals = Tore.Deals.list_current()
     assert Enum.any?(deals, &(&1.product_name == "Bröd"))
   end
@@ -35,7 +38,13 @@ defmodule Tore.DealsTest do
     future = Date.add(Date.utc_today(), 7)
 
     Tore.Deals.upsert_deals([
-      %{chain: "ica", store: "ICA Maxi", product_name: "Fisk", source: :scraped, valid_until: future}
+      %{
+        chain: "ica",
+        store: "ICA Maxi",
+        product_name: "Fisk",
+        source: :scraped,
+        valid_until: future
+      }
     ])
 
     deals = Tore.Deals.list_current()
@@ -44,7 +53,13 @@ defmodule Tore.DealsTest do
 
   test "list_current excludes expired deals" do
     Tore.Deals.upsert_deals([
-      %{chain: "ica", store: "ICA Maxi", product_name: "Expired", source: :scraped, valid_until: ~D[2020-01-01]}
+      %{
+        chain: "ica",
+        store: "ICA Maxi",
+        product_name: "Expired",
+        source: :scraped,
+        valid_until: ~D[2020-01-01]
+      }
     ])
 
     deals = Tore.Deals.list_current()
@@ -53,7 +68,13 @@ defmodule Tore.DealsTest do
 
   test "clear_expired removes deals past valid_until" do
     Tore.Deals.upsert_deals([
-      %{chain: "ica", store: "ICA Maxi", product_name: "OldDeal", source: :scraped, valid_until: ~D[2020-01-01]}
+      %{
+        chain: "ica",
+        store: "ICA Maxi",
+        product_name: "OldDeal",
+        source: :scraped,
+        valid_until: ~D[2020-01-01]
+      }
     ])
 
     Tore.Deals.clear_expired()

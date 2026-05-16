@@ -67,10 +67,15 @@ defmodule ToreWeb.PlannerLive do
 
     parent = self()
     plan_id = socket.assigns.plan_id
-    dietary_guidance = Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
+
+    dietary_guidance =
+      Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
 
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, dietary_guidance: dietary_guidance) do
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
+             limit: 5,
+             dietary_guidance: dietary_guidance
+           ) do
         {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
         _ -> send(parent, {:suggestions_loaded, sk, []})
       end
@@ -99,7 +104,12 @@ defmodule ToreWeb.PlannerLive do
 
     socket =
       update_slot(socket, fn s ->
-        %{s | selected_recipe_id: rid, servings: (recipe && recipe.base_servings) || s.servings || 4, flipped: false}
+        %{
+          s
+          | selected_recipe_id: rid,
+            servings: (recipe && recipe.base_servings) || s.servings || 4,
+            flipped: false
+        }
       end)
 
     # Auto-save immediately on recipe pick
@@ -144,10 +154,15 @@ defmodule ToreWeb.PlannerLive do
     parent = self()
     sk = s.slot_key
 
-    dietary_guidance = Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
+    dietary_guidance =
+      Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
 
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk, limit: 5, include_llm: true, dietary_guidance: dietary_guidance) do
+      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
+             limit: 5,
+             include_llm: true,
+             dietary_guidance: dietary_guidance
+           ) do
         {:ok, suggestions} -> send(parent, {:suggestions_loaded, sk, suggestions})
         {:error, reason} -> send(parent, {:suggestion_error, sk, reason})
       end
@@ -170,7 +185,9 @@ defmodule ToreWeb.PlannerLive do
 
   defp auto_save_slot(socket) do
     case socket.assigns.slot_action do
-      nil -> socket
+      nil ->
+        socket
+
       s ->
         plan_id = socket.assigns.plan_id
 
@@ -188,36 +205,41 @@ defmodule ToreWeb.PlannerLive do
               MapSet.to_list(s.leftover_days)
             )
 
-          true -> :noop
+          true ->
+            :noop
         end
 
         socket
     end
   end
 
+  defp assigned_recipe_ids(plan_state) do
+    plan_state.slots
+    |> Map.values()
+    |> Enum.reject(&(&1.skipped || &1.leftover))
+    |> Enum.map(& &1.recipe_id)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.sort()
+  end
+
   defp rebuild_grocery_list(socket) do
     %{week_start: week_start} = socket.assigns
-    {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
-
-    recipe_ids =
-      plan_state.slots
-      |> Map.values()
-      |> Enum.reject(&(&1.skipped || &1.leftover))
-      |> Enum.map(& &1.recipe_id)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+    recipe_ids = assigned_recipe_ids(socket.assigns.plan_state)
 
     if recipe_ids != [] do
-      GroceriesHandler.build_list(grocery_id(week_start), week_start, recipe_ids)
+      Task.start(fn ->
+        GroceriesHandler.build_list(grocery_id(week_start), week_start, recipe_ids)
+      end)
     end
-
-    socket
   end
 
   def handle_info({:events, _events}, socket) do
     {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
-    rebuild_grocery_list(socket)
-    {:noreply, assign(socket, plan_state: plan_state)}
+    old_ids = assigned_recipe_ids(socket.assigns.plan_state)
+    new_ids = assigned_recipe_ids(plan_state)
+    socket = assign(socket, plan_state: plan_state)
+    if old_ids != new_ids, do: rebuild_grocery_list(socket)
+    {:noreply, socket}
   end
 
   def handle_info({:suggestions_loaded, sk, suggestions}, socket) do
@@ -261,60 +283,65 @@ defmodule ToreWeb.PlannerLive do
 
     ~H"""
     <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/"}>
-    <.page max_width={:md}>
-      <header class="flex items-center justify-between gap-4 mb-5">
-        <button
-          type="button"
-          phx-click="prev_week"
-          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
-          aria-label={gettext("Previous week")}
-        >
-          <.icon name="hero-chevron-left" class="size-5" />
-        </button>
+      <.page max_width={:md}>
+        <header class="flex items-center justify-between gap-4 mb-5">
+          <button
+            type="button"
+            phx-click="prev_week"
+            class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+            aria-label={gettext("Previous week")}
+          >
+            <.icon name="hero-chevron-left" class="size-5" />
+          </button>
 
-        <div class="text-center">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("This week")}</h1>
-          <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-            {plan_subtitle(@plan_state, @week_start, @week_end)}
+          <div class="text-center">
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
+              {gettext("This week")}
+            </h1>
+            <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+              {plan_subtitle(@plan_state, @week_start, @week_end)}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            phx-click="next_week"
+            class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+            aria-label={gettext("Next week")}
+          >
+            <.icon name="hero-chevron-right" class="size-5" />
+          </button>
+        </header>
+
+        <.card padded={false}>
+          <ul class="divide-y divide-[color:var(--hairline)]" inert={if @slot_action, do: true}>
+            <.day_row
+              :for={{day, i} <- Enum.with_index(@days)}
+              day={day}
+              date={Date.add(@week_start, i)}
+              today={@today}
+              slot_key={"#{day}_dinner"}
+              plan_state={@plan_state}
+              recipes={@recipes}
+              days={@days}
+            />
+          </ul>
+
+          <p
+            class="px-6 py-4 text-center text-[color:var(--subtle)]"
+            style="font-size: var(--t-meta);"
+          >
+            {gettext("Swipe left to right to see other weeks")}
           </p>
-        </div>
+        </.card>
 
-        <button
-          type="button"
-          phx-click="next_week"
-          class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
-          aria-label={gettext("Next week")}
-        >
-          <.icon name="hero-chevron-right" class="size-5" />
-        </button>
-      </header>
-
-      <.card padded={false}>
-        <ul class="divide-y divide-[color:var(--hairline)]" inert={if @slot_action, do: true}>
-          <.day_row
-            :for={{day, i} <- Enum.with_index(@days)}
-            day={day}
-            date={Date.add(@week_start, i)}
-            today={@today}
-            slot_key={"#{day}_dinner"}
-            plan_state={@plan_state}
-            recipes={@recipes}
-            days={@days}
-          />
-        </ul>
-
-        <p class="px-6 py-4 text-center text-[color:var(--subtle)]" style="font-size: var(--t-meta);">
-          {gettext("Swipe left to right to see other weeks")}
-        </p>
-      </.card>
-
-      <.slot_modal
-        :if={@slot_action}
-        slot_action={@slot_action}
-        plan_state={@plan_state}
-        recipes={@recipes}
-      />
-    </.page>
+        <.slot_modal
+          :if={@slot_action}
+          slot_action={@slot_action}
+          plan_state={@plan_state}
+          recipes={@recipes}
+        />
+      </.page>
     </Layouts.app>
     """
   end
@@ -364,7 +391,11 @@ defmodule ToreWeb.PlannerLive do
           >
             {Calendar.strftime(@date, "%-d")}
           </div>
-          <div :if={@is_today} class="mt-1 text-[color:var(--accent)] font-medium leading-none" style="font-size: 11px;">
+          <div
+            :if={@is_today}
+            class="mt-1 text-[color:var(--accent)] font-medium leading-none"
+            style="font-size: 11px;"
+          >
             {gettext("Today")}
           </div>
         </div>
@@ -374,7 +405,12 @@ defmodule ToreWeb.PlannerLive do
           @recipe && "bg-[color:var(--hairline)]",
           !@recipe && "bg-transparent border border-dashed border-[color:var(--border)]"
         ]}>
-          <img :if={@recipe && @recipe.image_path} src={@recipe.image_path} alt="" class="h-full w-full object-cover" />
+          <img
+            :if={@recipe && @recipe.image_path}
+            src={@recipe.image_path}
+            alt=""
+            class="h-full w-full object-cover"
+          />
           <.icon :if={@recipe && !@recipe.image_path} name="hero-photo" class="size-6" />
           <.icon :if={!@recipe} name="hero-plus" class="size-5" />
         </div>
@@ -385,27 +421,42 @@ defmodule ToreWeb.PlannerLive do
               <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">
                 {@recipe.title}
               </p>
-              <div class="mt-1 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+              <div
+                class="mt-1 flex items-center gap-3 text-[color:var(--muted)]"
+                style="font-size: var(--t-meta);"
+              >
                 <span :if={@slot.servings} class="inline-flex items-center gap-1">
-                  <.icon name="hero-user-group" class="size-3.5" /> {gettext("%{n} servings", n: @slot.servings)}
+                  <.icon name="hero-user-group" class="size-3.5" /> {gettext("%{n} servings",
+                    n: @slot.servings
+                  )}
                 </span>
                 <span :if={@slot.leftover} class="inline-flex items-center gap-1">
                   <.icon name="hero-arrow-uturn-right" class="size-3.5" /> {gettext("Uses leftovers")}
                 </span>
               </div>
             <% @slot && @slot.leftover -> %>
-              <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("Leftovers")}</p>
+              <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">
+                {gettext("Leftovers")}
+              </p>
             <% @slot && @slot.skipped -> %>
-              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">{gettext("Skipped")}</p>
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">
+                {gettext("Skipped")}
+              </p>
             <% true -> %>
-              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">{gettext("— add a meal")}</p>
+              <p class="text-[color:var(--subtle)]" style="font-size: var(--t-body);">
+                {gettext("— add a meal")}
+              </p>
           <% end %>
         </div>
 
         <.chip :if={leftover_target(@plan_state, @days, @date) != nil} tone={:accent}>
           {gettext("Leftovers for %{day}", day: leftover_target(@plan_state, @days, @date))}
         </.chip>
-        <.icon :if={leftover_target(@plan_state, @days, @date) == nil} name="hero-chevron-right" class="size-5 text-[color:var(--subtle)]" />
+        <.icon
+          :if={leftover_target(@plan_state, @days, @date) == nil}
+          name="hero-chevron-right"
+          class="size-5 text-[color:var(--subtle)]"
+        />
       </div>
     </li>
     """
@@ -465,64 +516,110 @@ defmodule ToreWeb.PlannerLive do
         phx-window-keydown="close_slot"
         phx-key="Escape"
       >
-        <div class={["slot-panel-wrap bg-[var(--surface)] rounded-[var(--r-xl)] shadow-[0_8px_32px_rgba(17,24,39,0.16)]", @slot_action.flipped && "is-flipped"]}>
-
+        <div class={[
+          "slot-panel-wrap bg-[var(--surface)] rounded-[var(--r-xl)] shadow-[0_8px_32px_rgba(17,24,39,0.16)]",
+          @slot_action.flipped && "is-flipped"
+        ]}>
           <%!-- FRONT PANEL --%>
           <div class="slot-panel slot-panel-front overflow-hidden rounded-[var(--r-xl)]">
             <header class="flex items-center justify-between px-6 py-4 border-b border-[color:var(--hairline)]">
               <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
                 {slot_label(@slot_action.slot_key)}
               </h2>
-              <button type="button" phx-click="close_slot"
-                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]">
+              <button
+                type="button"
+                phx-click="close_slot"
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+              >
                 <.icon name="hero-x-mark" class="size-5" />
               </button>
             </header>
 
             <%= if @selected_recipe do %>
               <div class="aspect-[16/9] w-full bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
-                <img :if={@selected_recipe.image_path} src={@selected_recipe.image_path} alt="" class="h-full w-full object-cover" />
+                <img
+                  :if={@selected_recipe.image_path}
+                  src={@selected_recipe.image_path}
+                  alt=""
+                  class="h-full w-full object-cover"
+                />
                 <.icon :if={!@selected_recipe.image_path} name="hero-photo" class="size-10" />
               </div>
               <div class="px-6 pt-4">
-                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{@selected_recipe.title}</p>
+                <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
+                  {@selected_recipe.title}
+                </p>
                 <div :if={@selected_recipe.tags != []} class="flex flex-wrap gap-1.5 mt-2">
-                  <.chip :for={tag <- Enum.take(@selected_recipe.tags, 3)} tone={:accent}>{tag.name}</.chip>
+                  <.chip :for={tag <- Enum.take(@selected_recipe.tags, 3)} tone={:accent}>
+                    {tag.name}
+                  </.chip>
                 </div>
               </div>
             <% else %>
               <div class="px-6 pt-6 pb-2">
-                <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("No meal chosen yet — tap Change recipe to pick one.")}</p>
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-body);">
+                  {gettext("No meal chosen yet — tap Change recipe to pick one.")}
+                </p>
               </div>
             <% end %>
 
-            <div class={["px-6 py-5 space-y-4", @slot_action.skipped && "opacity-40 pointer-events-none"]}>
+            <div class={[
+              "px-6 py-5 space-y-4",
+              @slot_action.skipped && "opacity-40 pointer-events-none"
+            ]}>
               <div class="flex items-center justify-between">
-                <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">{gettext("Portions")}</span>
+                <span
+                  class="text-[color:var(--muted)]"
+                  style="font-size: var(--t-meta); font-weight: 500;"
+                >
+                  {gettext("Portions")}
+                </span>
                 <div class="inline-flex items-center gap-3">
-                  <button type="button" phx-click="dec_servings"
-                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]">
+                  <button
+                    type="button"
+                    phx-click="dec_servings"
+                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]"
+                  >
                     <.icon name="hero-minus" class="size-4" />
                   </button>
-                  <span class="w-6 text-center font-semibold tabular-nums" style="font-size: var(--t-h2);">{@slot_action.servings}</span>
-                  <button type="button" phx-click="inc_servings"
-                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]">
+                  <span
+                    class="w-6 text-center font-semibold tabular-nums"
+                    style="font-size: var(--t-h2);"
+                  >
+                    {@slot_action.servings}
+                  </span>
+                  <button
+                    type="button"
+                    phx-click="inc_servings"
+                    class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]"
+                  >
                     <.icon name="hero-plus" class="size-4" />
                   </button>
                 </div>
               </div>
 
-              <div :if={@days_after != [] and @slot_action.selected_recipe_id} class="flex items-start gap-3">
-                <span class="text-[color:var(--muted)] mt-1.5" style="font-size: var(--t-meta); font-weight: 500;">{gettext("Leftovers for")}</span>
+              <div
+                :if={@days_after != [] and @slot_action.selected_recipe_id}
+                class="flex items-start gap-3"
+              >
+                <span
+                  class="text-[color:var(--muted)] mt-1.5"
+                  style="font-size: var(--t-meta); font-weight: 500;"
+                >
+                  {gettext("Leftovers for")}
+                </span>
                 <div class="flex flex-wrap gap-1.5">
-                  <button :for={d <- @days_after}
+                  <button
+                    :for={d <- @days_after}
                     type="button"
                     phx-click="toggle_leftover_day"
                     phx-value-day={"#{d}_dinner"}
                     class={[
                       "h-7 px-2.5 rounded-[var(--r-pill)] capitalize transition-colors",
-                      MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] font-medium",
-                      !MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") && "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
+                      MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") &&
+                        "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] font-medium",
+                      !MapSet.member?(@slot_action.leftover_days, "#{d}_dinner") &&
+                        "bg-[color:var(--hairline)] text-[color:var(--muted)] hover:text-[var(--text)]"
                     ]}
                     style="font-size: var(--t-meta);"
                   >
@@ -547,31 +644,47 @@ defmodule ToreWeb.PlannerLive do
                 phx-click="toggle_skipped"
                 class={[
                   "inline-flex items-center gap-2 rounded-[var(--r-pill)] px-3 h-8 transition-colors",
-                  @slot_action.skipped && "bg-[color:var(--warn-soft)] text-[color:var(--warn)] font-medium",
-                  !@slot_action.skipped && "text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)]"
+                  @slot_action.skipped &&
+                    "bg-[color:var(--warn-soft)] text-[color:var(--warn)] font-medium",
+                  !@slot_action.skipped &&
+                    "text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)]"
                 ]}
                 style="font-size: var(--t-meta);"
               >
-                <.icon name={if @slot_action.skipped, do: "hero-x-circle", else: "hero-x-circle"} class="size-4" />
-                <%= if @slot_action.skipped, do: gettext("Skipped"), else: gettext("Skip dinner") %>
+                <.icon
+                  name={if @slot_action.skipped, do: "hero-x-circle", else: "hero-x-circle"}
+                  class="size-4"
+                />
+                {if @slot_action.skipped, do: gettext("Skipped"), else: gettext("Skip dinner")}
               </button>
             </div>
           </div>
 
           <%!-- BACK PANEL (recipe browser) --%>
-          <div class="slot-panel slot-panel-back overflow-hidden rounded-[var(--r-xl)] flex flex-col" style="max-height: 80vh;">
+          <div
+            class="slot-panel slot-panel-back overflow-hidden rounded-[var(--r-xl)] flex flex-col"
+            style="max-height: 80vh;"
+          >
             <header class="flex items-center gap-3 px-6 py-4 border-b border-[color:var(--hairline)] shrink-0">
-              <button type="button" phx-click="flip_slot"
-                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]">
+              <button
+                type="button"
+                phx-click="flip_slot"
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)]"
+              >
                 <.icon name="hero-chevron-left" class="size-5" />
               </button>
-              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("Choose a recipe")}</h2>
+              <h2 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">
+                {gettext("Choose a recipe")}
+              </h2>
             </header>
 
             <div class="flex-1 overflow-y-auto px-6 pt-4 pb-6 space-y-4">
               <form phx-change="search_slot_recipes">
                 <div class="relative">
-                  <.icon name="hero-magnifying-glass" class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]" />
+                  <.icon
+                    name="hero-magnifying-glass"
+                    class="size-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[color:var(--subtle)]"
+                  />
                   <input
                     type="text"
                     name="q"
@@ -586,7 +699,12 @@ defmodule ToreWeb.PlannerLive do
               <%= if @slot_action.search == "" do %>
                 <section>
                   <div class="flex items-center justify-between mb-2">
-                    <h3 class="uppercase tracking-wider text-[color:var(--subtle)]" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Suggested")}</h3>
+                    <h3
+                      class="uppercase tracking-wider text-[color:var(--subtle)]"
+                      style="font-size: var(--t-micro); font-weight: 600;"
+                    >
+                      {gettext("Suggested")}
+                    </h3>
                     <button
                       type="button"
                       phx-click="regenerate_suggestion"
@@ -599,33 +717,47 @@ defmodule ToreWeb.PlannerLive do
                   </div>
 
                   <%= if @slot_action.loading_suggestions and @slot_action.suggestions == [] do %>
-                    <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">{gettext("Finding suggestions…")}</p>
+                    <p class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">
+                      {gettext("Finding suggestions…")}
+                    </p>
                   <% else %>
                     <ul class="space-y-2">
-                      <.recipe_pick_row :for={sug <- @slot_action.suggestions}
+                      <.recipe_pick_row
+                        :for={sug <- @slot_action.suggestions}
                         recipe={sug.recipe}
                         reasons={sug.reasons}
-                        selected={@slot_action.selected_recipe_id == sug.recipe.id} />
+                        selected={@slot_action.selected_recipe_id == sug.recipe.id}
+                      />
                     </ul>
                   <% end %>
                 </section>
               <% end %>
 
               <section>
-                <h3 class="uppercase tracking-wider text-[color:var(--subtle)] mb-2" style="font-size: var(--t-micro); font-weight: 600;">
-                  <%= if @slot_action.search == "", do: gettext("All recipes"), else: gettext("Results") %>
+                <h3
+                  class="uppercase tracking-wider text-[color:var(--subtle)] mb-2"
+                  style="font-size: var(--t-micro); font-weight: 600;"
+                >
+                  {if @slot_action.search == "", do: gettext("All recipes"), else: gettext("Results")}
                 </h3>
                 <ul class="space-y-2">
-                  <.recipe_pick_row :for={r <- @other_recipes}
+                  <.recipe_pick_row
+                    :for={r <- @other_recipes}
                     recipe={r}
                     reasons={[]}
-                    selected={@slot_action.selected_recipe_id == r.id} />
+                    selected={@slot_action.selected_recipe_id == r.id}
+                  />
                 </ul>
-                <p :if={@other_recipes == [] and @slot_action.search != ""} class="text-[color:var(--muted)] py-2" style="font-size: var(--t-meta);">{gettext("No recipes match.")}</p>
+                <p
+                  :if={@other_recipes == [] and @slot_action.search != ""}
+                  class="text-[color:var(--muted)] py-2"
+                  style="font-size: var(--t-meta);"
+                >
+                  {gettext("No recipes match.")}
+                </p>
               </section>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -653,16 +785,25 @@ defmodule ToreWeb.PlannerLive do
         ]}
       >
         <div class="size-12 shrink-0 rounded-[var(--r-md)] overflow-hidden bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
-          <img :if={@recipe.image_path} src={@recipe.image_path} alt="" class="h-full w-full object-cover" />
+          <img
+            :if={@recipe.image_path}
+            src={@recipe.image_path}
+            alt=""
+            class="h-full w-full object-cover"
+          />
           <.icon :if={!@recipe.image_path} name="hero-photo" class="size-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">{@recipe.title}</p>
+          <p class="font-semibold text-[var(--text)] truncate" style="font-size: var(--t-body);">
+            {@recipe.title}
+          </p>
           <p class="mt-0.5 text-[color:var(--muted)] truncate" style="font-size: var(--t-meta);">
             <%= if @reasons != [] do %>
               {Enum.join(@reasons, " · ")}
             <% else %>
-              <%= if @total_min > 0, do: gettext("%{n} min", n: @total_min), else: "" %><%= if @recipe.base_servings, do: " · #{gettext("%{n} portions", n: @recipe.base_servings)}", else: "" %>
+              {if @total_min > 0, do: gettext("%{n} min", n: @total_min), else: ""}{if @recipe.base_servings,
+                do: " · #{gettext("%{n} portions", n: @recipe.base_servings)}",
+                else: ""}
             <% end %>
           </p>
         </div>

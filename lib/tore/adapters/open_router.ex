@@ -11,8 +11,8 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   @impl Tore.LLM
-  def generate_prep_guide(plan) do
-    {system, user} = Tore.LLM.Prompts.prep_guide(plan)
+  def generate_prep_guide(plan, locale \\ nil) do
+    {system, user} = Tore.LLM.Prompts.prep_guide(plan, locale)
     chat(system, user)
   end
 
@@ -92,7 +92,8 @@ defmodule Tore.Adapters.OpenRouter do
                 product_name: item["product_name"],
                 quantity: parse_decimal(item["quantity"]),
                 unit_price: parse_decimal(item["unit_price"]),
-                total_price: parse_decimal(item["total_price"])
+                total_price: parse_decimal(item["total_price"]),
+                category: item["category"]
               }
             end)
 
@@ -159,10 +160,17 @@ defmodule Tore.Adapters.OpenRouter do
           {:ok, items, usage}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
@@ -218,10 +226,17 @@ defmodule Tore.Adapters.OpenRouter do
           {:ok, result, usage}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
@@ -233,6 +248,36 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   def estimate_nutrition(_), do: {:error, :invalid_recipe}
+
+  @impl Tore.LLM
+  def filter_pantry_items(ingredients, pantry) do
+    {system, user} = Tore.LLM.Prompts.filter_pantry_items(ingredients, pantry)
+
+    case cheap_chat(system, user, check_model_fallback(), Tore.LLM.Prompts.filter_pantry_schema()) do
+      {:ok, resp, _usage} when is_list(resp) ->
+        build_filter_result(resp)
+
+      {:ok, %{"items" => items}, _usage} when is_list(items) ->
+        build_filter_result(items)
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @impl Tore.LLM
+  def classify_grocery_item(name) do
+    {system, user} = Tore.LLM.Prompts.classify_grocery_item(name)
+
+    case cheap_chat(system, user, model()) do
+      {:ok, %{"section" => section}, _usage} -> {:ok, to_section_atom(section)}
+      {:ok, _, _} -> {:error, :invalid_response}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   @impl Tore.LLM
   def parse_deals_image(_image), do: {:error, :not_implemented}
@@ -251,7 +296,10 @@ defmodule Tore.Adapters.OpenRouter do
           role: "user",
           content: [
             %{type: "text", text: user_text},
-            %{type: "file", file: %{filename: "deals.pdf", file_data: "data:application/pdf;base64,#{b64}"}}
+            %{
+              type: "file",
+              file: %{filename: "deals.pdf", file_data: "data:application/pdf;base64,#{b64}"}
+            }
           ]
         }
       ]
@@ -298,10 +346,17 @@ defmodule Tore.Adapters.OpenRouter do
           {:ok, deals}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
@@ -339,16 +394,24 @@ defmodule Tore.Adapters.OpenRouter do
           {:ok, parse_recipe_attrs(data)}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
   @impl Tore.ImageGen
   def generate_food_image(title, recipe_text) do
-    context = if recipe_text && recipe_text != "", do: "\n\nRecipe context:\n#{recipe_text}", else: ""
+    context =
+      if recipe_text && recipe_text != "", do: "\n\nRecipe context:\n#{recipe_text}", else: ""
 
     prompt =
       "Food photography, overhead shot, natural light, #{title}.#{context} " <>
@@ -370,7 +433,15 @@ defmodule Tore.Adapters.OpenRouter do
          ) do
       {:ok, %{status: 200, body: resp}} ->
         data_url =
-          get_in(resp, ["choices", Access.at(0), "message", "images", Access.at(0), "image_url", "url"])
+          get_in(resp, [
+            "choices",
+            Access.at(0),
+            "message",
+            "images",
+            Access.at(0),
+            "image_url",
+            "url"
+          ])
 
         case data_url do
           "data:" <> _ ->
@@ -413,10 +484,10 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
-  defp cheap_chat(system_prompt, user_prompt, model_name) do
+  defp cheap_chat(system_prompt, user_prompt, model_name, response_format \\ %{type: "json_object"}) do
     body = %{
       model: model_name,
-      response_format: %{type: "json_object"},
+      response_format: response_format,
       messages: [
         %{role: "system", content: system_prompt},
         %{role: "user", content: user_prompt}
@@ -439,10 +510,17 @@ defmodule Tore.Adapters.OpenRouter do
           {:ok, parsed, usage}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
@@ -507,7 +585,10 @@ defmodule Tore.Adapters.OpenRouter do
       |> Enum.chunk_by(& &1["phase"])
       |> Enum.map(fn phase_steps ->
         phase = hd(phase_steps)["phase"]
-        lines = Enum.map(phase_steps, fn s -> "#{s["order"]}. #{s["action"]}" end) |> Enum.join("\n")
+
+        lines =
+          Enum.map(phase_steps, fn s -> "#{s["order"]}. #{s["action"]}" end) |> Enum.join("\n")
+
         "## #{phase}\n\n#{lines}"
       end)
       |> Enum.join("\n\n")
@@ -529,7 +610,11 @@ defmodule Tore.Adapters.OpenRouter do
 
   defp parse_ingredients(list) do
     Enum.map(list, fn item ->
-      %{name: item["item"] || item["name"], quantity: parse_decimal(item["quantity"]), unit: item["unit"]}
+      %{
+        name: item["item"] || item["name"],
+        quantity: parse_decimal(item["quantity"]),
+        unit: item["unit"]
+      }
     end)
   end
 
@@ -538,6 +623,7 @@ defmodule Tore.Adapters.OpenRouter do
   defp decode_content(_), do: {:error, :no_content}
 
   defp parse_date(nil), do: nil
+
   defp parse_date(s) when is_binary(s) do
     case Date.from_iso8601(s) do
       {:ok, date} -> date
@@ -545,14 +631,54 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
+  defp build_filter_result(items) do
+    result =
+      items
+      |> Enum.map(fn i -> Map.put(i, "name", i["name"] || i["item"] || i["ingredient"]) end)
+      |> Enum.filter(&is_binary(&1["name"]))
+      |> Enum.map(fn i ->
+        qty = case i["quantity"] do
+          nil -> nil
+          n when is_number(n) -> n
+          s when is_binary(s) -> s
+          _ -> nil
+        end
+
+        %{
+          id: Ecto.UUID.generate(),
+          name: i["name"],
+          quantity: qty,
+          unit: i["unit"],
+          section: to_section_atom(i["section"]),
+          checked: false
+        }
+      end)
+
+    {:ok, result}
+  end
+
+  @valid_sections ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+
+  defp to_section_atom(s) when is_binary(s) and s in @valid_sections, do: String.to_atom(s)
+  defp to_section_atom(_), do: :other
+
   defp parse_decimal(nil), do: nil
   defp parse_decimal(n) when is_number(n), do: Decimal.from_float(n * 1.0)
   defp parse_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   defp api_key, do: Application.fetch_env!(:tore, :openrouter_api_key)
   defp model, do: Application.get_env(:tore, :openrouter_model, "openai/gpt-5-mini")
-  defp vision_model, do: Application.get_env(:tore, :openrouter_vision_model, "google/gemini-2.5-flash-lite")
-  defp image_model, do: Application.get_env(:tore, :openrouter_image_model, "google/gemini-3.1-flash-image-preview")
-  defp check_model, do: Application.get_env(:tore, :openrouter_check_model, "openai/gpt-oss-120b:free")
-  defp check_model_fallback, do: Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
+
+  defp vision_model,
+    do: Application.get_env(:tore, :openrouter_vision_model, "google/gemini-2.5-flash-lite")
+
+  defp image_model,
+    do:
+      Application.get_env(:tore, :openrouter_image_model, "google/gemini-3.1-flash-image-preview")
+
+  defp check_model,
+    do: Application.get_env(:tore, :openrouter_check_model, "openai/gpt-oss-120b:free")
+
+  defp check_model_fallback,
+    do: Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
 end

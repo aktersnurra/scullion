@@ -17,6 +17,7 @@ defmodule Tore.Groceries.Decider do
          name: cmd.name,
          quantity: cmd.quantity,
          unit: cmd.unit,
+         section: cmd.section,
          added_by: cmd.added_by
        }
      ]}
@@ -46,14 +47,37 @@ defmodule Tore.Groceries.Decider do
     end
   end
 
+  @section_atoms ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)a
+
+  defp atomize(map) when is_map(map) do
+    Map.new(map, fn
+      {"section", v} -> {:section, to_section_atom(v)}
+      {:section, v} -> {:section, to_section_atom(v)}
+      {k, v} when is_binary(k) -> {String.to_atom(k), v}
+      {k, v} -> {k, v}
+    end)
+  end
+
+  defp to_section_atom(v) when is_binary(v) do
+    atom = String.to_atom(v)
+    if atom in @section_atoms, do: atom, else: :other
+  end
+
+  defp to_section_atom(_), do: :other
+
   @spec evolve(State.t(), Events.t()) :: State.t()
   def evolve(state, %Events.ListBuilt{week_start: ws, items: items}) do
-    item_map = Map.new(items, fn item -> {item.id, item} end)
+    item_map =
+      Map.new(items, fn item ->
+        item = atomize(item)
+        {item.id, item}
+      end)
+
     %{state | week_start: ws, items: item_map}
   end
 
   def evolve(state, %Events.ItemAdded{} = e) do
-    item = %{id: e.item_id, name: e.name, quantity: e.quantity, unit: e.unit, checked: false}
+    item = %{id: e.item_id, name: e.name, quantity: e.quantity, unit: e.unit, section: e.section, checked: false}
     %{state | items: Map.put(state.items, e.item_id, item)}
   end
 

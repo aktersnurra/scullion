@@ -9,7 +9,7 @@ Return a JSON object with this exact structure:
       "name": "string — item name in Swedish",
       "quantity": 1,
       "unit": "string or null — e.g. g, kg, ml, dl, st, förp",
-      "category": "string or null — e.g. mejeri, kött, grönsaker, frys, skafferi, dryck"
+      "category": "string — one of the fixed values listed below"
     }
   ]
 }
@@ -19,5 +19,6 @@ Rules:
 - Estimate quantity if visible (e.g. "3" eggs, "500" for a 500g pack); use null if unclear
 - Use null for unit when it cannot be determined
 - name must be in Swedish (translate if needed)
-- category should be one of: mejeri, kött, fisk, grönsaker, frukt, frys, skafferi, dryck, övrigt
+- category must be exactly one of these values (use "other" if unsure):
+  dairy, meat, produce, frozen, dry_goods, canned, herbs_spices, condiments, other
 - Return only the JSON object, no prose

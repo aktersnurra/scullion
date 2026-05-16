@@ -20,27 +20,38 @@ if System.get_env("PHX_SERVER") do
   config :tore, ToreWeb.Endpoint, server: true
 end
 
-config :tore, ToreWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+config :tore, ToreWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :prod do
+  config :tore,
+         :uploads_dir,
+         System.get_env("UPLOADS_DIR") ||
+           raise("environment variable UPLOADS_DIR is missing. Example: /var/data/tore/uploads")
+
   config :tore, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
-  config :tore, :openrouter_model,
-    System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
-  config :tore, :openrouter_vision_model,
-    System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
-  config :tore, :openrouter_image_model,
-    System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
-  config :tore, :openrouter_check_model,
-    System.get_env("OPENROUTER_CHECK_MODEL", "openai/gpt-oss-120b:free")
-  config :tore, :openrouter_check_model_fallback,
-    System.get_env("OPENROUTER_CHECK_MODEL_FALLBACK", "openai/gpt-oss-120b")
+  config :tore, :openrouter_model, System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
+
+  config :tore,
+         :openrouter_vision_model,
+         System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
+
+  config :tore,
+         :openrouter_image_model,
+         System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
+
+  config :tore,
+         :openrouter_check_model,
+         System.get_env("OPENROUTER_CHECK_MODEL", "openai/gpt-oss-120b:free")
+
+  config :tore,
+         :openrouter_check_model_fallback,
+         System.get_env("OPENROUTER_CHECK_MODEL_FALLBACK", "openai/gpt-oss-120b")
 
   database_path =
     System.get_env("DATABASE_PATH") ||
       raise """
       environment variable DATABASE_PATH is missing.
-      For example: /etc/tore/scullion.db
+      For example: /var/lib/tore/tore.db
       """
 
   config :tore, Tore.Repo,

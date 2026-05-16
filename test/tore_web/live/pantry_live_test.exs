@@ -24,7 +24,19 @@ defmodule ToreWeb.PantryLiveTest do
 
   test "add item via form appears in list", %{conn: conn} do
     {:ok, lv, _html} = live(conn, "/pantry")
-    html = lv |> form("form[phx-submit='add_item']", %{name: "Linser", quantity: "400", unit: "g", category: "legumes", expires_at: ""}) |> render_submit()
+
+    lv |> element("button[phx-value-cat='canned']") |> render_click()
+
+    html =
+      lv
+      |> form("form[phx-submit='add_item']", %{
+        name: "Linser",
+        quantity: "400",
+        unit: "g",
+        expires_at: ""
+      })
+      |> render_submit()
+
     assert html =~ "Linser"
   end
 

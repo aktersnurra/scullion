@@ -13,13 +13,14 @@ defmodule ToreWeb.SettingsLive do
       by_feature: Costs.llm_calls_this_month_by_feature()
     }
 
-    {:ok, assign(socket,
-      users: users,
-      new_user_name: "",
-      revealed_codes: %{},
-      add_error: nil,
-      ai: ai
-    )}
+    {:ok,
+     assign(socket,
+       users: users,
+       new_user_name: "",
+       revealed_codes: %{},
+       add_error: nil,
+       ai: ai
+     )}
   end
 
   def handle_event("add_user", _params, %{assigns: %{current_user: %{role: role}}} = socket)
@@ -31,22 +32,31 @@ defmodule ToreWeb.SettingsLive do
       {:ok, {user, code}} ->
         users = Accounts.list_users()
         revealed = Map.put(socket.assigns.revealed_codes, user.id, format_code(code))
-        {:noreply, assign(socket, users: users, new_user_name: "", revealed_codes: revealed, add_error: nil)}
+
+        {:noreply,
+         assign(socket, users: users, new_user_name: "", revealed_codes: revealed, add_error: nil)}
+
       {:error, _} ->
         {:noreply, assign(socket, add_error: gettext("Could not create user."))}
     end
   end
 
-  def handle_event("regenerate_code", _params, %{assigns: %{current_user: %{role: role}}} = socket)
+  def handle_event(
+        "regenerate_code",
+        _params,
+        %{assigns: %{current_user: %{role: role}}} = socket
+      )
       when role != :admin,
       do: {:noreply, socket}
 
   def handle_event("regenerate_code", %{"id" => id}, socket) do
     user = Accounts.get_user!(id)
+
     case Accounts.regenerate_code(user) do
       {:ok, {_updated, code}} ->
         revealed = Map.put(socket.assigns.revealed_codes, user.id, format_code(code))
         {:noreply, assign(socket, revealed_codes: revealed)}
+
       {:error, _} ->
         {:noreply, socket}
     end
@@ -78,106 +88,183 @@ defmodule ToreWeb.SettingsLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/settings"}>
-    <.page max_width={:md}>
-      <.card padded={false}>
-        <header class="px-6 pt-6 pb-3">
-          <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Settings")}</h1>
-        </header>
+      <.page max_width={:md}>
+        <.card padded={false}>
+          <header class="px-6 pt-6 pb-3">
+            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">
+              {gettext("Settings")}
+            </h1>
+          </header>
 
-        <%!-- Users --%>
-        <section class="px-6 pt-3 pb-5 border-t border-[color:var(--hairline)]">
-          <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Users")}</h2>
+          <%!-- Users --%>
+          <section class="px-6 pt-3 pb-5 border-t border-[color:var(--hairline)]">
+            <h2
+              class="uppercase tracking-wider text-[color:var(--subtle)] mb-3"
+              style="font-size: var(--t-micro); font-weight: 600;"
+            >
+              {gettext("Users")}
+            </h2>
 
-          <div class="flex flex-col gap-3">
-            <div :for={user <- @users} class="flex items-center gap-3">
-              <span class="size-9 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] inline-flex items-center justify-center font-semibold shrink-0" style="font-size: var(--t-meta);">
-                {String.first(user.name || "?")}
-              </span>
-              <div class="flex-1 min-w-0">
-                <p class="font-medium text-[var(--text)] truncate" style="font-size: var(--t-body);">{user.name}</p>
-                <p class="text-[color:var(--muted)] capitalize" style="font-size: var(--t-meta);">{user.role}</p>
-              </div>
-              <div :if={@current_user.role == :admin and Map.has_key?(@revealed_codes, user.id)} class="flex items-center gap-2">
-                <code class="bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] px-2 py-0.5 rounded font-mono" style="font-size: var(--t-meta);">
-                  {Map.get(@revealed_codes, user.id)}
-                </code>
-                <button type="button" phx-click="dismiss_code" phx-value-id={user.id} class="text-[color:var(--muted)] hover:text-[var(--text)]">
-                  <.icon name="hero-x-mark" class="size-4" />
+            <div class="flex flex-col gap-3">
+              <div :for={user <- @users} class="flex items-center gap-3">
+                <span
+                  class="size-9 rounded-full bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] inline-flex items-center justify-center font-semibold shrink-0"
+                  style="font-size: var(--t-meta);"
+                >
+                  {String.first(user.name || "?")}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-[var(--text)] truncate" style="font-size: var(--t-body);">
+                    {user.name}
+                  </p>
+                  <p class="text-[color:var(--muted)] capitalize" style="font-size: var(--t-meta);">
+                    {user.role}
+                  </p>
+                </div>
+                <div
+                  :if={@current_user.role == :admin and Map.has_key?(@revealed_codes, user.id)}
+                  class="flex items-center gap-2"
+                >
+                  <code
+                    class="bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)] px-2 py-0.5 rounded font-mono"
+                    style="font-size: var(--t-meta);"
+                  >
+                    {Map.get(@revealed_codes, user.id)}
+                  </code>
+                  <button
+                    type="button"
+                    phx-click="dismiss_code"
+                    phx-value-id={user.id}
+                    class="text-[color:var(--muted)] hover:text-[var(--text)]"
+                  >
+                    <.icon name="hero-x-mark" class="size-4" />
+                  </button>
+                </div>
+                <button
+                  :if={@current_user.role == :admin and not Map.has_key?(@revealed_codes, user.id)}
+                  type="button"
+                  phx-click="regenerate_code"
+                  phx-value-id={user.id}
+                  class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline shrink-0"
+                  style="font-size: var(--t-meta);"
+                >
+                  <.icon name="hero-arrow-path" class="size-3.5" />{gettext("New code")}
                 </button>
               </div>
+            </div>
+
+            <form
+              :if={@current_user.role == :admin}
+              phx-submit="add_user"
+              class="mt-4 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                name="name"
+                value={@new_user_name}
+                placeholder={gettext("Name")}
+                required
+                class="flex-1 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-1.5 text-[var(--text)] placeholder:text-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              />
+              <.button type="submit" variant={:primary}>
+                <.icon name="hero-plus" class="size-4" />{gettext("Add user")}
+              </.button>
+            </form>
+            <p
+              :if={@add_error}
+              class="mt-1 text-[color:var(--danger)]"
+              style="font-size: var(--t-meta);"
+            >
+              {@add_error}
+            </p>
+          </section>
+
+          <%!-- Device tokens --%>
+          <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
+            <h2
+              class="uppercase tracking-wider text-[color:var(--subtle)] mb-3"
+              style="font-size: var(--t-micro); font-weight: 600;"
+            >
+              {gettext("Kiosk")}
+            </h2>
+            <div class="flex items-center gap-3">
+              <.icon name="hero-device-tablet" class="size-5 text-[color:var(--muted)] shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="font-medium" style="font-size: var(--t-body);">
+                  {gettext("Kitchen kiosk")}
+                </p>
+                <p class="text-[color:var(--accent)]" style="font-size: var(--t-meta);">
+                  {gettext("active")}
+                </p>
+              </div>
               <button
-                :if={@current_user.role == :admin and not Map.has_key?(@revealed_codes, user.id)}
+                :if={@current_user.role == :admin}
                 type="button"
-                phx-click="regenerate_code"
-                phx-value-id={user.id}
-                class="inline-flex items-center gap-1 text-[color:var(--accent)] hover:underline shrink-0"
+                class="text-[color:var(--danger)] hover:underline"
                 style="font-size: var(--t-meta);"
               >
-                <.icon name="hero-arrow-path" class="size-3.5" />{gettext("New code")}
+                {gettext("Revoke")}
               </button>
             </div>
-          </div>
+          </section>
 
-          <form :if={@current_user.role == :admin} phx-submit="add_user" class="mt-4 flex items-center gap-2">
-            <input
-              type="text"
-              name="name"
-              value={@new_user_name}
-              placeholder={gettext("Name")}
-              required
-              class="flex-1 rounded-lg border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-1.5 text-[var(--text)] placeholder:text-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
-              style="font-size: var(--t-body);"
-            />
-            <.button type="submit" variant={:primary}>
-              <.icon name="hero-plus" class="size-4" />{gettext("Add user")}
-            </.button>
-          </form>
-          <p :if={@add_error} class="mt-1 text-[color:var(--danger)]" style="font-size: var(--t-meta);">{@add_error}</p>
-        </section>
-
-        <%!-- Device tokens --%>
-        <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
-          <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Kiosk")}</h2>
-          <div class="flex items-center gap-3">
-            <.icon name="hero-device-tablet" class="size-5 text-[color:var(--muted)] shrink-0" />
-            <div class="flex-1 min-w-0">
-              <p class="font-medium" style="font-size: var(--t-body);">{gettext("Kitchen kiosk")}</p>
-              <p class="text-[color:var(--accent)]" style="font-size: var(--t-meta);">{gettext("active")}</p>
+          <%!-- AI usage --%>
+          <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
+            <h2
+              class="uppercase tracking-wider text-[color:var(--subtle)] mb-3"
+              style="font-size: var(--t-micro); font-weight: 600;"
+            >
+              {gettext("AI usage")}
+            </h2>
+            <div class="flex flex-col gap-2">
+              <div class="flex justify-between">
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">
+                  {gettext("This month")}
+                </span>
+                <span class="font-medium tabular-nums" style="font-size: var(--t-body);">
+                  {format_usd(@ai.this_month)}
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">
+                  {gettext("Last 30 days")}
+                </span>
+                <span class="font-medium tabular-nums" style="font-size: var(--t-body);">
+                  {format_usd(@ai.last_30_days)}
+                </span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">
+                  {gettext("Total")}
+                </span>
+                <span class="font-medium tabular-nums" style="font-size: var(--t-body);">
+                  {format_usd(@ai.total)}
+                </span>
+              </div>
             </div>
-            <button :if={@current_user.role == :admin} type="button" class="text-[color:var(--danger)] hover:underline" style="font-size: var(--t-meta);">{gettext("Revoke")}</button>
-          </div>
-        </section>
-
-        <%!-- AI usage --%>
-        <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
-          <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("AI usage")}</h2>
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between">
-              <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("This month")}</span>
-              <span class="font-medium tabular-nums" style="font-size: var(--t-body);">{format_usd(@ai.this_month)}</span>
+            <div
+              :if={@ai.by_feature != []}
+              class="mt-3 pt-3 border-t border-[color:var(--hairline)] flex flex-col gap-1.5"
+            >
+              <p class="text-[color:var(--subtle)] mb-1" style="font-size: var(--t-micro);">
+                {gettext("This month by feature")}
+              </p>
+              <div
+                :for={{feature, calls, cost} <- @ai.by_feature}
+                class="flex justify-between items-center"
+              >
+                <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                  {feature_label(feature)}
+                </span>
+                <span class="text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
+                  {calls}× · {format_usd(cost)}
+                </span>
+              </div>
             </div>
-            <div class="flex justify-between">
-              <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("Last 30 days")}</span>
-              <span class="font-medium tabular-nums" style="font-size: var(--t-body);">{format_usd(@ai.last_30_days)}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-[color:var(--muted)]" style="font-size: var(--t-body);">{gettext("Total")}</span>
-              <span class="font-medium tabular-nums" style="font-size: var(--t-body);">{format_usd(@ai.total)}</span>
-            </div>
-          </div>
-          <div :if={@ai.by_feature != []} class="mt-3 pt-3 border-t border-[color:var(--hairline)] flex flex-col gap-1.5">
-            <p class="text-[color:var(--subtle)] mb-1" style="font-size: var(--t-micro);">{gettext("This month by feature")}</p>
-            <div :for={{feature, calls, cost} <- @ai.by_feature} class="flex justify-between items-center">
-              <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">{feature_label(feature)}</span>
-              <span class="text-[color:var(--muted)] tabular-nums" style="font-size: var(--t-meta);">
-                {calls}× · {format_usd(cost)}
-              </span>
-            </div>
-          </div>
-        </section>
-
-      </.card>
-    </.page>
+          </section>
+        </.card>
+      </.page>
     </Layouts.app>
     """
   end

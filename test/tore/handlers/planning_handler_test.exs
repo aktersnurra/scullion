@@ -55,8 +55,13 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       {:ok,
        %{
          "days" => [
-           %{"slot_key" => "mon_dinner", "recipe_id" => 999, "servings" => 4,
-             "cascade_from" => nil, "notes" => ""}
+           %{
+             "slot_key" => "mon_dinner",
+             "recipe_id" => 999,
+             "servings" => 4,
+             "cascade_from" => nil,
+             "notes" => ""
+           }
          ],
          "prep_session" => %{}
        }, mock_usage()}
@@ -134,7 +139,10 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
     test "respects :limit" do
       Enum.each(1..6, fn i -> create_recipe("Recipe #{i}") end)
-      assert {:ok, results} = PlanningHandler.suggest_recipes_for_slot(plan_id(), "mon_dinner", limit: 3)
+
+      assert {:ok, results} =
+               PlanningHandler.suggest_recipes_for_slot(plan_id(), "mon_dinner", limit: 3)
+
       assert length(results) <= 3
     end
 
@@ -165,7 +173,9 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       |> expect(:suggest_slot_recipe, fn _ -> {:error, :timeout} end)
 
       assert {:ok, results} =
-               PlanningHandler.suggest_recipes_for_slot(plan_id(), "tue_dinner", include_llm: true)
+               PlanningHandler.suggest_recipes_for_slot(plan_id(), "tue_dinner",
+                 include_llm: true
+               )
 
       assert is_list(results)
     end

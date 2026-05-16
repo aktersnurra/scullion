@@ -32,6 +32,7 @@ defmodule Tore.SpendGuard do
 
   defp budget_ok?(estimated_tokens) do
     spent = Tore.Costs.llm_spend_this_month()
+
     if spent + estimated_tokens * @price_per_token > @monthly_limit_usd do
       {:error, :budget_exceeded}
     else
@@ -45,7 +46,9 @@ defmodule Tore.SpendGuard do
         :ok
 
       last ->
-        seconds = DateTime.diff(DateTime.utc_now(), DateTime.from_naive!(last.inserted_at, "Etc/UTC"))
+        seconds =
+          DateTime.diff(DateTime.utc_now(), DateTime.from_naive!(last.inserted_at, "Etc/UTC"))
+
         if seconds < cooldown_seconds, do: {:error, :cooldown}, else: :ok
     end
   end

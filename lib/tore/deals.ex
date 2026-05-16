@@ -8,7 +8,9 @@ defmodule Tore.Deals do
 
     rows =
       deals
-      |> Enum.filter(&(not is_nil(&1[:store]) and not is_nil(&1[:product_name]) and not is_nil(&1[:chain])))
+      |> Enum.filter(
+        &(not is_nil(&1[:store]) and not is_nil(&1[:product_name]) and not is_nil(&1[:chain]))
+      )
       |> Enum.map(fn d ->
         d
         |> Map.put_new(:source, :scraped)
@@ -36,6 +38,7 @@ defmodule Tore.Deals do
       from(d in Deal, where: d.chain == ^chain and d.store == ^old_store),
       set: [store: new_store, store_location: new_store]
     )
+
     :ok
   end
 
@@ -64,14 +67,16 @@ defmodule Tore.Deals do
     |> Repo.insert()
   end
 
-  @spec update_store_config(StoreConfig.t(), map()) :: {:ok, StoreConfig.t()} | {:error, Ecto.Changeset.t()}
+  @spec update_store_config(StoreConfig.t(), map()) ::
+          {:ok, StoreConfig.t()} | {:error, Ecto.Changeset.t()}
   def update_store_config(config, attrs) do
     config
     |> StoreConfig.changeset(attrs)
     |> Repo.update()
   end
 
-  @spec delete_store_config(StoreConfig.t()) :: {:ok, StoreConfig.t()} | {:error, Ecto.Changeset.t()}
+  @spec delete_store_config(StoreConfig.t()) ::
+          {:ok, StoreConfig.t()} | {:error, Ecto.Changeset.t()}
   def delete_store_config(config), do: Repo.delete(config)
 
   @spec get_store_config!(integer()) :: StoreConfig.t()

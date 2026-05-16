@@ -1,15 +1,15 @@
 # First-deploy checklist on the server:
 
-- [ ] useradd -r -s /sbin/nologin scullion
-- [ ] mkdir -p /var/lib/scullion /etc/scullion /opt/scullion
-- [ ] cp deploy/env /etc/scullion/env  # then fill in values
-- [ ] chmod 600 /etc/scullion/env && chown scullion:scullion /etc/scullion/env
-- [ ] cp deploy/scullion.nginx /etc/nginx/sites-available/scullion
-- [ ] ln -s /etc/nginx/sites-available/scullion /etc/nginx/sites-enabled/scullion
-- [ ] certbot --nginx -d scullion.example.com  # obtain TLS cert
+- [ ] useradd -r -s /sbin/nologin tore
+- [ ] mkdir -p /var/lib/tore /etc/tore /opt/tore
+- [ ] cp deploy/env /etc/tore/env  # then fill in values
+- [ ] chmod 600 /etc/tore/env && chown tore:tore /etc/tore/env
+- [ ] cp deploy/tore.nginx /etc/nginx/sites-available/tore
+- [ ] ln -s /etc/nginx/sites-available/tore /etc/nginx/sites-enabled/tore
+- [ ] certbot --nginx -d tore.example.com  # obtain TLS cert
 - [ ] nginx -t && systemctl reload nginx
-- [ ] cp deploy/scullion.service /etc/systemd/system/
-- [ ] systemctl daemon-reload && systemctl enable scullion
+- [ ] cp deploy/tore.service /etc/systemd/system/
+- [ ] systemctl daemon-reload && systemctl enable tore
 
 # Subsequent deploys:
 

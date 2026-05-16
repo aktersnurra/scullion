@@ -11,7 +11,14 @@ defmodule Tore.Handlers.CostsHandlerTest do
   end
 
   test "parse_and_log_receipt/2 calls LLM and persists receipt", %{user_id: user_id} do
-    line_items = [%{product_name: "Bröd", quantity: Decimal.new(1), unit_price: Decimal.new("25.00"), total_price: Decimal.new("25.00")}]
+    line_items = [
+      %{
+        product_name: "Bröd",
+        quantity: Decimal.new(1),
+        unit_price: Decimal.new("25.00"),
+        total_price: Decimal.new("25.00")
+      }
+    ]
 
     Tore.MockLLM
     |> expect(:parse_receipt_image, fn _binary -> {:ok, line_items, %{}} end)
@@ -25,11 +32,18 @@ defmodule Tore.Handlers.CostsHandlerTest do
     Tore.MockLLM
     |> expect(:parse_receipt_image, fn _binary -> {:error, :rate_limited} end)
 
-    assert {:error, :rate_limited} = Tore.Handlers.CostsHandler.parse_and_log_receipt(<<1>>, user_id)
+    assert {:error, :rate_limited} =
+             Tore.Handlers.CostsHandler.parse_and_log_receipt(<<1>>, user_id)
   end
 
   test "log_dining_out/2 delegates to Costs context", %{user_id: user_id} do
-    attrs = %{date: Date.utc_today(), description: "Sushi", total_amount: Decimal.new("400.00"), num_people: 2}
+    attrs = %{
+      date: Date.utc_today(),
+      description: "Sushi",
+      total_amount: Decimal.new("400.00"),
+      num_people: 2
+    }
+
     assert {:ok, entry} = Tore.Handlers.CostsHandler.log_dining_out(attrs, user_id)
     assert entry.description == "Sushi"
   end

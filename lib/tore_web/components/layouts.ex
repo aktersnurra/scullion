@@ -31,7 +31,13 @@ defmodule ToreWeb.Layouts do
     ~H"""
     <header class="sticky top-0 z-40 hidden md:flex h-[var(--nav-height)] items-center justify-center bg-[var(--bg)]/80 backdrop-blur border-b border-[color:var(--border)]">
       <nav class="flex items-center gap-1">
-        <.nav_link :for={{path, label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} label={label} />
+        <.nav_link
+          :for={{path, label, icon} <- @nav_items}
+          path={path}
+          current={@current_path}
+          icon={icon}
+          label={label}
+        />
       </nav>
     </header>
 
@@ -40,7 +46,12 @@ defmodule ToreWeb.Layouts do
     </main>
 
     <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-9 bg-[var(--surface)] border-t border-[color:var(--border)]">
-      <.bottom_link :for={{path, _label, icon} <- @nav_items} path={path} current={@current_path} icon={icon} />
+      <.bottom_link
+        :for={{path, _label, icon} <- @nav_items}
+        path={path}
+        current={@current_path}
+        icon={icon}
+      />
     </nav>
 
     <.flash_group flash={@flash} />

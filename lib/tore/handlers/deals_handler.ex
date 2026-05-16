@@ -69,7 +69,11 @@ defmodule Tore.Handlers.DealsHandler do
         Logger.info("scraped #{count} deals", store: store_config.name, url: store_config.url)
 
       {:error, reason} ->
-        Logger.error("scrape failed", store: store_config.name, url: store_config.url, reason: inspect(reason))
+        Logger.error("scrape failed",
+          store: store_config.name,
+          url: store_config.url,
+          reason: inspect(reason)
+        )
     end
   end
 

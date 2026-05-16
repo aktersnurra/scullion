@@ -3,12 +3,12 @@ defmodule Tore.Handlers.PrepHandler do
 
   @llm Application.compile_env(:tore, :llm_client)
 
-  def generate_guide(plan_id, week_start) do
+  def generate_guide(plan_id, week_start, locale \\ nil) do
     with :ok <- SpendGuard.allow?(:generate_prep_guide),
          {:ok, plan_state} <- PlanningHandler.load_plan(plan_id) do
       plan_for_prompt = build_plan_for_prompt(plan_state, week_start)
 
-      with {:ok, guide_data, usage} <- @llm.generate_prep_guide(plan_for_prompt),
+      with {:ok, guide_data, usage} <- @llm.generate_prep_guide(plan_for_prompt, locale),
            :ok <- SpendGuard.log_usage(:generate_prep_guide, usage) do
         attrs = Map.put(guide_data, "week_start", week_start)
         Prep.save_guide(attrs)

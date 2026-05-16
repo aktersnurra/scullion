@@ -52,6 +52,7 @@ defmodule Tore.Household do
 
   defp cuisine_line(nil), do: nil
   defp cuisine_line(map) when map == %{}, do: nil
+
   defp cuisine_line(map) do
     more = map |> Enum.filter(fn {_, v} -> v == "more" end) |> Enum.map(&elem(&1, 0))
     less = map |> Enum.filter(fn {_, v} -> v == "less" end) |> Enum.map(&elem(&1, 0))

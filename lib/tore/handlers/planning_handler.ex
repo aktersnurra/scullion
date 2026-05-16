@@ -21,7 +21,8 @@ defmodule Tore.Handlers.PlanningHandler do
       with {:ok, llm_result, usage} <- @llm.generate_plan(context),
            :ok <- SpendGuard.log_usage(:generate_plan, usage),
            {:ok, slots} <- parse_llm_slots(llm_result),
-           {:ok, events} <- Decider.decide(%Commands.GeneratePlan{week_start: week_start, slots: slots}, state),
+           {:ok, events} <-
+             Decider.decide(%Commands.GeneratePlan{week_start: week_start, slots: slots}, state),
            :ok <- EventStore.append(plan_id, events) do
         PubSub.broadcast(@pubsub, @topic, {:events, events})
         {:ok, events}
@@ -30,7 +31,11 @@ defmodule Tore.Handlers.PlanningHandler do
   end
 
   def assign_recipe(plan_id, slot_key, recipe_id, servings) do
-    run(plan_id, %Commands.AssignRecipe{slot_key: slot_key, recipe_id: recipe_id, servings: servings})
+    run(plan_id, %Commands.AssignRecipe{
+      slot_key: slot_key,
+      recipe_id: recipe_id,
+      servings: servings
+    })
   end
 
   @doc """
@@ -158,9 +163,21 @@ defmodule Tore.Handlers.PlanningHandler do
         |> Enum.take(limit)
 
       if include_llm do
-        case llm_extra_suggestion(state, slot_key, recipes, ranked, pantry_names, deals_names, recent_ids, dietary_guidance) do
-          {:ok, extra} -> {:ok, [extra | ranked] |> Enum.uniq_by(& &1.recipe.id) |> Enum.take(limit + 1)}
-          {:error, _} -> {:ok, ranked}
+        case llm_extra_suggestion(
+               state,
+               slot_key,
+               recipes,
+               ranked,
+               pantry_names,
+               deals_names,
+               recent_ids,
+               dietary_guidance
+             ) do
+          {:ok, extra} ->
+            {:ok, [extra | ranked] |> Enum.uniq_by(& &1.recipe.id) |> Enum.take(limit + 1)}
+
+          {:error, _} ->
+            {:ok, ranked}
         end
       else
         {:ok, ranked}
@@ -303,7 +320,16 @@ defmodule Tore.Handlers.PlanningHandler do
     |> MapSet.new()
   end
 
-  defp llm_extra_suggestion(state, slot_key, recipes, ranked, pantry, deals, recent_ids, dietary_guidance) do
+  defp llm_extra_suggestion(
+         state,
+         slot_key,
+         recipes,
+         ranked,
+         pantry,
+         deals,
+         recent_ids,
+         dietary_guidance
+       ) do
     excluded_ids = Enum.map(ranked, & &1.recipe.id)
     candidate_ids = Enum.map(recipes, & &1.id)
 
@@ -352,6 +378,7 @@ defmodule Tore.Handlers.PlanningHandler do
   defp build_plan_context(state, week_start, mode, dietary_guidance) do
     recipes =
       Recipes.list(sort: :alphabetical)
+      |> Tore.Repo.preload(recipe_ingredients: :ingredient)
       |> Enum.map(fn r ->
         %{
           id: r.id,
@@ -373,9 +400,10 @@ defmodule Tore.Handlers.PlanningHandler do
       slot_keys: slot_keys,
       pins: state.pins,
       pantry: [],
-      deals: Enum.map(Deals.list_current(), fn d ->
-        "#{d.product_name}#{if d.price, do: " #{d.price}kr", else: ""}"
-      end),
+      deals:
+        Enum.map(Deals.list_current(), fn d ->
+          "#{d.product_name}#{if d.price, do: " #{d.price}kr", else: ""}"
+        end),
       recent_recipes: [],
       week_start: week_start,
       mode: mode,

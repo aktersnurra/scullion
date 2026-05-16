@@ -66,13 +66,22 @@ config :tore, ToreWeb.Endpoint,
     ]
   ]
 
+config :tore, :uploads_dir, Path.expand("../priv/static/uploads", __DIR__)
+
 config :tore, :http_client, Tore.Adapters.ReqHTTP
 config :tore, :llm_client, Tore.Adapters.OpenRouter
 config :tore, :image_gen_client, Tore.Adapters.OpenRouter
 config :tore, :openrouter_api_key, System.get_env("OPENROUTER_API_KEY", "dev-key")
 config :tore, :openrouter_model, System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
-config :tore, :openrouter_vision_model, System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
-config :tore, :openrouter_image_model, System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
+
+config :tore,
+       :openrouter_vision_model,
+       System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash-lite")
+
+config :tore,
+       :openrouter_image_model,
+       System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
+
 
 # Enable dev routes for dashboard and mailbox
 config :tore, dev_routes: true

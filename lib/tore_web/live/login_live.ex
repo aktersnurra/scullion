@@ -68,7 +68,12 @@ defmodule ToreWeb.LoginLive do
           {:error, :invalid_code} ->
             RateLimiter.record_failure(ip)
             locked = rate_limit_state(ip)
-            error = if locked, do: gettext("Too many attempts. Try again later."), else: gettext("Invalid code")
+
+            error =
+              if locked,
+                do: gettext("Too many attempts. Try again later."),
+                else: gettext("Invalid code")
+
             {:noreply, assign(socket, error: error, digits: [], locked: locked)}
         end
     end
@@ -76,6 +81,7 @@ defmodule ToreWeb.LoginLive do
 
   attr :value, :string, required: true
   attr :locked, :boolean, required: true
+
   defp numpad_button(assigns) do
     ~H"""
     <button
@@ -94,18 +100,27 @@ defmodule ToreWeb.LoginLive do
     assigns = assign(assigns, slots: digit_slots(assigns.digits))
 
     ~H"""
-    <div class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8" phx-window-keydown="keydown">
+    <div
+      class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8"
+      phx-window-keydown="keydown"
+    >
       <div class="w-full max-w-sm">
         <div class="flex items-center justify-center mb-6">
           <img src="/images/logo.svg" alt="Tore" class="h-24 w-auto" />
         </div>
 
-        <h1 class="text-center font-semibold text-[var(--text)] mb-5" style="font-size: var(--t-h1); line-height: 1.2;">
+        <h1
+          class="text-center font-semibold text-[var(--text)] mb-5"
+          style="font-size: var(--t-h1); line-height: 1.2;"
+        >
           {gettext("Enter your 16-digit code")}
         </h1>
 
         <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] py-3 px-4 mb-5 shadow-[0_1px_2px_rgba(17,24,39,0.04)] w-full overflow-hidden">
-          <div class="flex items-center justify-between font-mono tabular-nums w-full" style="font-size: 16px;">
+          <div
+            class="flex items-center justify-between font-mono tabular-nums w-full"
+            style="font-size: 16px;"
+          >
             <div :for={{group, gi} <- Enum.with_index(@slots)} class="flex gap-1">
               <span
                 :for={{d, di} <- Enum.with_index(group)}
@@ -127,7 +142,11 @@ defmodule ToreWeb.LoginLive do
           </div>
         </div>
 
-        <p :if={@error} class="text-[color:var(--danger)] text-center mb-3 bg-red-50 rounded-[var(--r-lg)] py-2 px-3" style="font-size: var(--t-meta);">
+        <p
+          :if={@error}
+          class="text-[color:var(--danger)] text-center mb-3 bg-red-50 rounded-[var(--r-lg)] py-2 px-3"
+          style="font-size: var(--t-meta);"
+        >
           {@error}
         </p>
 
@@ -164,7 +183,13 @@ defmodule ToreWeb.LoginLive do
         </div>
 
         <div class="mt-6 text-center">
-          <a href="#" class="text-[color:var(--accent)] hover:underline" style="font-size: var(--t-meta);">{gettext("Need help?")}</a>
+          <a
+            href="#"
+            class="text-[color:var(--accent)] hover:underline"
+            style="font-size: var(--t-meta);"
+          >
+            {gettext("Need help?")}
+          </a>
         </div>
       </div>
     </div>

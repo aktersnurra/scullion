@@ -2,6 +2,7 @@ defmodule Tore.Handlers.GroceriesHandler do
   alias Tore.{EventStore, Groceries.Decider, Groceries.Commands, Groceries.Aggregator, Pantry}
   alias Phoenix.PubSub
 
+  @llm Application.compile_env(:tore, :llm_client)
   @pubsub Tore.PubSub
   @topic "grocery_list"
 
@@ -10,16 +11,36 @@ defmodule Tore.Handlers.GroceriesHandler do
   end
 
   def build_list(list_id, week_start, recipe_ids) do
-    items = Aggregator.aggregate_by_ids(recipe_ids)
+    all_items = Aggregator.aggregate_by_ids(recipe_ids)
+    pantry = Pantry.list_inventory()
+
+    items =
+      if pantry == [] do
+        all_items
+      else
+        case @llm.filter_pantry_items(all_items, pantry) do
+          {:ok, filtered} -> filtered
+          _ -> all_items
+        end
+      end
+
+    EventStore.reset(list_id)
     run(list_id, %Commands.BuildList{week_start: week_start, items: items})
   end
 
   def add_item(list_id, name, quantity, unit, user_id) do
+    section =
+      case @llm.classify_grocery_item(name) do
+        {:ok, s} -> s
+        _ -> :other
+      end
+
     run(list_id, %Commands.AddItem{
       item_id: Ecto.UUID.generate(),
       name: name,
       quantity: quantity,
       unit: unit,
+      section: section,
       added_by: user_id
     })
   end
@@ -30,7 +51,8 @@ defmodule Tore.Handlers.GroceriesHandler do
 
   def check_item(list_id, item_id, user_id) do
     with {:ok, state} <- EventStore.load(list_id, Decider),
-         {:ok, events} <- Decider.decide(%Commands.CheckItem{item_id: item_id, checked_by: user_id}, state),
+         {:ok, events} <-
+           Decider.decide(%Commands.CheckItem{item_id: item_id, checked_by: user_id}, state),
          :ok <- EventStore.append(list_id, events) do
       PubSub.broadcast(@pubsub, @topic, {:events, events})
       item = Map.get(state.items, item_id)

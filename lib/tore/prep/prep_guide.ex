@@ -15,8 +15,15 @@ defmodule Tore.Prep.PrepGuide do
 
   def changeset(guide, attrs) do
     guide
-    |> cast(attrs, [:week_start, :instructions, :timeline, :cascade_map,
-                    :storage_notes, :daily_assembly, :prep_session])
+    |> cast(attrs, [
+      :week_start,
+      :instructions,
+      :timeline,
+      :cascade_map,
+      :storage_notes,
+      :daily_assembly,
+      :prep_session
+    ])
     |> validate_required([:week_start])
   end
 end

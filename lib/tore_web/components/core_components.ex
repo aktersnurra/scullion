@@ -64,8 +64,16 @@ defmodule ToreWeb.CoreComponents do
         @kind == :info && "bg-[var(--surface)] border-[color:var(--hairline)] text-[var(--text)]",
         @kind == :error && "bg-red-50 border-red-200 text-red-800"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0 mt-0.5 text-[color:var(--accent)]" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0 mt-0.5 text-red-500" />
+        <.icon
+          :if={@kind == :info}
+          name="hero-information-circle"
+          class="size-5 shrink-0 mt-0.5 text-[color:var(--accent)]"
+        />
+        <.icon
+          :if={@kind == :error}
+          name="hero-exclamation-circle"
+          class="size-5 shrink-0 mt-0.5 text-red-500"
+        />
         <div class="flex-1 min-w-0" style="font-size: var(--t-meta);">
           <p :if={@title} class="font-semibold mb-0.5">{@title}</p>
           <p>{msg}</p>
@@ -500,7 +508,10 @@ defmodule ToreWeb.CoreComponents do
       !@centered && "justify-between"
     ]}>
       <div>
-        <h1 class="font-semibold tracking-tight text-[var(--text)]" style="font-size: var(--t-h1); line-height: 1.2;">
+        <h1
+          class="font-semibold tracking-tight text-[var(--text)]"
+          style="font-size: var(--t-h1); line-height: 1.2;"
+        >
           {@title}
         </h1>
         <p :if={@subtitle} class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
@@ -586,7 +597,8 @@ defmodule ToreWeb.CoreComponents do
     <div
       class={[
         "flex items-center gap-3 px-4 min-h-[var(--tap-min)] py-3 border-b border-[color:var(--hairline)] last:border-b-0",
-        @clickable && "cursor-pointer hover:bg-[color:var(--accent-soft)]/40 -mx-4 rounded-[var(--r-md)]"
+        @clickable &&
+          "cursor-pointer hover:bg-[color:var(--accent-soft)]/40 -mx-4 rounded-[var(--r-md)]"
       ]}
       {@rest}
     >
@@ -609,7 +621,10 @@ defmodule ToreWeb.CoreComponents do
   attr :size, :atom, values: [:md, :lg, :xl], default: :md
   attr :type, :string, default: "button"
   attr :full, :boolean, default: false
-  attr :rest, :global, include: ~w(phx-click phx-value-id href disabled form name value phx-disable-with)
+
+  attr :rest, :global,
+    include: ~w(phx-click phx-value-id href disabled form name value phx-disable-with)
+
   slot :inner_block, required: true
 
   def button(assigns) do
@@ -634,10 +649,12 @@ defmodule ToreWeb.CoreComponents do
   defp button_size_class(:xl), do: "h-14 px-7 text-[length:var(--t-h2)]"
 
   defp button_variant_class(:primary),
-    do: "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] shadow-[0_1px_2px_rgba(17,24,39,0.06)]"
+    do:
+      "bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)] shadow-[0_1px_2px_rgba(17,24,39,0.06)]"
 
   defp button_variant_class(:secondary),
-    do: "bg-[var(--surface)] text-[var(--text)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]"
+    do:
+      "bg-[var(--surface)] text-[var(--text)] border border-[color:var(--border)] hover:border-[color:var(--subtle)]"
 
   defp button_variant_class(:ghost),
     do: "bg-transparent text-[color:var(--muted)] hover:text-[var(--text)]"
@@ -707,7 +724,11 @@ defmodule ToreWeb.CoreComponents do
         style="font-size: var(--t-body);"
         {@rest}
       />
-      <p :for={err <- @errors} class="mt-1 text-[color:var(--danger)]" style="font-size: var(--t-meta);">
+      <p
+        :for={err <- @errors}
+        class="mt-1 text-[color:var(--danger)]"
+        style="font-size: var(--t-meta);"
+      >
         {err}
       </p>
     </label>
@@ -765,7 +786,10 @@ defmodule ToreWeb.CoreComponents do
   end
 
   defp chip_tone_class(:neutral), do: "bg-[color:var(--hairline)] text-[var(--text)]"
-  defp chip_tone_class(:accent), do: "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]"
+
+  defp chip_tone_class(:accent),
+    do: "bg-[color:var(--accent-soft)] text-[color:var(--accent-ink)]"
+
   defp chip_tone_class(:warn), do: "bg-[color:var(--warn-soft)] text-[#9a4a13]"
   defp chip_tone_class(:muted), do: "bg-transparent text-[color:var(--muted)]"
 
@@ -791,7 +815,8 @@ defmodule ToreWeb.CoreComponents do
         class={[
           "h-11 px-4 -mb-px border-b-2 transition-colors",
           item.id == @active && "text-[var(--text)] border-[color:var(--accent)]",
-          item.id != @active && "text-[color:var(--muted)] border-transparent hover:text-[var(--text)]"
+          item.id != @active &&
+            "text-[color:var(--muted)] border-transparent hover:text-[var(--text)]"
         ]}
         style="font-size: var(--t-body); font-weight: 500;"
       >
@@ -828,14 +853,21 @@ defmodule ToreWeb.CoreComponents do
           alt=""
           class="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <div :if={!@image} class="h-full w-full flex items-center justify-center text-[color:var(--subtle)]">
+        <div
+          :if={!@image}
+          class="h-full w-full flex items-center justify-center text-[color:var(--subtle)]"
+        >
           <.icon name="hero-photo" class="size-8" />
         </div>
         <div :if={@overlay != []} class="absolute inset-0">{render_slot(@overlay)}</div>
       </div>
       <div class="mt-3">
         <p class="font-semibold text-[var(--text)]" style="font-size: var(--t-body);">{@title}</p>
-        <div :if={@meta != []} class="mt-1 flex items-center gap-3 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+        <div
+          :if={@meta != []}
+          class="mt-1 flex items-center gap-3 text-[color:var(--muted)]"
+          style="font-size: var(--t-meta);"
+        >
           {render_slot(@meta)}
         </div>
       </div>

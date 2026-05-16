@@ -4,8 +4,6 @@ defmodule Tore.Handlers.RecipeHandler do
   @llm Application.compile_env(:tore, :llm_client)
   @image_gen Application.compile_env(:tore, :image_gen_client)
 
-  @uploads_dir Path.join([:code.priv_dir(:tore), "static", "uploads", "recipes"])
-
   @spec scrape_and_create(String.t(), String.t() | nil) ::
           {:ok, Tore.Recipes.Recipe.t()} | {:error, term()}
   def scrape_and_create(url, locale \\ nil) do
@@ -17,10 +15,11 @@ defmodule Tore.Handlers.RecipeHandler do
 
   @spec generate_image(Tore.Recipes.Recipe.t(), String.t() | nil) :: :ok | {:error, term()}
   def generate_image(recipe, image_url) do
-    File.mkdir_p!(@uploads_dir)
+    uploads_dir = Path.join(Application.fetch_env!(:tore, :uploads_dir), "recipes")
+    File.mkdir_p!(uploads_dir)
 
     with {:ok, binary} <- fetch_or_generate(recipe, image_url),
-         path = image_path(recipe.id),
+         path = Path.join(uploads_dir, "#{recipe.id}.jpg"),
          :ok <- File.write(path, binary) do
       Tore.Repo.update_all(
         from(r in Tore.Recipes.Recipe, where: r.id == ^recipe.id),
@@ -46,6 +45,4 @@ defmodule Tore.Handlers.RecipeHandler do
   defp fetch_or_generate(recipe, _image_url) do
     @image_gen.generate_food_image(recipe.title, recipe.instructions)
   end
-
-  defp image_path(id), do: Path.join(@uploads_dir, "#{id}.jpg")
 end

@@ -62,7 +62,14 @@ defmodule ToreWeb.GroceryLive do
       unit = Map.get(params, "unit", "")
       quantity = if qty == "", do: nil, else: parse_qty(qty)
       unit = if unit == "", do: nil, else: unit
-      GroceriesHandler.add_item(socket.assigns.list_id, name, quantity, unit, socket.assigns.user_id)
+
+      GroceriesHandler.add_item(
+        socket.assigns.list_id,
+        name,
+        quantity,
+        unit,
+        socket.assigns.user_id
+      )
     end
 
     {:noreply, socket}
@@ -76,101 +83,123 @@ defmodule ToreWeb.GroceryLive do
   def render(assigns) do
     items = sorted_items(assigns.grocery_state.items)
     {unchecked, checked} = Enum.split_with(items, &(!&1.checked))
-    assigns = assign(assigns, unchecked: unchecked, checked: checked, total: length(items), unchecked_count: length(unchecked))
+    groups = group_by_section(unchecked)
+
+    assigns =
+      assign(assigns,
+        groups: groups,
+        checked: checked,
+        total: length(items),
+        unchecked_count: length(unchecked)
+      )
 
     ~H"""
     <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/groceries"}>
-    <.page max_width={:md}>
-      <.card padded={false}>
-        <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
-          <div>
-            <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Groceries")}</h1>
-            <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
-              {gettext("%{n} unchecked · Week %{week}", n: @unchecked_count, week: @week_number)}
-            </p>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+      <.page max_width={:md}>
+        <.card padded={false}>
+          <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
+            <div>
+              <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">
+                {gettext("Groceries")}
+              </h1>
+              <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                {gettext("%{n} unchecked · Week %{week}", n: @unchecked_count, week: @week_number)}
+              </p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                phx-click="export_list"
+                aria-label={gettext("More")}
+                class="size-9 inline-flex items-center justify-center rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+              >
+                <.icon name="hero-ellipsis-horizontal" class="size-4" />
+              </button>
+            </div>
+          </header>
+
+          <div
+            :if={@export_text}
+            class="mx-6 mb-4 border border-[color:var(--border)] rounded-[var(--r-lg)] p-3"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <span
+                class="text-[color:var(--muted)]"
+                style="font-size: var(--t-meta); font-weight: 500;"
+              >
+                {gettext("Export")}
+              </span>
+              <.icon_button icon="hero-x-mark" label="Close" phx-click="clear_export" />
+            </div>
+            <textarea
+              readonly
+              class="w-full bg-transparent text-[var(--text)] font-mono resize-none focus:outline-none"
               style="font-size: var(--t-meta);"
-            >
-              <.icon name="hero-funnel" class="size-4" /> {gettext("Group by category")}
-              <.icon name="hero-chevron-down" class="size-3.5" />
-            </button>
-            <button
-              type="button"
-              phx-click="export_list"
-              aria-label={gettext("More")}
-              class="size-9 inline-flex items-center justify-center rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
-            >
-              <.icon name="hero-ellipsis-horizontal" class="size-4" />
-            </button>
+              rows="6"
+            ><%= @export_text %></textarea>
           </div>
-        </header>
 
-        <div :if={@export_text} class="mx-6 mb-4 border border-[color:var(--border)] rounded-[var(--r-lg)] p-3">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[color:var(--muted)]" style="font-size: var(--t-meta); font-weight: 500;">
-              {gettext("Export")}
-            </span>
-            <.icon_button icon="hero-x-mark" label="Close" phx-click="clear_export" />
-          </div>
-          <textarea
-            readonly
-            class="w-full bg-transparent text-[var(--text)] font-mono resize-none focus:outline-none"
-            style="font-size: var(--t-meta);"
-            rows="6"
-          ><%= @export_text %></textarea>
-        </div>
+          <div class="px-6 pb-3">
+            <%= if @total == 0 do %>
+              <.empty message={gettext("No items yet")} />
+            <% else %>
+              <%= for {section, section_items} <- @groups do %>
+                <h2
+                  class="uppercase tracking-wider text-[color:var(--subtle)] mt-5 mb-1 first:mt-0"
+                  style="font-size: var(--t-micro); font-weight: 600;"
+                >
+                  {section_label(section)}
+                </h2>
+                <ul class="divide-y divide-[color:var(--hairline)]">
+                  <.grocery_row :for={item <- section_items} item={item} />
+                </ul>
+              <% end %>
 
-        <div class="px-6 pb-3">
-          <%= if @total == 0 do %>
-            <.empty message={gettext("No items yet")} />
-          <% else %>
-            <ul class="divide-y divide-[color:var(--hairline)]">
-              <.grocery_row :for={item <- @unchecked} item={item} />
-            </ul>
-
-            <%= if @checked != [] do %>
-              <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mt-6 mb-1" style="font-size: var(--t-micro); font-weight: 600;">
-                {gettext("Done · %{n}", n: length(@checked))}
-              </h2>
-              <ul class="divide-y divide-[color:var(--hairline)]">
-                <.grocery_row :for={item <- @checked} item={item} />
-              </ul>
+              <%= if @checked != [] do %>
+                <h2
+                  class="uppercase tracking-wider text-[color:var(--subtle)] mt-6 mb-1"
+                  style="font-size: var(--t-micro); font-weight: 600;"
+                >
+                  {gettext("Done · %{n}", n: length(@checked))}
+                </h2>
+                <ul class="divide-y divide-[color:var(--hairline)]">
+                  <.grocery_row :for={item <- @checked} item={item} />
+                </ul>
+              <% end %>
             <% end %>
-          <% end %>
 
-          <form phx-submit="add_item" class="mt-2 pt-3 border-t border-[color:var(--hairline)] flex items-center gap-3">
-            <.icon name="hero-plus" class="size-5 text-[color:var(--accent)] shrink-0" />
-            <input
-              type="text"
-              name="name"
-              placeholder={gettext("Add item…")}
-              required
-              class="flex-1 h-10 bg-transparent border-0 text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none"
-              style="font-size: var(--t-body);"
-            />
-            <input
-              type="text"
-              name="quantity"
-              placeholder={gettext("Qty")}
-              inputmode="decimal"
-              class="w-16 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] tabular-nums text-right focus:outline-none"
-              style="font-size: var(--t-meta);"
-            />
-            <input
-              type="text"
-              name="unit"
-              placeholder={gettext("Unit")}
-              class="w-12 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] focus:outline-none"
-              style="font-size: var(--t-meta);"
-            />
-          </form>
-        </div>
-      </.card>
-    </.page>
+            <form
+              phx-submit="add_item"
+              class="mt-2 pt-3 border-t border-[color:var(--hairline)] flex items-center gap-3"
+            >
+              <.icon name="hero-plus" class="size-5 text-[color:var(--accent)] shrink-0" />
+              <input
+                type="text"
+                name="name"
+                placeholder={gettext("Add item…")}
+                required
+                class="flex-1 h-10 bg-transparent border-0 text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none"
+                style="font-size: var(--t-body);"
+              />
+              <input
+                type="text"
+                name="quantity"
+                placeholder={gettext("Qty")}
+                inputmode="decimal"
+                class="w-16 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] tabular-nums text-right focus:outline-none"
+                style="font-size: var(--t-meta);"
+              />
+              <input
+                type="text"
+                name="unit"
+                placeholder={gettext("Unit")}
+                class="w-12 h-10 bg-transparent border-0 text-[color:var(--muted)] placeholder:text-[color:var(--subtle)] focus:outline-none"
+                style="font-size: var(--t-meta);"
+              />
+            </form>
+          </div>
+        </.card>
+      </.page>
     </Layouts.app>
     """
   end
@@ -223,8 +252,35 @@ defmodule ToreWeb.GroceryLive do
   defp sorted_items(items) do
     items
     |> Map.values()
-    |> Enum.sort_by(fn i -> {i.checked, String.downcase(i.name)} end)
+    |> Enum.sort_by(fn i -> {i.checked, String.downcase(i.name || "")} end)
   end
+
+  @section_order ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)a
+
+  defp group_by_section(items) do
+    grouped = Enum.group_by(items, &(Map.get(&1, :section) || :other))
+
+    @section_order
+    |> Enum.filter(&Map.has_key?(grouped, &1))
+    |> Enum.map(fn section ->
+      {section, Enum.sort_by(grouped[section], &String.downcase(&1.name))}
+    end)
+  end
+
+  defp section_label(:produce), do: gettext("Produce")
+  defp section_label(:meat), do: gettext("Meat")
+  defp section_label(:fish), do: gettext("Fish & Seafood")
+  defp section_label(:dairy), do: gettext("Dairy & Eggs")
+  defp section_label(:deli), do: gettext("Deli")
+  defp section_label(:frozen), do: gettext("Frozen")
+  defp section_label(:bread), do: gettext("Bread")
+  defp section_label(:canned), do: gettext("Canned Goods")
+  defp section_label(:beverages), do: gettext("Beverages")
+  defp section_label(:herbs_spices), do: gettext("Herbs & Spices")
+  defp section_label(:condiments), do: gettext("Condiments & Oils")
+  defp section_label(:household), do: gettext("Household")
+  defp section_label(:dry_goods), do: gettext("Dry Goods")
+  defp section_label(:other), do: gettext("Other")
 
   defp qty_label(%{quantity: nil, unit: nil}), do: ""
   defp qty_label(%{quantity: nil, unit: unit}), do: unit
@@ -232,7 +288,9 @@ defmodule ToreWeb.GroceryLive do
   defp qty_label(%{quantity: qty, unit: unit}), do: "#{format_decimal(qty)} #{unit}"
 
   defp format_decimal(%Decimal{} = d) do
-    if Decimal.integer?(d), do: Decimal.to_string(Decimal.normalize(d)), else: Decimal.to_string(d)
+    if Decimal.integer?(d),
+      do: Decimal.to_string(Decimal.normalize(d)),
+      else: Decimal.to_string(d)
   end
 
   defp format_decimal(other), do: to_string(other)

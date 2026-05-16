@@ -67,6 +67,7 @@ defmodule Tore.Planning.Decider do
           skipped: v[:skipped] || v["skipped"] || false,
           leftover: v[:leftover] || v["leftover"] || false
         }
+
         {to_string(k), slot}
       end)
 

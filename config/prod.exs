@@ -26,5 +26,8 @@ config :tore, :image_gen_client, Tore.Adapters.OpenRouter
 # Do not print debug messages in production
 config :logger, level: :info
 
+# Initialize plugs at runtime so runtime.exs values (e.g. UPLOADS_DIR) are available
+config :phoenix, :plug_init_mode, :runtime
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

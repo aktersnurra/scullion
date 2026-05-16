@@ -19,14 +19,21 @@ defmodule Tore.Handlers.PrepHandlerTest do
 
   test "generate_guide calls LLM and persists prep guide" do
     Tore.MockLLM
-    |> expect(:generate_prep_guide, fn _plan ->
+    |> expect(:generate_prep_guide, fn _plan, _locale ->
       {:ok,
        %{
-         "timeline" => [%{"step" => 1, "task" => "Preheat oven", "duration_min" => 5, "component" => nil}],
+         "timeline" => [
+           %{"step" => 1, "task" => "Preheat oven", "duration_min" => 5, "component" => nil}
+         ],
          "cascade_map" => %{"mon_dinner" => "Roast Chicken"},
          "storage_notes" => "Chicken: 3 days",
          "daily_assembly" => %{"mon_dinner" => "Plate and serve"},
-         "prep_session" => %{"proteins" => ["chicken"], "bases" => [], "sauces" => [], "vegetables" => []}
+         "prep_session" => %{
+           "proteins" => ["chicken"],
+           "bases" => [],
+           "sauces" => [],
+           "vegetables" => []
+         }
        }, mock_usage()}
     end)
 
@@ -37,7 +44,7 @@ defmodule Tore.Handlers.PrepHandlerTest do
   end
 
   test "generate_guide returns error when LLM fails" do
-    Tore.MockLLM |> expect(:generate_prep_guide, fn _ -> {:error, :timeout} end)
+    Tore.MockLLM |> expect(:generate_prep_guide, fn _, _ -> {:error, :timeout} end)
     assert {:error, :timeout} = PrepHandler.generate_guide(plan_id(), week_start())
   end
 

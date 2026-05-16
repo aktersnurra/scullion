@@ -37,7 +37,10 @@ defmodule Tore.Deals.Parsers.ICA do
     # fall back to composing from parsed mechanics
     mechanic_label =
       nilify(details["mechanicInfo"]) ||
-        nilify("#{mechanics["value1"]} #{mechanics["value2"]} kr#{mechanics["value4"]}" |> String.trim())
+        nilify(
+          "#{mechanics["value1"]} #{mechanics["value2"]} kr#{mechanics["value4"]}"
+          |> String.trim()
+        )
 
     # Regular price comes from the store entry, e.g. "52,89-57,83" or "267"
     regular_price = nilify(store["regularPrice"])

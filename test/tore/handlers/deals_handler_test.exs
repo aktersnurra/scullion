@@ -14,7 +14,8 @@ defmodule Tore.Handlers.DealsHandlerTest do
     Tore.MockHTTP
     |> expect(:fetch, fn _url -> {:ok, @ica_html} end)
 
-    assert {:ok, 1} = Tore.Handlers.DealsHandler.scrape_url("https://ica.se/erbjudanden/test-123/", :ica)
+    assert {:ok, 1} =
+             Tore.Handlers.DealsHandler.scrape_url("https://ica.se/erbjudanden/test-123/", :ica)
 
     deals = Tore.Deals.list_current()
     assert Enum.any?(deals, &(&1.product_name == "Kycklingfilé"))

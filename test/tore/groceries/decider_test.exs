@@ -17,6 +17,7 @@ defmodule Tore.Groceries.DeciderTest do
     test "emits ListBuilt with items" do
       items = [item("a"), item("b")]
       cmd = %Commands.BuildList{week_start: ~D[2026-04-27], items: items}
+
       assert {:ok, [%Events.ListBuilt{week_start: ~D[2026-04-27], items: ^items}]} =
                Decider.decide(cmd, Decider.initial())
     end
@@ -25,6 +26,7 @@ defmodule Tore.Groceries.DeciderTest do
   describe "decide/2 — AddItem" do
     test "emits ItemAdded" do
       cmd = %Commands.AddItem{item_id: "x", name: "Eggs", quantity: nil, unit: nil, added_by: 1}
+
       assert {:ok, [%Events.ItemAdded{item_id: "x", name: "Eggs"}]} =
                Decider.decide(cmd, Decider.initial())
     end
@@ -38,6 +40,7 @@ defmodule Tore.Groceries.DeciderTest do
 
     test "emits ItemRemoved when present" do
       cmd = %Commands.RemoveItem{item_id: "item-1", removed_by: 1}
+
       assert {:ok, [%Events.ItemRemoved{item_id: "item-1"}]} =
                Decider.decide(cmd, state_with_item())
     end
@@ -51,6 +54,7 @@ defmodule Tore.Groceries.DeciderTest do
 
     test "emits ItemChecked when present" do
       cmd = %Commands.CheckItem{item_id: "item-1", checked_by: 1}
+
       assert {:ok, [%Events.ItemChecked{item_id: "item-1"}]} =
                Decider.decide(cmd, state_with_item())
     end
@@ -64,6 +68,7 @@ defmodule Tore.Groceries.DeciderTest do
 
     test "emits ItemUnchecked when present" do
       cmd = %Commands.UncheckItem{item_id: "item-1", unchecked_by: 1}
+
       assert {:ok, [%Events.ItemUnchecked{item_id: "item-1"}]} =
                Decider.decide(cmd, state_with_item())
     end
@@ -80,9 +85,23 @@ defmodule Tore.Groceries.DeciderTest do
     end
 
     test "ItemAdded adds item with checked: false" do
-      event = %Events.ItemAdded{item_id: "z", name: "Butter", quantity: nil, unit: "g", added_by: 1}
+      event = %Events.ItemAdded{
+        item_id: "z",
+        name: "Butter",
+        quantity: nil,
+        unit: "g",
+        added_by: 1
+      }
+
       state = Decider.evolve(Decider.initial(), event)
-      assert state.items["z"] == %{id: "z", name: "Butter", quantity: nil, unit: "g", checked: false}
+
+      assert state.items["z"] == %{
+               id: "z",
+               name: "Butter",
+               quantity: nil,
+               unit: "g",
+               checked: false
+             }
     end
 
     test "ItemRemoved removes item" do

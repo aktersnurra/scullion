@@ -30,6 +30,12 @@ defmodule Tore.EventStore do
     {:ok, state}
   end
 
+  @spec reset(String.t()) :: :ok
+  def reset(stream_id) do
+    Repo.delete_all(from e in Event, where: e.stream_id == ^stream_id)
+    :ok
+  end
+
   @spec append(String.t(), [struct()]) :: :ok | {:error, term()}
   def append(stream_id, events) do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)

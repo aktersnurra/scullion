@@ -21,4 +21,27 @@ defmodule Tore.Pantry do
   def list_inventory do
     Repo.all(from p in PantryItem, order_by: p.name)
   end
+
+  @spec list_inventory_grouped() :: [{atom() | nil, [PantryItem.t()]}]
+  def list_inventory_grouped do
+    items = Repo.all(from p in PantryItem, order_by: p.name)
+
+    grouped = Enum.group_by(items, & &1.category)
+
+    PantryItem.categories()
+    |> Enum.flat_map(fn key ->
+      str = Atom.to_string(key)
+
+      case Map.get(grouped, str) do
+        nil -> []
+        bucket -> [{key, bucket}]
+      end
+    end)
+    |> then(fn acc ->
+      case Map.get(grouped, nil) do
+        nil -> acc
+        uncategorised -> acc ++ [{nil, uncategorised}]
+      end
+    end)
+  end
 end

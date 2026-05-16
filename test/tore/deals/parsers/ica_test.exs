@@ -10,7 +10,11 @@ defmodule Tore.Deals.Parsers.ICATest do
   defp fixture_html do
     chicken =
       Jason.encode!(%{
-        "details" => %{"name" => "Kycklingfilé", "brand" => "Kronfågel", "packageInformation" => "500g"},
+        "details" => %{
+          "name" => "Kycklingfilé",
+          "brand" => "Kronfågel",
+          "packageInformation" => "500g"
+        },
         "parsedMechanics" => %{"value1" => "2", "value2" => "59", "value4" => "/kg"},
         "stores" => [%{"storeMarketingName" => "ICA Maxi", "regularPrice" => "89"}],
         "comparisonPrice" => "59:90/kg",

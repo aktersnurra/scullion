@@ -18,9 +18,15 @@ defmodule Tore.Household.Preferences do
   def changeset(prefs, attrs) do
     prefs
     |> cast(attrs, [
-      :dietary_restrictions, :allergies, :dislikes, :cooking_style,
-      :cuisine_preferences, :default_portions, :default_leftover_portions,
-      :include_lunches, :planning_days
+      :dietary_restrictions,
+      :allergies,
+      :dislikes,
+      :cooking_style,
+      :cuisine_preferences,
+      :default_portions,
+      :default_leftover_portions,
+      :include_lunches,
+      :planning_days
     ])
     |> validate_number(:default_portions, greater_than: 0)
     |> validate_number(:default_leftover_portions, greater_than_or_equal_to: 0)

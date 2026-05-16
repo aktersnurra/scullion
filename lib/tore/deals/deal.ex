@@ -23,9 +23,20 @@ defmodule Tore.Deals.Deal do
   def changeset(deal, attrs) do
     deal
     |> cast(attrs, [
-      :chain, :store, :store_location, :product_name, :brand, :size,
-      :price, :price_unit, :offer_condition, :regular_price, :comparison_price,
-      :valid_from, :valid_until, :source
+      :chain,
+      :store,
+      :store_location,
+      :product_name,
+      :brand,
+      :size,
+      :price,
+      :price_unit,
+      :offer_condition,
+      :regular_price,
+      :comparison_price,
+      :valid_from,
+      :valid_until,
+      :source
     ])
     |> validate_required([:chain, :store, :product_name, :source])
   end

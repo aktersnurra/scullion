@@ -1,17 +1,22 @@
-# /etc/scullion/env
-# Copy this file to /etc/scullion/env on the server and fill in the values.
-# Permissions: chmod 600 /etc/scullion/env; chown scullion:scullion /etc/scullion/env
+# /etc/tore/env
+# Copy this file to /etc/tore/env on the server and fill in the values.
+# Permissions: chmod 600 /etc/tore/env; chown tore:tore /etc/tore/env
 
 PHX_SERVER=true
-PHX_HOST=scullion.example.com
+PHX_HOST=tore.example.com
 PORT=4000
 
 # Generate with: mix phx.gen.secret
 SECRET_KEY_BASE=
 
 # Absolute path to the SQLite database file
-DATABASE_PATH=/var/lib/scullion/scullion.db
+DATABASE_PATH=/var/lib/tore/tore.db
 POOL_SIZE=5
+
+# Persistent directory for user-uploaded and scraped recipe images.
+# Must survive deploys — do NOT point this inside the release directory.
+# Create and chown before first run: mkdir -p /var/lib/tore/uploads && chown tore:tore /var/lib/tore/uploads
+UPLOADS_DIR=/var/lib/tore/uploads
 
 # OpenRouter API key — used for all LLM and image gen features
 OPENROUTER_API_KEY=

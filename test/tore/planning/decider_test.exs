@@ -21,6 +21,7 @@ defmodule Tore.Planning.DeciderTest do
     test "emits PlanGenerated" do
       slots = %{"mon_dinner" => %{recipe_id: 1, servings: 4}}
       cmd = %Commands.GeneratePlan{week_start: ~D[2026-04-27], slots: slots}
+
       assert {:ok, [%Events.PlanGenerated{week_start: ~D[2026-04-27], slots: ^slots}]} =
                Decider.decide(cmd, Decider.initial())
     end
@@ -29,6 +30,7 @@ defmodule Tore.Planning.DeciderTest do
   describe "decide/2 — AssignRecipe" do
     test "emits RecipeAssigned" do
       cmd = %Commands.AssignRecipe{slot_key: "mon_dinner", recipe_id: 42, servings: 4}
+
       assert {:ok, [%Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: 42, servings: 4}]} =
                Decider.decide(cmd, Decider.initial())
     end
@@ -42,6 +44,7 @@ defmodule Tore.Planning.DeciderTest do
 
     test "emits RecipeRemoved when slot filled" do
       cmd = %Commands.RemoveRecipe{slot_key: "mon_dinner"}
+
       assert {:ok, [%Events.RecipeRemoved{slot_key: "mon_dinner"}]} =
                Decider.decide(cmd, state_with_slot("mon_dinner"))
     end
@@ -55,6 +58,7 @@ defmodule Tore.Planning.DeciderTest do
 
     test "emits ServingsChanged when slot filled" do
       cmd = %Commands.SetServings{slot_key: "mon_dinner", servings: 6}
+
       assert {:ok, [%Events.ServingsChanged{slot_key: "mon_dinner", servings: 6}]} =
                Decider.decide(cmd, state_with_slot("mon_dinner"))
     end
@@ -64,6 +68,7 @@ defmodule Tore.Planning.DeciderTest do
     test "emits SlotPinned" do
       pin = %{type: :recipe, recipe_id: 5}
       cmd = %Commands.PinSlot{slot_key: "wed_dinner", pin: pin}
+
       assert {:ok, [%Events.SlotPinned{slot_key: "wed_dinner", pin: ^pin}]} =
                Decider.decide(cmd, Decider.initial())
     end
@@ -77,6 +82,7 @@ defmodule Tore.Planning.DeciderTest do
 
     test "emits SlotUnpinned when pinned" do
       cmd = %Commands.UnpinSlot{slot_key: "wed_dinner"}
+
       assert {:ok, [%Events.SlotUnpinned{slot_key: "wed_dinner"}]} =
                Decider.decide(cmd, state_with_pin("wed_dinner"))
     end
@@ -90,6 +96,7 @@ defmodule Tore.Planning.DeciderTest do
 
     test "emits MealSkipped when slot filled" do
       cmd = %Commands.SkipMeal{slot_key: "mon_dinner"}
+
       assert {:ok, [%Events.MealSkipped{slot_key: "mon_dinner"}]} =
                Decider.decide(cmd, state_with_slot("mon_dinner"))
     end
@@ -103,6 +110,7 @@ defmodule Tore.Planning.DeciderTest do
 
     test "emits LeftoverMarked when slot filled" do
       cmd = %Commands.MarkLeftover{slot_key: "mon_dinner"}
+
       assert {:ok, [%Events.LeftoverMarked{slot_key: "mon_dinner"}]} =
                Decider.decide(cmd, state_with_slot("mon_dinner"))
     end
@@ -123,7 +131,13 @@ defmodule Tore.Planning.DeciderTest do
     test "RecipeAssigned adds slot with skipped: false, leftover: false" do
       event = %Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: 7, servings: 3}
       state = Decider.evolve(Decider.initial(), event)
-      assert state.slots["mon_dinner"] == %{recipe_id: 7, servings: 3, skipped: false, leftover: false}
+
+      assert state.slots["mon_dinner"] == %{
+               recipe_id: 7,
+               servings: 3,
+               skipped: false,
+               leftover: false
+             }
     end
 
     test "RecipeRemoved deletes slot" do

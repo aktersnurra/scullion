@@ -33,6 +33,8 @@ config :phoenix,
 
 config :tore, Tore.Mailer, adapter: Swoosh.Adapters.Test
 
+config :tore, :uploads_dir, Path.expand("../tmp/uploads", __DIR__)
+
 config :tore, :image_gen_client, Tore.Adapters.StubImageGen
 config :tore, :http_client, Tore.MockHTTP
 config :tore, :llm_client, Tore.MockLLM

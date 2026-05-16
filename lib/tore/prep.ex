@@ -6,10 +6,11 @@ defmodule Tore.Prep do
     %PrepGuide{}
     |> PrepGuide.changeset(attrs)
     |> Repo.insert(
-         on_conflict: {:replace, [:timeline, :cascade_map, :storage_notes,
-                                  :daily_assembly, :prep_session, :instructions]},
-         conflict_target: [:week_start]
-       )
+      on_conflict:
+        {:replace,
+         [:timeline, :cascade_map, :storage_notes, :daily_assembly, :prep_session, :instructions]},
+      conflict_target: [:week_start]
+    )
   end
 
   def get_guide_for_week(week_start) do

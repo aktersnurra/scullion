@@ -5,6 +5,7 @@ defmodule ToreWeb.Plugs.LocaleTest do
 
   test "sets locale from current_user" do
     user = %{locale: "sv"}
+
     _conn =
       build_conn()
       |> assign(:current_user, user)

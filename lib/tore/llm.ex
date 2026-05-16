@@ -9,11 +9,17 @@ defmodule Tore.LLM do
   @callback parse_deals_pdf(pdf :: binary()) :: {:ok, [map()]} | {:error, term()}
   @callback parse_recipe_images(images :: [binary()], locale :: String.t() | nil) ::
               {:ok, map()} | {:error, term()}
-  @callback generate_prep_guide(plan :: map()) :: {:ok, map(), map()} | {:error, term()}
+  @callback generate_prep_guide(plan :: map(), locale :: String.t() | nil) ::
+              {:ok, map(), map()} | {:error, term()}
   @callback estimate_nutrition(recipe :: map()) :: {:ok, map(), map()} | {:error, term()}
   @callback parse_pantry_image(image :: binary()) :: {:ok, [map()], map()} | {:error, term()}
   @callback parse_receipt_for_pantry(image :: binary()) ::
               {:ok, %{total: Decimal.t() | nil, store_name: String.t() | nil, items: [map()]},
                map()}
               | {:error, term()}
+
+  @callback classify_grocery_item(name :: String.t()) :: {:ok, atom()} | {:error, term()}
+
+  @callback filter_pantry_items(ingredients :: [map()], pantry :: [map()]) ::
+              {:ok, [map()]} | {:error, term()}
 end

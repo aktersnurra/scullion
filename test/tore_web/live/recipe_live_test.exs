@@ -82,11 +82,13 @@ defmodule ToreWeb.RecipeLiveTest do
 
   describe "ingredient editor" do
     test "shows ingredient rows when editing a recipe", %{conn: conn, user: user} do
-      {:ok, recipe} = Recipes.create(%{
-        title: "Pasta",
-        recipe_type: :meal,
-        ingredients: [%{name: "Spaghetti", quantity: "200", unit: "g"}]
-      })
+      {:ok, recipe} =
+        Recipes.create(%{
+          title: "Pasta",
+          recipe_type: :meal,
+          ingredients: [%{name: "Spaghetti", quantity: "200", unit: "g"}]
+        })
+
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       render_click(lv, "select_recipe", %{"id" => to_string(recipe.id)})
       html = render_click(lv, "edit_recipe")
@@ -102,11 +104,13 @@ defmodule ToreWeb.RecipeLiveTest do
     end
 
     test "remove_ingredient_row removes a row", %{conn: conn, user: user} do
-      {:ok, recipe} = Recipes.create(%{
-        title: "Pasta",
-        recipe_type: :meal,
-        ingredients: [%{name: "Spaghetti", quantity: "200", unit: "g"}]
-      })
+      {:ok, recipe} =
+        Recipes.create(%{
+          title: "Pasta",
+          recipe_type: :meal,
+          ingredients: [%{name: "Spaghetti", quantity: "200", unit: "g"}]
+        })
+
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       render_click(lv, "select_recipe", %{"id" => to_string(recipe.id)})
       render_click(lv, "edit_recipe")
@@ -119,21 +123,23 @@ defmodule ToreWeb.RecipeLiveTest do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       render_click(lv, "select_recipe", %{"id" => to_string(recipe.id)})
       render_click(lv, "edit_recipe")
-      html = render_submit(lv, "save_recipe", %{
-        "recipe" => %{
-          "title" => "Pasta",
-          "recipe_type" => "meal",
-          "prep_time_minutes" => "",
-          "cook_time_minutes" => "",
-          "base_servings" => "",
-          "tags" => "",
-          "source_url" => "",
-          "instructions" => ""
-        },
-        "ingredients" => %{
-          "0" => %{"name" => "Spaghetti", "quantity" => "200", "unit" => "g"}
-        }
-      })
+
+      html =
+        render_submit(lv, "save_recipe", %{
+          "recipe" => %{
+            "title" => "Pasta",
+            "recipe_type" => "meal",
+            "prep_time_minutes" => "",
+            "cook_time_minutes" => "",
+            "base_servings" => "",
+            "tags" => "",
+            "source_url" => "",
+            "instructions" => ""
+          },
+          "ingredients" => %{
+            "0" => %{"name" => "Spaghetti", "quantity" => "200", "unit" => "g"}
+          }
+        })
 
       refute html =~ "Could not"
       updated = Recipes.get!(recipe.id)

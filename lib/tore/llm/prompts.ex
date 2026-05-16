@@ -39,11 +39,11 @@ defmodule Tore.LLM.Prompts do
     {system, user}
   end
 
-  def prep_guide(plan) do
+  def prep_guide(plan, locale \\ nil) do
     system = """
     You are a sous chef. Generate a Sunday prep session guide for the week's meals.
     Think in cascades: prep components that transform into different dishes across the week.
-    Respond with a JSON object only. No prose.
+    Respond with a JSON object only. No prose.#{translation_instruction(locale)}
     """
 
     user = render("prep_guide.eex", plan)
@@ -173,14 +173,26 @@ defmodule Tore.LLM.Prompts do
     """
   end
 
-  @locale_names %{"sv" => "Swedish", "en" => "English", "de" => "German", "fr" => "French", "es" => "Spanish", "no" => "Norwegian", "da" => "Danish", "fi" => "Finnish"}
+  @locale_names %{
+    "sv" => "Swedish",
+    "en" => "English",
+    "de" => "German",
+    "fr" => "French",
+    "es" => "Spanish",
+    "no" => "Norwegian",
+    "da" => "Danish",
+    "fi" => "Finnish"
+  }
 
   defp translation_instruction(nil), do: ""
 
   defp translation_instruction(locale) do
     case Map.get(@locale_names, locale) do
-      nil -> ""
-      language -> "- Translate ALL text fields (title, description, tags, step phases, step actions, ingredient names) into #{language}. Keep units as-is (g, ml, msk, tsk, etc.)."
+      nil ->
+        ""
+
+      language ->
+        "- Translate ALL text fields (title, description, tags, step phases, step actions, ingredient names) into #{language}. Keep units as-is (g, ml, msk, tsk, etc.)."
     end
   end
 
@@ -193,13 +205,17 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["product_name"],
+          required: ["product_name", "category"],
           additionalProperties: false,
           properties: %{
             product_name: %{type: "string"},
             quantity: %{type: ["number", "null"]},
             unit_price: %{type: ["number", "null"]},
-            total_price: %{type: ["number", "null"]}
+            total_price: %{type: ["number", "null"]},
+            category: %{
+              type: "string",
+              enum: ["dairy", "meat", "produce", "frozen", "dry_goods", "canned", "herbs_spices", "condiments", "other"]
+            }
           }
         }
       }
@@ -377,9 +393,96 @@ defmodule Tore.LLM.Prompts do
     {system, "Extract all deals from this PDF flyer."}
   end
 
+  @grocery_section_schema %{
+    type: "object",
+    required: ["section"],
+    additionalProperties: false,
+    properties: %{
+      section: %{
+        type: "string",
+        enum: ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+      }
+    }
+  }
+
+  def grocery_section_schema do
+    %{type: "json_schema", json_schema: %{name: "grocery_section", strict: true, schema: @grocery_section_schema}}
+  end
+
+  @filter_pantry_schema %{
+    type: "object",
+    required: ["items"],
+    additionalProperties: false,
+    properties: %{
+      items: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["name", "quantity", "unit", "section"],
+          additionalProperties: false,
+          properties: %{
+            name: %{type: "string"},
+            quantity: %{type: ["number", "null"]},
+            unit: %{type: ["string", "null"]},
+            section: %{
+              type: "string",
+              enum: ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  def filter_pantry_schema do
+    %{type: "json_schema", json_schema: %{name: "filter_pantry", strict: true, schema: @filter_pantry_schema}}
+  end
+
+  def filter_pantry_items(ingredients, pantry) do
+    ingredients_text =
+      Enum.map_join(ingredients, "\n", fn i ->
+        qty = if i.quantity, do: "#{i.quantity} #{i.unit} ", else: ""
+        "- #{qty}#{i.name}"
+      end)
+
+    pantry_text =
+      Enum.map_join(pantry, "\n", fn p ->
+        qty = if p.quantity, do: "#{p.quantity} #{p.unit} ", else: ""
+        "- #{qty}#{p.name}"
+      end)
+
+    system = """
+    You are a smart shopping assistant. Given a list of required ingredients and a pantry inventory, return only the items that still need to be bought.
+    Rules:
+    - If an ingredient is fully covered by the pantry, omit it.
+    - If partially covered, include it with the remaining quantity needed.
+    - Match items by meaning, not exact string (e.g. "chicken fillet" matches "chicken").
+    - Preserve original ingredient names and units in the output.
+    - If an ingredient has no quantity, include it unless the pantry clearly has it.
+    - Always omit water — it is assumed to be available.
+    - For each item, assign a section: produce, meat, fish, dairy, deli, frozen, bread, dry_goods, canned, beverages, herbs_spices, condiments, household, or other.
+    Respond with JSON only.
+    """
+
+    user = "Ingredients needed:\n#{ingredients_text}\n\nPantry:\n#{pantry_text}"
+    {system, user}
+  end
+
+  def classify_grocery_item(name) do
+    system = """
+    You are a grocery store assistant. Classify a grocery item into exactly one store section.
+    Sections: produce, meat, fish, dairy, deli, frozen, bread, dry_goods, canned, beverages, herbs_spices, condiments, household, other.
+    Respond with JSON only.
+    """
+
+    {system, name}
+  end
+
   defp dietary_guidance_instruction(nil), do: ""
   defp dietary_guidance_instruction(""), do: ""
-  defp dietary_guidance_instruction(guidance), do: "\n- Dietary guidance: #{String.trim(guidance)}"
+
+  defp dietary_guidance_instruction(guidance),
+    do: "\n- Dietary guidance: #{String.trim(guidance)}"
 
   defp render(template, assigns) do
     path = Path.join(@prompts_dir, template)
