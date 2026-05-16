@@ -319,6 +319,64 @@ defmodule Tore.LLM.Prompts do
     {system, user}
   end
 
+  @deals_json_schema %{
+    type: "object",
+    required: ["deals"],
+    additionalProperties: false,
+    properties: %{
+      deals: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["chain", "product_name", "store"],
+          additionalProperties: false,
+          properties: %{
+            chain: %{type: "string"},
+            store: %{type: "string"},
+            product_name: %{type: "string"},
+            brand: %{type: ["string", "null"]},
+            size: %{type: ["string", "null"]},
+            price: %{type: ["number", "null"]},
+            price_unit: %{type: ["string", "null"]},
+            offer_condition: %{type: ["string", "null"]},
+            regular_price: %{type: ["string", "null"]},
+            comparison_price: %{type: ["string", "null"]},
+            valid_from: %{type: ["string", "null"]},
+            valid_until: %{type: ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def deals_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "deals", strict: true, schema: @deals_json_schema}
+    }
+  end
+
+  def parse_deals_pdf do
+    system = """
+    You are a grocery deals extractor. Given a PDF flyer or weekly deals catalog from a Swedish supermarket:
+    Extract every product deal/offer into the structured format.
+    - chain: lowercase chain identifier, one of: "ica", "coop", "lidl", "willys", "hemkop", "citygross", "other"
+    - store: the full store name from the PDF (e.g. "ICA Maxi Flemingsberg", "Coop Forum Nacka")
+    - product_name: the product name as printed
+    - brand: brand name if separate from product name, else null
+    - size: package size/weight (e.g. "500g", "1 kg", "6-pack"), null if not stated
+    - price: sale price as a number (e.g. 29.90), null if not clear
+    - price_unit: currency or unit for price (e.g. "kr", "kr/kg"), null if not stated
+    - offer_condition: any condition text (e.g. "3 for 2", "2-pack", "Medlemspris"), null if none
+    - regular_price: ordinary price as a number if shown crossed out, else null
+    - comparison_price: comparison/unit price string as shown (e.g. "59.80 kr/kg"), null if not shown
+    - valid_from / valid_until: ISO 8601 date strings (YYYY-MM-DD) if stated, else null
+    Respond with a JSON object only. No prose.
+    """
+
+    {system, "Extract all deals from this PDF flyer."}
+  end
+
   defp dietary_guidance_instruction(nil), do: ""
   defp dietary_guidance_instruction(""), do: ""
   defp dietary_guidance_instruction(guidance), do: "\n- Dietary guidance: #{String.trim(guidance)}"

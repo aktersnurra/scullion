@@ -3,6 +3,7 @@ defmodule Tore.Deals.Deal do
   import Ecto.Changeset
 
   schema "deals" do
+    field :chain, :string
     field :store, :string
     field :store_location, :string
     field :product_name, :string
@@ -22,10 +23,10 @@ defmodule Tore.Deals.Deal do
   def changeset(deal, attrs) do
     deal
     |> cast(attrs, [
-      :store, :store_location, :product_name, :brand, :size,
+      :chain, :store, :store_location, :product_name, :brand, :size,
       :price, :price_unit, :offer_condition, :regular_price, :comparison_price,
       :valid_from, :valid_until, :source
     ])
-    |> validate_required([:store, :product_name, :source])
+    |> validate_required([:chain, :store, :product_name, :source])
   end
 end

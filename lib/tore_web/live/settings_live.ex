@@ -1,7 +1,7 @@
 defmodule ToreWeb.SettingsLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Accounts, Handlers.PlanningHandler}
+  alias Tore.Accounts
 
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
@@ -27,22 +27,6 @@ defmodule ToreWeb.SettingsLive do
       {:ok, _updated} -> {:noreply, assign(socket, dietary_guidance: "", saved: false)}
       {:error, _} -> {:noreply, socket}
     end
-  end
-
-  def handle_event("generate_plan", _params, socket) do
-    user = socket.assigns.current_user
-    guidance = get_in(user.preferences || %{}, ["dietary_guidance"])
-    plan_id = "default"
-    week_start = Date.utc_today() |> Date.beginning_of_week()
-
-    Task.start(fn ->
-      PlanningHandler.generate_plan(plan_id, week_start,
-        mode: :from_catalog,
-        dietary_guidance: guidance
-      )
-    end)
-
-    {:noreply, socket}
   end
 
   def render(assigns) do
@@ -101,13 +85,6 @@ defmodule ToreWeb.SettingsLive do
           </form>
         </section>
 
-        <section class="px-6 pt-5 pb-6 border-t border-[color:var(--hairline)]">
-          <h2 class="uppercase tracking-wider text-[color:var(--subtle)] mb-3" style="font-size: var(--t-micro); font-weight: 600;">{gettext("Jobs")}</h2>
-          <div class="flex flex-wrap gap-2">
-            <.button variant={:secondary}>{gettext("Run deal scrape")}</.button>
-            <.button variant={:secondary} phx-click="generate_plan">{gettext("Generate plan")}</.button>
-          </div>
-        </section>
       </.card>
     </.page>
     </Layouts.app>

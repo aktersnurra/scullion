@@ -7,7 +7,9 @@ defmodule Tore.Deals do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     rows =
-      Enum.map(deals, fn d ->
+      deals
+      |> Enum.filter(&(not is_nil(&1[:store]) and not is_nil(&1[:product_name]) and not is_nil(&1[:chain])))
+      |> Enum.map(fn d ->
         d
         |> Map.put_new(:source, :scraped)
         |> Map.merge(%{inserted_at: now, updated_at: now})
@@ -16,7 +18,7 @@ defmodule Tore.Deals do
     {count, _} =
       Repo.insert_all(Deal, rows,
         on_conflict: :nothing,
-        conflict_target: [:store, :product_name]
+        conflict_target: [:chain, :store, :product_name]
       )
 
     {:ok, count}
@@ -26,6 +28,15 @@ defmodule Tore.Deals do
   def list_current do
     today = Date.utc_today()
     Repo.all(from d in Deal, where: is_nil(d.valid_until) or d.valid_until >= ^today)
+  end
+
+  @spec rename_store(String.t(), String.t(), String.t()) :: :ok
+  def rename_store(chain, old_store, new_store) do
+    Repo.update_all(
+      from(d in Deal, where: d.chain == ^chain and d.store == ^old_store),
+      set: [store: new_store, store_location: new_store]
+    )
+    :ok
   end
 
   @spec clear_expired() :: :ok

@@ -51,9 +51,12 @@ defmodule Tore.Deals.Parsers.ICA do
         s -> Regex.replace(~r/(\d+):(\d+)/, s, "\\1.\\2")
       end)
 
+    store_name = nilify(store["storeMarketingName"]) || "ICA"
+
     %{
-      store: "ica",
-      store_location: nilify(store["storeMarketingName"]),
+      chain: "ica",
+      store: store_name,
+      store_location: store_name,
       product_name: details["name"] || "",
       brand: nilify(details["brand"]),
       size: nilify(details["packageInformation"]),

@@ -4,6 +4,7 @@ defmodule Tore.Handlers.DealsHandler do
   alias Tore.{Alerts, Deals, Deals.StoreConfig, Repo}
 
   @http Application.compile_env(:tore, :http_client)
+  @llm Application.compile_env(:tore, :llm_client)
 
   @spec scrape_all() :: :ok
   def scrape_all do
@@ -15,12 +16,23 @@ defmodule Tore.Handlers.DealsHandler do
     :ok
   end
 
-  @spec scrape_url(String.t(), atom()) :: {:ok, integer()} | {:error, term()}
-  def scrape_url(url, chain) do
+  @spec scrape_url(String.t(), atom(), String.t() | nil) :: {:ok, integer()} | {:error, term()}
+  def scrape_url(url, chain, store_name \\ nil) do
     parser = parser_for(chain)
 
     with {:ok, html} <- @http.fetch(url),
          {:ok, deals} <- parser.parse(html) do
+      deals =
+        if store_name do
+          Enum.map(deals, fn d ->
+            d
+            |> Map.put(:store, store_name)
+            |> Map.put_new(:chain, to_string(chain))
+          end)
+        else
+          Enum.map(deals, &Map.put_new(&1, :chain, to_string(chain)))
+        end
+
       case deals do
         [] ->
           Logger.warning("scrape returned 0 deals — parser may be broken",
@@ -37,8 +49,22 @@ defmodule Tore.Handlers.DealsHandler do
     end
   end
 
+  @spec parse_pdf(binary()) :: {:ok, integer()} | {:error, term()}
+  def parse_pdf(pdf_binary) do
+    with {:ok, deals} <- @llm.parse_deals_pdf(pdf_binary) do
+      case deals do
+        [] ->
+          Logger.warning("PDF parse returned 0 deals")
+          {:ok, 0}
+
+        _ ->
+          Deals.upsert_deals(deals)
+      end
+    end
+  end
+
   defp scrape_store(store_config) do
-    case scrape_url(store_config.url, store_config.chain) do
+    case scrape_url(store_config.url, store_config.chain, store_config.name) do
       {:ok, count} ->
         Logger.info("scraped #{count} deals", store: store_config.name, url: store_config.url)
 

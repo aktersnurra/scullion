@@ -1,7 +1,7 @@
 defmodule ToreWeb.PrepLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Handlers.PrepHandler, Prep}
+  alias Tore.{Handlers.PrepHandler, Handlers.PlanningHandler, Prep}
 
   def mount(_params, _session, socket) do
     week_start = week_start(Date.utc_today())
@@ -12,6 +12,21 @@ defmodule ToreWeb.PrepLive do
   end
 
   def handle_event("set_tab", %{"tab" => tab}, socket), do: {:noreply, assign(socket, tab: tab)}
+
+  def handle_event("generate_plan", _params, socket) do
+    user = socket.assigns.current_user
+    guidance = get_in(user.preferences || %{}, ["dietary_guidance"])
+    week_start = socket.assigns.week_start
+
+    Task.start(fn ->
+      PlanningHandler.generate_plan(socket.assigns.plan_id, week_start,
+        mode: :from_catalog,
+        dietary_guidance: guidance
+      )
+    end)
+
+    {:noreply, put_flash(socket, :info, gettext("Generating plan…"))}
+  end
 
   def handle_event("generate_guide", _params, socket) do
     %{plan_id: plan_id, week_start: week_start} = socket.assigns
@@ -52,14 +67,24 @@ defmodule ToreWeb.PrepLive do
       <.card padded={false}>
         <header class="flex items-center justify-between px-6 pt-6 pb-3">
           <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">{gettext("Prep Guide")}</h1>
-          <button
-            type="button"
-            class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
-            style="font-size: var(--t-meta);"
-          >
-            {Calendar.strftime(@week_start, "%b %-d")} – {Calendar.strftime(Date.add(@week_start, 6), "%b %-d")}
-            <.icon name="hero-chevron-down" class="size-3.5" />
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              phx-click="generate_plan"
+              title={gettext("Generate week plan")}
+              class="size-8 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)] transition-colors"
+            >
+              <.icon name="hero-calendar-days" class="size-5" />
+            </button>
+            <button
+              type="button"
+              class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"
+              style="font-size: var(--t-meta);"
+            >
+              {Calendar.strftime(@week_start, "%b %-d")} – {Calendar.strftime(Date.add(@week_start, 6), "%b %-d")}
+              <.icon name="hero-chevron-down" class="size-3.5" />
+            </button>
+          </div>
         </header>
 
         <%= if @guide do %>
@@ -102,8 +127,8 @@ defmodule ToreWeb.PrepLive do
           </div>
         <% else %>
           <div class="px-6 py-14 flex flex-col items-center text-center border-t border-[color:var(--hairline)]">
-            <div class="size-14 rounded-full bg-[color:var(--accent-soft)] inline-flex items-center justify-center mb-5">
-              <.icon name="custom-prep" class="size-8" />
+            <div class="mb-5">
+              <.icon name="custom-prep" class="size-24" />
             </div>
             <h3 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h2);">{gettext("No guide yet")}</h3>
             <p class="mt-1 text-[color:var(--muted)]" style="font-size: var(--t-meta);">

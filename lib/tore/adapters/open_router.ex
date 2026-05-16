@@ -238,6 +238,74 @@ defmodule Tore.Adapters.OpenRouter do
   def parse_deals_image(_image), do: {:error, :not_implemented}
 
   @impl Tore.LLM
+  def parse_deals_pdf(pdf_binary) do
+    {system, user_text} = Tore.LLM.Prompts.parse_deals_pdf()
+    b64 = Base.encode64(pdf_binary)
+
+    body = %{
+      model: vision_model(),
+      response_format: %{type: "json_object"},
+      messages: [
+        %{role: "system", content: system},
+        %{
+          role: "user",
+          content: [
+            %{type: "text", text: user_text},
+            %{type: "file", file: %{filename: "deals.pdf", file_data: "data:application/pdf;base64,#{b64}"}}
+          ]
+        }
+      ]
+    }
+
+    case Req.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+             {"X-Title", "Tore"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        content = get_in(resp, ["choices", Access.at(0), "message", "content"])
+
+        with {:ok, parsed} <- decode_content(content) do
+          raw_deals =
+            cond do
+              is_list(parsed) -> parsed
+              is_map(parsed) -> parsed["deals"] || []
+              true -> []
+            end
+
+          deals =
+            Enum.map(raw_deals, fn d ->
+              %{
+                chain: d["chain"] || "other",
+                store: d["store"] || d["chain"] || "other",
+                product_name: d["product_name"],
+                brand: d["brand"],
+                size: d["size"],
+                price: parse_decimal(d["price"]),
+                price_unit: d["price_unit"],
+                offer_condition: d["offer_condition"],
+                regular_price: d["regular_price"],
+                comparison_price: d["comparison_price"],
+                valid_from: parse_date(d["valid_from"]),
+                valid_until: parse_date(d["valid_until"]),
+                source: :vision
+              }
+            end)
+
+          {:ok, deals}
+        end
+
+      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
+      {:ok, %{status: 429}} -> {:error, :rate_limited}
+      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
+      {:error, reason} -> {:error, {:http_error, reason}}
+    end
+  end
+
+  @impl Tore.LLM
   def parse_recipe_images(images, locale \\ nil) do
     system = Tore.LLM.Prompts.parse_recipe_images(locale)
 
@@ -463,6 +531,18 @@ defmodule Tore.Adapters.OpenRouter do
     Enum.map(list, fn item ->
       %{name: item["item"] || item["name"], quantity: parse_decimal(item["quantity"]), unit: item["unit"]}
     end)
+  end
+
+  defp decode_content(content) when is_binary(content), do: Jason.decode(content)
+  defp decode_content(content) when is_map(content) or is_list(content), do: {:ok, content}
+  defp decode_content(_), do: {:error, :no_content}
+
+  defp parse_date(nil), do: nil
+  defp parse_date(s) when is_binary(s) do
+    case Date.from_iso8601(s) do
+      {:ok, date} -> date
+      _ -> nil
+    end
   end
 
   defp parse_decimal(nil), do: nil

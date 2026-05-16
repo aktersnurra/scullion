@@ -246,15 +246,24 @@ Upload a photo on the pantry page -> vision llm -> pantry items (editable)
 
 # Run scraping of custom url for deals
 
+> **DONE** — one-time URL scrape via + modal on deals page, chain auto-detected from URL
+
 Add feature to input custom url for parsing of deals to run once
 
 # Add urls for recurring scraping of deals
+
+> **DONE** — recurring store configs with enable toggle, scrape-all trigger, unified with one-time scrape in the + modal
+
 add urls for recurring scraping of deals. Maybe unify with run scraping once
 
 # Scrap pdf deals
+
+> **DONE** — PDF upload via + modal, base64 sent to Gemini via OpenRouter, deals extracted and grouped by chain → store; store name editable inline with auto-save on blur/enter
 
 Be able to upload a pdf with deals
 
 # Fix logo
 
 Create svg from logo.png, add it somewhere on the site
+
+# Add/managed users
