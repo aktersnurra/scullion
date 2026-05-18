@@ -280,6 +280,61 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   @impl Tore.LLM
+  def suggest_substitution(missing, recipe_context) do
+    system = """
+    You are a practical cooking assistant. The user is missing an ingredient mid-cook.
+    Suggest a realistic substitution they can make right now with common kitchen items.
+    If the substitution requires changing the steps, include brief updated instructions.
+    Return JSON only: {"suggestion": "...", "updated_steps": "..." or null}
+    Keep the suggestion to 1-2 sentences. Be direct and practical.
+    """
+
+    user = "Recipe: #{recipe_context}\nMissing ingredient: #{missing}"
+
+    case chat(system, user) do
+      {:ok, %{"suggestion" => suggestion} = result, _usage} ->
+        {:ok, %{
+          suggestion: suggestion,
+          updated_steps: result["updated_steps"]
+        }}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @impl Tore.LLM
+  def cook_mode_steps(recipe) do
+    system = """
+    You are a cooking assistant. Compress recipe steps into a 3-phase action list.
+    Phase 1 "do_first": things to start before anything else (pre-heat, prep, start slow things).
+    Phase 2 "while_cooking": things to do while the main component cooks.
+    Phase 3 "finish": final assembly and plating.
+    Each phase is a list of short action phrases (5-10 words each). Max 4 items per phase.
+    Return JSON only: {"do_first": [...], "while_cooking": [...], "finish": [...]}
+    """
+
+    title = recipe["title"] || recipe[:title] || "Unknown"
+    instructions = recipe["instructions"] || recipe[:instructions] || "No instructions"
+
+    user = "Recipe: #{title}\nSteps: #{instructions}"
+
+    case chat(system, user) do
+      {:ok, %{"do_first" => do_first, "while_cooking" => while_cooking, "finish" => finish}, _usage} ->
+        {:ok, %{do_first: do_first, while_cooking: while_cooking, finish: finish}}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @impl Tore.LLM
   def parse_deals_image(_image), do: {:error, :not_implemented}
 
   @impl Tore.LLM

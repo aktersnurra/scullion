@@ -407,7 +407,8 @@ defmodule Tore.Handlers.PlanningHandler do
       recent_recipes: [],
       week_start: week_start,
       mode: mode,
-      dietary_guidance: dietary_guidance
+      dietary_guidance: dietary_guidance,
+      week_mode_fragment: Tore.WeekMode.mode_prompt_fragment(Tore.WeekMode.get_current_mode())
     }
   end
 

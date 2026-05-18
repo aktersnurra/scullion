@@ -43,5 +43,11 @@ npm-debug.log
 
 search-mock.png
 mock-v2.png
+llm-native-mock.png
 
 .claude/
+
+/docs/
+
+# Symlink to nuc-setup deploy script
+/deploy

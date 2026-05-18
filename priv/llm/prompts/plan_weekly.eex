@@ -15,6 +15,10 @@ DEALS: <%= if Enum.empty?(@deals), do: "none", else: Enum.join(@deals, ", ") %>
 
 RECENTLY USED (avoid repeating): <%= if Enum.empty?(@recent_recipes), do: "none", else: Enum.join(@recent_recipes, ", ") %>
 
+<%= if assigns[:week_mode_fragment] do %>
+<%= @week_mode_fragment %>
+<% end %>
+
 Return JSON only — no prose, no markdown:
 {
   "days": [

@@ -1,5 +1,7 @@
 # Tore
 
+![tore](priv/static/images/logo.svg)
+
 An AI-assisted meal planner built with Phoenix LiveView — named as a homage to [Tore Wretman](https://sv.wikipedia.org/wiki/Tore_Wretman), the father of modern Swedish cuisine.
 
 ---

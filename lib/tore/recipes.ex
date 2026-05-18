@@ -105,6 +105,19 @@ defmodule Tore.Recipes do
     @llm.parse_recipe_images(binaries, locale)
   end
 
+  @spec suggest_substitution(String.t(), String.t()) ::
+          {:ok, %{suggestion: String.t(), updated_steps: String.t() | nil}} | {:error, term()}
+  def suggest_substitution(missing, recipe_context) do
+    @llm.suggest_substitution(missing, recipe_context)
+  end
+
+  @spec cook_mode_steps(map()) ::
+          {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}} |
+          {:error, term()}
+  def cook_mode_steps(recipe) do
+    @llm.cook_mode_steps(recipe)
+  end
+
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp insert_recipe(attrs) do

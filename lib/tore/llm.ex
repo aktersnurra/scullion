@@ -22,4 +22,11 @@ defmodule Tore.LLM do
 
   @callback filter_pantry_items(ingredients :: [map()], pantry :: [map()]) ::
               {:ok, [map()]} | {:error, term()}
+
+  @callback suggest_substitution(missing :: String.t(), recipe_context :: String.t()) ::
+              {:ok, %{suggestion: String.t(), updated_steps: String.t() | nil}} | {:error, term()}
+
+  @callback cook_mode_steps(recipe :: map()) ::
+              {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}} |
+              {:error, term()}
 end

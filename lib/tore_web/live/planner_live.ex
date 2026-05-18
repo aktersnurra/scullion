@@ -1,7 +1,7 @@
 defmodule ToreWeb.PlannerLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Recipes, Handlers.PlanningHandler, Handlers.GroceriesHandler}
+  alias Tore.{Recipes, Handlers.PlanningHandler, Handlers.GroceriesHandler, PlanHealth}
   alias Phoenix.PubSub
 
   @days ~w[mon tue wed thu fri sat sun]
@@ -25,7 +25,10 @@ defmodule ToreWeb.PlannerLive do
        plan_id: plan_id,
        plan_state: plan_state,
        recipes: recipes,
-       slot_action: nil
+       slot_action: nil,
+       counter_notes: Tore.CounterNotes.list_for_surface("week"),
+       plan_health: PlanHealth.compute(plan_state),
+       current_week_mode: Tore.WeekMode.get_current_mode()
      )}
   end
 
@@ -176,6 +179,25 @@ defmodule ToreWeb.PlannerLive do
     {:noreply, socket}
   end
 
+  def handle_event("accept_note", %{"id" => id}, socket) do
+    Tore.CounterNotes.accept(String.to_integer(id))
+    {:noreply, assign(socket, counter_notes: Tore.CounterNotes.list_for_surface("week"))}
+  end
+
+  def handle_event("ignore_note", %{"id" => id}, socket) do
+    Tore.CounterNotes.ignore(String.to_integer(id))
+    {:noreply, assign(socket, counter_notes: Tore.CounterNotes.list_for_surface("week"))}
+  end
+
+  def handle_event("set_week_mode", %{"mode" => mode}, socket) do
+    case Tore.WeekMode.set_mode(mode) do
+      {:ok, _} ->
+        {:noreply, assign(socket, current_week_mode: mode)}
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
+
   defp update_slot(socket, fun) do
     case socket.assigns.slot_action do
       nil -> socket
@@ -237,7 +259,14 @@ defmodule ToreWeb.PlannerLive do
     {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
     old_ids = assigned_recipe_ids(socket.assigns.plan_state)
     new_ids = assigned_recipe_ids(plan_state)
-    socket = assign(socket, plan_state: plan_state)
+
+    socket =
+      assign(socket,
+        plan_state: plan_state,
+        counter_notes: Tore.CounterNotes.list_for_surface("week"),
+        plan_health: PlanHealth.compute(plan_state)
+      )
+
     if old_ids != new_ids, do: rebuild_grocery_list(socket)
     {:noreply, socket}
   end
@@ -312,6 +341,62 @@ defmodule ToreWeb.PlannerLive do
             <.icon name="hero-chevron-right" class="size-5" />
           </button>
         </header>
+
+        <%!-- Counter notes --%>
+        <%= if @counter_notes != [] do %>
+          <div class="flex flex-col gap-3 mb-4">
+            <%= for note <- @counter_notes do %>
+              <div class="rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--surface-raised)] p-4">
+                <p class="text-[10px] font-semibold text-[color:var(--accent)] uppercase tracking-widest mb-1">
+                  {gettext("Tore noticed")}
+                </p>
+                <p class="font-semibold text-[var(--text)] text-sm mb-0.5">{note.title}</p>
+                <p class="text-sm text-[color:var(--muted)] mb-3">{note.body}</p>
+                <div class="flex gap-2">
+                  <button phx-click="accept_note" phx-value-id={note.id}
+                    class="flex-1 py-2 rounded-xl bg-[color:var(--accent)] text-white text-xs font-semibold">
+                    {gettext("Accept")}
+                  </button>
+                  <button phx-click="ignore_note" phx-value-id={note.id}
+                    class="px-4 py-2 rounded-xl border border-[color:var(--hairline)] text-[color:var(--muted)] text-xs font-medium">
+                    {gettext("Ignore")}
+                  </button>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%!-- Plan health badge (placeholder until Task 3 wires real data) --%>
+        <div class={[
+          "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-4",
+          elem(@plan_health, 0) == :ready && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+          elem(@plan_health, 0) == :flexible && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+          elem(@plan_health, 0) == :fragile && "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+          elem(@plan_health, 0) == :unplanned && "bg-[color:var(--surface-raised)] text-[color:var(--muted)]"
+        ]}>
+          <span class="size-1.5 rounded-full inline-block" style={health_dot_color(elem(@plan_health, 0))} />
+          {elem(@plan_health, 1)}
+        </div>
+
+        <%!-- Week mode selector (placeholder — modes are normal only until Task 4 builds WeekMode) --%>
+        <div class="flex flex-wrap gap-2 mb-4">
+          <%= for {mode, label} <- [{"normal", gettext("Normal")}, {"low_effort", gettext("Low effort")}, {"budget_week", gettext("Budget")}, {"use_pantry", gettext("Use pantry")}, {"more_leftovers", gettext("More leftovers")}] do %>
+            <button
+              phx-click="set_week_mode"
+              phx-value-mode={mode}
+              class={[
+                "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                @current_week_mode == mode &&
+                  "bg-[color:var(--accent)] text-white border-[color:var(--accent)]",
+                @current_week_mode != mode &&
+                  "bg-transparent text-[color:var(--muted)] border-[color:var(--hairline)]"
+              ]}
+            >
+              {label}
+            </button>
+          <% end %>
+        </div>
 
         <.card padded={false}>
           <ul class="divide-y divide-[color:var(--hairline)]" inert={if @slot_action, do: true}>
@@ -815,7 +900,7 @@ defmodule ToreWeb.PlannerLive do
   defp load_week(socket, week_start) do
     plan_id = plan_id(week_start)
     {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
-    assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state)
+    assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state, plan_health: PlanHealth.compute(plan_state))
   end
 
   defp recipe_by_id(_recipes, nil), do: nil
@@ -917,4 +1002,9 @@ defmodule ToreWeb.PlannerLive do
 
   defp plan_id(week_start), do: "plan:#{Date.to_iso8601(week_start)}"
   defp grocery_id(week_start), do: "grocery_list:#{Date.to_iso8601(week_start)}"
+
+  defp health_dot_color(:ready), do: "background:#16a34a"
+  defp health_dot_color(:flexible), do: "background:#ca8a04"
+  defp health_dot_color(:fragile), do: "background:#ea580c"
+  defp health_dot_color(:unplanned), do: "background:var(--muted)"
 end

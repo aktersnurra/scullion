@@ -86,8 +86,9 @@ defmodule ToreWeb.LoginLive do
     ~H"""
     <button
       id={"digit-#{@value}"}
-      phx-click={JS.push("digit", value: %{value: @value})}
+      phx-click={JS.push("digit", value: %{value: @value}) |> JS.focus(to: "#keypad-focus-trap")}
       disabled={@locked}
+      tabindex="-1"
       class="h-16 bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] text-[var(--text)] font-semibold hover:bg-[color:var(--hairline)] active:bg-[color:var(--accent-soft)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.04)] transition-colors"
       style="font-size: 22px;"
     >
@@ -100,10 +101,16 @@ defmodule ToreWeb.LoginLive do
     assigns = assign(assigns, slots: digit_slots(assigns.digits))
 
     ~H"""
-    <div
-      class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8"
-      phx-window-keydown="keydown"
-    >
+    <div class="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4 py-8">
+      <input
+        id="keypad-focus-trap"
+        aria-label={gettext("Enter code")}
+        autofocus
+        phx-keydown="keydown"
+        readonly
+        class="sr-only"
+        value=""
+      />
       <div class="w-full max-w-sm">
         <div class="flex items-center justify-center mb-6">
           <img src="/images/logo.svg" alt="Tore" class="h-24 w-auto" />
@@ -162,8 +169,9 @@ defmodule ToreWeb.LoginLive do
           <.numpad_button value="9" locked={@locked} />
 
           <button
-            phx-click="backspace"
+            phx-click={JS.push("backspace") |> JS.focus(to: "#keypad-focus-trap")}
             disabled={@locked}
+            tabindex="-1"
             aria-label={gettext("Backspace")}
             class="h-16 bg-[var(--surface)] border border-[color:var(--border)] rounded-[var(--r-xl)] text-[color:var(--muted)] hover:bg-[color:var(--hairline)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.04)] inline-flex items-center justify-center"
           >
@@ -173,8 +181,9 @@ defmodule ToreWeb.LoginLive do
           <.numpad_button value="0" locked={@locked} />
 
           <button
-            phx-click="submit"
+            phx-click={JS.push("submit") |> JS.focus(to: "#keypad-focus-trap")}
             disabled={@locked or length(@digits) < 16}
+            tabindex="-1"
             aria-label={gettext("Submit")}
             class="h-16 bg-[color:var(--accent)] hover:bg-[color:var(--accent-hover)] text-white rounded-[var(--r-xl)] disabled:opacity-40 shadow-[0_1px_2px_rgba(17,24,39,0.06)] inline-flex items-center justify-center"
           >

@@ -27,7 +27,13 @@ defmodule ToreWeb.RecipeLive do
        time_filters: @time_filters,
        show_more_filters: false,
        ingredient_rows: [],
-       show_recipe_menu: false
+       show_recipe_menu: false,
+       show_substitution: false,
+       substitution: nil,
+       substitution_loading: false,
+       cook_mode: false,
+       cook_mode_steps: nil,
+       cook_mode_loading: false
      )
      |> allow_upload(:recipe_images,
        accept: ~w(.jpg .jpeg .png .webp),
@@ -145,7 +151,19 @@ defmodule ToreWeb.RecipeLive do
 
   def handle_event("select_recipe", %{"id" => id}, socket) do
     recipe = Recipes.get!(String.to_integer(id))
-    {:noreply, assign(socket, selected: recipe, form: nil, error: nil, show_recipe_menu: false)}
+    {:noreply,
+     assign(socket,
+       selected: recipe,
+       form: nil,
+       error: nil,
+       show_recipe_menu: false,
+       cook_mode: false,
+       cook_mode_steps: nil,
+       cook_mode_loading: false,
+       show_substitution: false,
+       substitution: nil,
+       substitution_loading: false
+     )}
   end
 
   def handle_event("edit_recipe", _, socket) do
@@ -186,12 +204,42 @@ defmodule ToreWeb.RecipeLive do
        form: nil,
        extracted_attrs: nil,
        error: nil,
-       show_recipe_menu: false
+       show_recipe_menu: false,
+       cook_mode: false,
+       cook_mode_steps: nil,
+       cook_mode_loading: false,
+       show_substitution: false,
+       substitution: nil,
+       substitution_loading: false
      )}
   end
 
   def handle_event("toggle_recipe_menu", _, socket) do
     {:noreply, assign(socket, show_recipe_menu: !socket.assigns.show_recipe_menu)}
+  end
+
+  def handle_event("toggle_substitution", _params, socket) do
+    {:noreply, assign(socket, show_substitution: !socket.assigns.show_substitution, substitution: nil)}
+  end
+
+  def handle_event("get_substitution", %{"missing" => missing}, socket) when missing != "" do
+    recipe_title = (socket.assigns.selected && socket.assigns.selected.title) || "current recipe"
+    send(self(), {:run_substitution, missing, recipe_title})
+    {:noreply, assign(socket, substitution_loading: true)}
+  end
+
+  def handle_event("get_substitution", %{"missing" => ""}, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("enter_cook_mode", _params, socket) do
+    recipe = socket.assigns.selected
+    send(self(), {:load_cook_mode, recipe})
+    {:noreply, assign(socket, cook_mode: true, cook_mode_loading: true, cook_mode_steps: nil)}
+  end
+
+  def handle_event("exit_cook_mode", _params, socket) do
+    {:noreply, assign(socket, cook_mode: false, cook_mode_steps: nil)}
   end
 
   def handle_event("validate", _params, socket), do: {:noreply, socket}
@@ -271,6 +319,31 @@ defmodule ToreWeb.RecipeLive do
       {:error, reason} ->
         {:noreply, assign(socket, scrape_state: :idle, error: scrape_error(reason))}
     end
+  end
+
+  def handle_info({:run_substitution, missing, recipe_context}, socket) do
+    result =
+      case Recipes.suggest_substitution(missing, recipe_context) do
+        {:ok, r} -> r
+        {:error, _} -> %{suggestion: gettext("Couldn't find a substitution — try a web search."), updated_steps: nil}
+      end
+
+    {:noreply, assign(socket, substitution: result, substitution_loading: false)}
+  end
+
+  def handle_info({:load_cook_mode, recipe}, socket) do
+    steps =
+      case Recipes.cook_mode_steps(Map.from_struct(recipe)) do
+        {:ok, s} -> s
+        {:error, _} ->
+          %{
+            do_first: [gettext("Follow the recipe steps")],
+            while_cooking: [],
+            finish: [gettext("Plate and serve")]
+          }
+      end
+
+    {:noreply, assign(socket, cook_mode_steps: steps, cook_mode_loading: false)}
   end
 
   # ── Render ─────────────────────────────────────────────────────────────────
@@ -706,6 +779,119 @@ defmodule ToreWeb.RecipeLive do
           >
             <.icon name="hero-link" class="size-4" /> {gettext("Original recipe")}
           </a>
+        </div>
+
+        <%!-- Cooking substitution --%>
+        <div class="pt-4 border-t border-[color:var(--hairline)]">
+          <button
+            phx-click="toggle_substitution"
+            class="flex items-center gap-2 text-sm text-[color:var(--muted)] hover:text-[var(--text)] transition-colors"
+          >
+            <.icon name="hero-question-mark-circle" class="size-4" />
+            {gettext("Missing something?")}
+          </button>
+
+          <%= if @show_substitution do %>
+            <form phx-submit="get_substitution" class="mt-3 flex gap-2">
+              <input
+                type="text"
+                name="missing"
+                placeholder={gettext("e.g. crème fraîche")}
+                autocomplete="off"
+                class="flex-1 rounded-xl border border-[color:var(--hairline)] bg-[color:var(--surface)] px-3 py-2.5 text-sm text-[var(--text)] placeholder:text-[color:var(--muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
+              />
+              <button
+                type="submit"
+                class="bg-[color:var(--accent)] text-white rounded-xl px-4 py-2.5 text-sm font-semibold"
+              >
+                {gettext("Ask")}
+              </button>
+            </form>
+
+            <%= if @substitution_loading do %>
+              <p class="mt-3 text-sm text-[color:var(--muted)]">{gettext("Thinking…")}</p>
+            <% end %>
+
+            <%= if @substitution do %>
+              <div class="mt-3 rounded-2xl bg-[color:var(--surface-raised)] p-4">
+                <p class="text-sm text-[var(--text)] leading-relaxed">{@substitution.suggestion}</p>
+                <%= if @substitution.updated_steps do %>
+                  <p class="mt-2 text-sm text-[color:var(--muted)] leading-relaxed">
+                    {@substitution.updated_steps}
+                  </p>
+                <% end %>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+
+        <%!-- Cook mode --%>
+        <div class="mt-4">
+          <%= if !@cook_mode do %>
+            <button phx-click="enter_cook_mode"
+              class="w-full py-3 rounded-2xl bg-[color:var(--accent)] text-white text-sm font-semibold flex items-center justify-center gap-2">
+              <.icon name="hero-fire" class="size-4" />
+              {gettext("Start cooking")}
+            </button>
+          <% else %>
+            <div class="rounded-2xl bg-[color:var(--surface-raised)] p-4">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="font-semibold text-[var(--text)]">{gettext("Cook mode")}</h3>
+                <button phx-click="exit_cook_mode" class="text-[color:var(--muted)] text-sm">
+                  {gettext("Exit")}
+                </button>
+              </div>
+
+              <%= if @cook_mode_loading do %>
+                <p class="text-sm text-[color:var(--muted)]">{gettext("Preparing steps…")}</p>
+              <% end %>
+
+              <%= if @cook_mode_steps do %>
+                <div class="space-y-4">
+                  <div>
+                    <p class="text-xs font-semibold text-[color:var(--accent)] uppercase tracking-wide mb-2">
+                      {gettext("Do first")}
+                    </p>
+                    <ul class="space-y-1">
+                      <li :for={step <- @cook_mode_steps.do_first}
+                        class="text-sm text-[var(--text)] flex gap-2">
+                        <span class="text-[color:var(--accent)] mt-0.5">→</span>
+                        <span>{step}</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <%= if @cook_mode_steps.while_cooking != [] do %>
+                    <div>
+                      <p class="text-xs font-semibold text-[color:var(--muted)] uppercase tracking-wide mb-2">
+                        {gettext("While it cooks")}
+                      </p>
+                      <ul class="space-y-1">
+                        <li :for={step <- @cook_mode_steps.while_cooking}
+                          class="text-sm text-[var(--text)] flex gap-2">
+                          <span class="text-[color:var(--muted)] mt-0.5">→</span>
+                          <span>{step}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  <% end %>
+
+                  <div>
+                    <p class="text-xs font-semibold text-[color:var(--muted)] uppercase tracking-wide mb-2">
+                      {gettext("Finish")}
+                    </p>
+                    <ul class="space-y-1">
+                      <li :for={step <- @cook_mode_steps.finish}
+                        class="text-sm text-[var(--text)] flex gap-2">
+                        <span class="text-[color:var(--muted)] mt-0.5">→</span>
+                        <span>{step}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
         </div>
       </div>
     </div>
