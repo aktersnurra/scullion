@@ -17,4 +17,13 @@ defmodule Tore.Chat.SystemPromptTest do
     result = Tore.Chat.SystemPrompt.build()
     assert result =~ "Tore"
   end
+
+  test "build/0 includes insights when active insights exist" do
+    {:ok, _} = Tore.Family.replace_insights([
+      %{kind: "skip_pattern", body: "Mondays are often skipped.", confidence: 0.8, evidence: []}
+    ])
+
+    result = Tore.Chat.SystemPrompt.build()
+    assert result =~ "Mondays are often skipped."
+  end
 end

@@ -12,7 +12,8 @@ defmodule Tore.Chat.SystemPrompt do
       dietary_section(),
       week_mode_section(week_mode),
       week_context_section(today),
-      pantry_section()
+      pantry_section(),
+      insights_section()
     ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join("\n\n")
@@ -84,6 +85,19 @@ defmodule Tore.Chat.SystemPrompt do
     else
       names = items |> Enum.map(& &1.name) |> Enum.take(20) |> Enum.join(", ")
       "Pantry has: #{names}#{if length(items) > 20, do: " and #{length(items) - 20} more", else: ""}."
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp insights_section do
+    insights = Family.list_active_insights() |> Enum.take(5)
+
+    if insights == [] do
+      nil
+    else
+      lines = Enum.map(insights, fn i -> "- #{i.body}" end) |> Enum.join("\n")
+      "Family patterns:\n#{lines}"
     end
   rescue
     _ -> nil
