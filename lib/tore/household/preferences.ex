@@ -12,6 +12,7 @@ defmodule Tore.Household.Preferences do
     field :default_leftover_portions, :integer, default: 2
     field :include_lunches, :boolean, default: false
     field :planning_days, :integer, default: 5
+    belongs_to :family, Tore.Family.FamilySchema
     timestamps()
   end
 
@@ -26,7 +27,8 @@ defmodule Tore.Household.Preferences do
       :default_portions,
       :default_leftover_portions,
       :include_lunches,
-      :planning_days
+      :planning_days,
+      :family_id
     ])
     |> validate_number(:default_portions, greater_than: 0)
     |> validate_number(:default_leftover_portions, greater_than_or_equal_to: 0)
