@@ -59,6 +59,7 @@ config :tore, Tore.Scheduler,
   jobs: [
     {"0 6 * * *", {Tore.Jobs.HomeNote, :run, []}},
     {"0 3 * * *", {Tore.Deals, :clear_expired, []}},
+    {"0 6 * * 6", {Tore.Handlers.InsightsHandler, :synthesise_weekly, []}},
     {"0 8 * * 6", {Tore.Handlers.DealsHandler, :scrape_all, []}},
     {"0 18 * * 6",
      fn ->
