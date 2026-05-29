@@ -198,7 +198,9 @@ defmodule ToreWeb.PlannerLive do
     end
   end
 
-  def handle_event("open_chat", _params, socket), do: {:noreply, socket}
+  def handle_event("open_chat", _params, socket) do
+    {:noreply, push_navigate(socket, to: "/chat")}
+  end
 
   defp update_slot(socket, fun) do
     case socket.assigns.slot_action do

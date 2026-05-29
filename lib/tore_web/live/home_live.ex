@@ -122,7 +122,7 @@ defmodule ToreWeb.HomeLive do
   end
 
   def handle_event("open_chat", _params, socket) do
-    {:noreply, socket}
+    {:noreply, push_navigate(socket, to: "/chat")}
   end
 
   attr :plan_state, :map, required: true
