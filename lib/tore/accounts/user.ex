@@ -8,6 +8,7 @@ defmodule Tore.Accounts.User do
     field :role, Ecto.Enum, values: [:admin, :member], default: :member
     field :preferences, :map, default: %{}
     field :locale, :string, default: "sv"
+    belongs_to :family, Tore.Family.FamilySchema
     timestamps()
   end
 
