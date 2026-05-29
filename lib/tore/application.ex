@@ -24,7 +24,16 @@ defmodule Tore.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Tore.Supervisor]
-    Supervisor.start_link(children, opts)
+    result = Supervisor.start_link(children, opts)
+
+    if Application.get_env(:tore, :env, :prod) == :dev do
+      Task.start(fn ->
+        Process.sleep(500)
+        Tore.Storage.S3.ensure_buckets_exist()
+      end)
+    end
+
+    result
   end
 
   # Tell Phoenix to update the endpoint configuration
