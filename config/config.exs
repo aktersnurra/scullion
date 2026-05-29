@@ -73,6 +73,17 @@ config :tore, Tore.Mailer, adapter: Swoosh.Adapters.Local
 
 config :swoosh, :api_client, false
 
+config :ex_aws,
+  access_key_id: {:system, "GARAGE_ACCESS_KEY_ID"},
+  secret_access_key: {:system, "GARAGE_SECRET_ACCESS_KEY"},
+  region: "garage"
+
+config :ex_aws, :s3,
+  scheme: "http://",
+  host: "localhost",
+  port: 3900,
+  path_style: true
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

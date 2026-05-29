@@ -86,6 +86,19 @@ if config_env() == :prod do
         no_mx_lookups: true
   end
 
+  config :ex_aws,
+    access_key_id: System.fetch_env!("GARAGE_ACCESS_KEY_ID"),
+    secret_access_key: System.fetch_env!("GARAGE_SECRET_ACCESS_KEY"),
+    region: "garage"
+
+  config :ex_aws, :s3,
+    scheme: "http://",
+    host: System.fetch_env!("GARAGE_HOST"),
+    port: String.to_integer(System.get_env("GARAGE_PORT", "3900")),
+    path_style: true
+
+  config :tore, :storage_client, Tore.Storage.S3
+
   config :tore, ToreWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

@@ -83,6 +83,9 @@ config :tore,
        System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
 
 
+config :tore, :storage_client, Tore.Storage.S3
+config :tore, :env, :dev
+
 # Enable dev routes for dashboard and mailbox
 config :tore, dev_routes: true
 
