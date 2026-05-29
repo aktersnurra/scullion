@@ -44,6 +44,7 @@ defmodule ToreWeb.Router do
       live "/costs", CostLive
       live "/cooking", CookingLive
       live "/settings", SettingsLive
+      live "/chat", ChatLive
     end
   end
 end
