@@ -5,7 +5,7 @@ defmodule Tore.StorageMockTest do
   alias Tore.Storage.Buckets
 
   setup do
-    start_supervised!(Mock)
+    Mock.reset()
     :ok
   end
 

@@ -15,15 +15,14 @@ defmodule Tore.Handlers.RecipeHandler do
 
   @spec generate_image(Tore.Recipes.Recipe.t(), String.t() | nil) :: :ok | {:error, term()}
   def generate_image(recipe, image_url) do
-    uploads_dir = Path.join(Application.fetch_env!(:tore, :uploads_dir), "recipes")
-    File.mkdir_p!(uploads_dir)
+    storage = Tore.Storage.client()
+    key = "recipes/#{recipe.id}/#{Ecto.UUID.generate()}.jpg"
 
     with {:ok, binary} <- fetch_or_generate(recipe, image_url),
-         path = Path.join(uploads_dir, "#{recipe.id}.jpg"),
-         :ok <- File.write(path, binary) do
+         {:ok, url} <- storage.put_object(Tore.Storage.Buckets.recipes(), key, binary, content_type: "image/jpeg") do
       Tore.Repo.update_all(
         from(r in Tore.Recipes.Recipe, where: r.id == ^recipe.id),
-        set: [image_path: "/uploads/recipes/#{recipe.id}.jpg"]
+        set: [image_path: url]
       )
 
       :ok
