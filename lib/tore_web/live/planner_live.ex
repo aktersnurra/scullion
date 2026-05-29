@@ -72,7 +72,7 @@ defmodule ToreWeb.PlannerLive do
     plan_id = socket.assigns.plan_id
 
     dietary_guidance =
-      Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
+      Tore.Family.get_preferences() |> Tore.Family.prefs_to_dietary_guidance()
 
     Task.start(fn ->
       case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
@@ -158,7 +158,7 @@ defmodule ToreWeb.PlannerLive do
     sk = s.slot_key
 
     dietary_guidance =
-      Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
+      Tore.Family.get_preferences() |> Tore.Family.prefs_to_dietary_guidance()
 
     Task.start(fn ->
       case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
