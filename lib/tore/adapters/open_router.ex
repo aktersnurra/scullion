@@ -7,13 +7,13 @@ defmodule Tore.Adapters.OpenRouter do
   @impl Tore.LLM
   def generate_plan(constraints) do
     {system, user} = Tore.LLM.Prompts.plan_weekly(constraints)
-    chat(system, user)
+    json_chat(system, user)
   end
 
   @impl Tore.LLM
   def generate_prep_guide(plan, locale \\ nil) do
     {system, user} = Tore.LLM.Prompts.prep_guide(plan, locale)
-    chat(system, user)
+    json_chat(system, user)
   end
 
   @impl Tore.LLM
@@ -23,7 +23,7 @@ defmodule Tore.Adapters.OpenRouter do
   def suggest_slot_recipe(context) do
     {system, user} = Tore.LLM.Prompts.suggest_slot_recipe(context)
 
-    case chat(system, user) do
+    case json_chat(system, user) do
       {:ok, %{"recipe_id" => rid} = data, usage} when is_integer(rid) ->
         candidate_ids = MapSet.new(context.candidate_recipe_ids || [])
 
@@ -46,7 +46,7 @@ defmodule Tore.Adapters.OpenRouter do
     with :ok <- check_parseable(html) do
       {system, user} = Tore.LLM.Prompts.extract_recipe(html, locale)
 
-      case chat(system, user, Tore.LLM.Prompts.recipe_json_schema()) do
+      case json_chat(system, user, Tore.LLM.Prompts.recipe_json_schema()) do
         {:ok, data, _usage} -> {:ok, parse_recipe_attrs(data)}
         {:error, reason} -> {:error, reason}
       end
@@ -244,7 +244,7 @@ defmodule Tore.Adapters.OpenRouter do
   def estimate_nutrition(%{title: title, ingredients: ingredients}) do
     {system, _} = Tore.LLM.Prompts.estimate_nutrition()
     user = "Recipe: #{title}\nIngredients: #{Enum.join(ingredients, ", ")}"
-    chat(system, user)
+    json_chat(system, user)
   end
 
   def estimate_nutrition(_), do: {:error, :invalid_recipe}
@@ -291,7 +291,7 @@ defmodule Tore.Adapters.OpenRouter do
 
     user = "Recipe: #{recipe_context}\nMissing ingredient: #{missing}"
 
-    case chat(system, user) do
+    case json_chat(system, user) do
       {:ok, %{"suggestion" => suggestion} = result, _usage} ->
         {:ok, %{
           suggestion: suggestion,
@@ -322,7 +322,7 @@ defmodule Tore.Adapters.OpenRouter do
 
     user = "Recipe: #{title}\nSteps: #{instructions}"
 
-    case chat(system, user) do
+    case json_chat(system, user) do
       {:ok, %{"do_first" => do_first, "while_cooking" => while_cooking, "finish" => finish}, _usage} ->
         {:ok, %{do_first: do_first, while_cooking: while_cooking, finish: finish}}
 
@@ -333,6 +333,41 @@ defmodule Tore.Adapters.OpenRouter do
         {:error, reason}
     end
   end
+
+  @impl Tore.LLM
+  def chat(system, messages) do
+    body = %{
+      model: model(),
+      messages: [%{role: "system", content: system} | messages]
+    }
+
+    case Req.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+             {"X-Title", "Tore"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        content = get_in(resp, ["choices", Access.at(0), "message", "content"])
+        usage = extract_usage(resp)
+        {:ok, content, usage}
+
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
+    end
+  end
+
 
   @impl Tore.LLM
   def parse_deals_image(_image), do: {:error, :not_implemented}
@@ -579,7 +614,7 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
-  defp chat(system_prompt, user_prompt, response_format \\ %{type: "json_object"}) do
+  defp json_chat(system_prompt, user_prompt, response_format \\ %{type: "json_object"}) do
     body = %{
       model: model(),
       response_format: response_format,

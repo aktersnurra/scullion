@@ -29,4 +29,7 @@ defmodule Tore.LLM do
   @callback cook_mode_steps(recipe :: map()) ::
               {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}} |
               {:error, term()}
+
+  @callback chat(system :: String.t(), messages :: [map()]) ::
+              {:ok, String.t(), map()} | {:error, term()}
 end
