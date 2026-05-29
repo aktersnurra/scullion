@@ -370,6 +370,67 @@ defmodule Tore.Adapters.OpenRouter do
 
 
   @impl Tore.LLM
+  def classify_image(image_binary) do
+    system = """
+    You are an image classifier for a meal planning app.
+    Classify the image into exactly one of these categories: receipt, recipe, pantry_items, fridge, unknown.
+    - receipt: a store receipt or invoice with line items and prices
+    - recipe: a recipe card, cookbook page, or handwritten recipe
+    - pantry_items: individual food products, cans, boxes, ingredients on a shelf or counter
+    - fridge: an open fridge or freezer showing its contents
+    - unknown: anything else
+    Return JSON only: {"class": "<one of the five values>", "confidence": <0.0-1.0>}
+    """
+
+    user_text = "Classify this image."
+    b64 = Base.encode64(image_binary)
+
+    body = %{
+      model: vision_model(),
+      messages: [
+        %{role: "system", content: system},
+        %{
+          role: "user",
+          content: [
+            %{type: "text", text: user_text},
+            %{type: "image_url", image_url: %{url: "data:image/jpeg;base64,#{b64}"}}
+          ]
+        }
+      ]
+    }
+
+    case Req.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://scullion.gustafrydholm.xyz"},
+             {"X-Title", "Tore"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        content = get_in(resp, ["choices", Access.at(0), "message", "content"])
+
+        with {:ok, %{"class" => cls, "confidence" => conf}} <- Jason.decode(content),
+             class_atom when class_atom != nil <- parse_image_class(cls) do
+          {:ok, %{class: class_atom, confidence: conf}}
+        else
+          _ -> {:ok, %{class: :unknown, confidence: 0.0}}
+        end
+
+      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
+      {:ok, %{status: 429}} -> {:error, :rate_limited}
+      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
+      {:error, reason} -> {:error, {:http_error, reason}}
+    end
+  end
+
+  defp parse_image_class("receipt"), do: :receipt
+  defp parse_image_class("recipe"), do: :recipe
+  defp parse_image_class("pantry_items"), do: :pantry_items
+  defp parse_image_class("fridge"), do: :fridge
+  defp parse_image_class(_), do: :unknown
+
+  @impl Tore.LLM
   def parse_deals_image(_image), do: {:error, :not_implemented}
 
   @impl Tore.LLM

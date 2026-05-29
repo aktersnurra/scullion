@@ -32,4 +32,8 @@ defmodule Tore.LLM do
 
   @callback chat(system :: String.t(), messages :: [map()]) ::
               {:ok, String.t(), map()} | {:error, term()}
+
+  @callback classify_image(image :: binary()) ::
+              {:ok, %{class: :receipt | :recipe | :pantry_items | :fridge | :unknown, confidence: float()}}
+              | {:error, term()}
 end
