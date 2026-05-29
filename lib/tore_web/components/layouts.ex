@@ -8,7 +8,8 @@ defmodule ToreWeb.Layouts do
 
   defp nav_items do
     [
-      {"/", gettext("Week"), "nav-week"},
+      {"/", gettext("Home"), "nav-home"},
+      {"/plan", gettext("Week"), "nav-week"},
       {"/recipes", gettext("Recipes"), "nav-recipes"},
       {"/groceries", gettext("Groceries"), "nav-groceries"},
       {"/prep", gettext("Prep"), "nav-prep"},
@@ -45,7 +46,7 @@ defmodule ToreWeb.Layouts do
       {render_slot(@inner_block)}
     </main>
 
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-9 bg-[var(--surface)] border-t border-[color:var(--border)]">
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-10 bg-[var(--surface)] border-t border-[color:var(--border)]">
       <.bottom_link
         :for={{path, _label, icon} <- @nav_items}
         path={path}

@@ -34,7 +34,8 @@ defmodule ToreWeb.Router do
 
     live_session :authenticated,
       on_mount: [{ToreWeb.Live.Auth, :require_authenticated}] do
-      live "/", PlannerLive
+      live "/", HomeLive
+      live "/plan", PlannerLive
       live "/recipes", RecipeLive
       live "/groceries", GroceryLive
       live "/prep", PrepLive
