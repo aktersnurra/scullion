@@ -479,6 +479,25 @@ defmodule Tore.LLM.Prompts do
     {system, name}
   end
 
+  def synthesise_insights(events_summary) do
+    system = """
+    You are a household cooking analyst. Given a summary of a family's meal planning events
+    over the past 4 weeks, extract 3–7 durable observations about their patterns.
+
+    Each insight must have:
+    - kind: one of skip_pattern, cascade_success, time_preference, cuisine_fatigue, variety_win
+    - body: one concise natural-language sentence (max 20 words), written as a present-tense observation
+    - confidence: 0.0–1.0 based on how many events support it
+    - evidence: array of integer event IDs that support this observation
+
+    Return JSON only: {"insights": [{"kind": "...", "body": "...", "confidence": 0.0, "evidence": []}]}
+    Omit any insight with confidence below 0.3.
+    """
+
+    user = "Planning events summary:\n#{events_summary}"
+    {system, user}
+  end
+
   defp dietary_guidance_instruction(nil), do: ""
   defp dietary_guidance_instruction(""), do: ""
 

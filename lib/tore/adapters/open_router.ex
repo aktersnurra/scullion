@@ -617,6 +617,32 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
+  @impl Tore.LLM
+  def synthesise_insights(events_summary) do
+    {system, user} = Tore.LLM.Prompts.synthesise_insights(events_summary)
+
+    case json_chat(system, user) do
+      {:ok, %{"insights" => insights}, _usage} when is_list(insights) ->
+        parsed =
+          Enum.map(insights, fn i ->
+            %{
+              kind: i["kind"],
+              body: i["body"],
+              confidence: i["confidence"] || 0.5,
+              evidence: i["evidence"] || []
+            }
+          end)
+
+        {:ok, parsed}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   defp check_parseable(html) do
     {system, user} = Tore.LLM.Prompts.check_recipe_html(html)
 

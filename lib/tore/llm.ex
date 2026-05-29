@@ -36,4 +36,8 @@ defmodule Tore.LLM do
   @callback classify_image(image :: binary()) ::
               {:ok, %{class: :receipt | :recipe | :pantry_items | :fridge | :unknown, confidence: float()}}
               | {:error, term()}
+
+  @callback synthesise_insights(events_summary :: String.t()) ::
+    {:ok, [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]} |
+    {:error, term()}
 end
