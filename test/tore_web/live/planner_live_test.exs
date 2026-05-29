@@ -34,7 +34,7 @@ defmodule ToreWeb.PlannerLiveTest do
   describe "slot modal" do
     test "open_slot loads suggestions and shows modal", %{conn: conn, user: user, recipe: recipe} do
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
 
       html = render_click(lv, "open_slot", %{"slot_key" => "mon_dinner"})
       # modal title
@@ -52,7 +52,7 @@ defmodule ToreWeb.PlannerLiveTest do
       recipe: recipe
     } do
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
       render_click(lv, "open_slot", %{"slot_key" => "tue_dinner"})
       :timer.sleep(150)
       render_click(lv, "pick_recipe", %{"id" => to_string(recipe.id)})
@@ -68,7 +68,7 @@ defmodule ToreWeb.PlannerLiveTest do
       recipe: recipe
     } do
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
       render_click(lv, "open_slot", %{"slot_key" => "mon_dinner"})
       :timer.sleep(150)
       render_click(lv, "pick_recipe", %{"id" => to_string(recipe.id)})
@@ -89,7 +89,7 @@ defmodule ToreWeb.PlannerLiveTest do
       PlanningHandler.assign_recipe(this_plan_id(), "wed_dinner", recipe.id, 4)
 
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
       render_click(lv, "open_slot", %{"slot_key" => "wed_dinner"})
       :timer.sleep(150)
       render_click(lv, "toggle_skipped", %{})
@@ -101,7 +101,7 @@ defmodule ToreWeb.PlannerLiveTest do
 
     test "search_slot_recipes event updates search state", %{conn: conn, user: user} do
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
       render_click(lv, "open_slot", %{"slot_key" => "mon_dinner"})
       :timer.sleep(150)
       # drive the event directly rather than via form helper (avoids phx-click-away)
@@ -112,7 +112,7 @@ defmodule ToreWeb.PlannerLiveTest do
 
     test "servings stepper bounded to 1..12", %{conn: conn, user: user} do
       conn = authed(conn, user)
-      {:ok, lv, _html} = live(conn, "/")
+      {:ok, lv, _html} = live(conn, "/plan")
       render_click(lv, "open_slot", %{"slot_key" => "mon_dinner"})
       :timer.sleep(150)
 
