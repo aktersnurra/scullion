@@ -45,4 +45,21 @@ defmodule Tore.LLM.ToolTest do
     assert {:error, {:missing_arg, "slot_key"}} = Tool.validate_args(t, %{})
     assert :ok = Tool.validate_args(t, %{"slot_key" => "mon_dinner"})
   end
+
+  test "validate_args handles string-keyed `required` list" do
+    t = %Tool{
+      name: "skip_meal",
+      description: "x",
+      kind: :action,
+      parameters: %{
+        "type" => "object",
+        "properties" => %{"slot_key" => %{"type" => "string"}},
+        "required" => ["slot_key"]
+      },
+      run: fn _, _ -> {:ok, %{}} end
+    }
+
+    assert {:error, {:missing_arg, "slot_key"}} = Tool.validate_args(t, %{})
+    assert :ok = Tool.validate_args(t, %{"slot_key" => "mon_dinner"})
+  end
 end
