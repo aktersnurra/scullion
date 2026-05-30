@@ -40,4 +40,16 @@ defmodule Tore.LLM do
   @callback synthesise_insights(events_summary :: String.t()) ::
     {:ok, [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]} |
     {:error, term()}
+
+  @type tool_call :: %{id: String.t(), name: String.t(), args: map()}
+  @type tool_response ::
+          {:message, String.t()}
+          | {:tool_calls, [tool_call()]}
+
+  @callback chat_with_tools(
+              system :: String.t(),
+              messages :: [map()],
+              tools :: [map()],
+              opts :: keyword()
+            ) :: {:ok, tool_response(), usage :: map()} | {:error, term()}
 end
