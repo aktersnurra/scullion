@@ -184,21 +184,26 @@ defmodule Tore.LLM.PlannerTools do
       },
       run: fn args, _ctx ->
         limit = Map.get(args, "limit", 8)
+        max_minutes = args["max_minutes"]
 
         base =
           case args["query"] do
-            q when is_binary(q) and byte_size(q) > 0 -> Tore.Recipes.search(q)
-            _ -> Tore.Recipes.list()
-          end
+            q when is_binary(q) and byte_size(q) > 0 ->
+              results = Tore.Recipes.search(q)
 
-        filtered =
-          case args["max_minutes"] do
-            n when is_integer(n) -> Enum.filter(base, &recipe_under_minutes?(&1, n))
-            _ -> base
+              if is_integer(max_minutes) do
+                Enum.filter(results, &recipe_under_minutes?(&1, max_minutes))
+              else
+                results
+              end
+
+            _ ->
+              opts = if is_integer(max_minutes), do: [max_minutes: max_minutes], else: []
+              Tore.Recipes.list(opts)
           end
 
         result =
-          filtered
+          base
           |> Enum.take(limit)
           |> Enum.map(&summarise_recipe/1)
 
@@ -235,7 +240,8 @@ defmodule Tore.LLM.PlannerTools do
   defp active_deals do
     %Tool{
       name: "active_deals",
-      description: "Currently active store deals across configured stores.",
+      description:
+        "Currently active store deals across configured stores. Use before suggesting recipes that align with current promotions.",
       kind: :read,
       parameters: %{type: "object", properties: %{}, required: []},
       run: fn _args, _ctx ->
@@ -258,23 +264,26 @@ defmodule Tore.LLM.PlannerTools do
     }
   end
 
-  defp recipe_under_minutes?(%{prep_time_minutes: p, cook_time_minutes: c}, max) do
-    total = (p || 0) + (c || 0)
-    total <= max
+  defp recipe_under_minutes?(%{prep_time_minutes: _, cook_time_minutes: _} = recipe, max) do
+    total_minutes(recipe) <= max
   end
 
   defp recipe_under_minutes?(_, _), do: false
 
   defp summarise_recipe(r) do
-    total = (r.prep_time_minutes || 0) + (r.cook_time_minutes || 0)
-
     %{
       id: r.id,
       title: r.title,
       base_servings: r.base_servings,
-      total_minutes: total
+      total_minutes: total_minutes(r)
     }
   end
+
+  defp total_minutes(%{prep_time_minutes: p, cook_time_minutes: c}) do
+    (p || 0) + (c || 0)
+  end
+
+  defp total_minutes(_), do: 0
 
   defp wrap_ok({:ok, _}), do: {:ok, %{ok: true}}
   defp wrap_ok({:error, reason}), do: {:error, reason}
