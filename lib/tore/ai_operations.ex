@@ -13,4 +13,13 @@ defmodule Tore.AiOperations do
   def find_by_correlation(correlation_id) do
     Repo.one(from o in AiOperation, where: o.correlation_id == ^correlation_id)
   end
+
+  @spec list_by_correlation(String.t()) :: [AiOperation.t()]
+  def list_by_correlation(correlation_id) do
+    Repo.all(
+      from o in AiOperation,
+        where: o.correlation_id == ^correlation_id,
+        order_by: [asc: o.step_index]
+    )
+  end
 end

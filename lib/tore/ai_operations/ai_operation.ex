@@ -7,15 +7,17 @@ defmodule Tore.AiOperations.AiOperation do
     field :kind, :string
     field :payload, :string
     field :result, :string
+    field :step_index, :integer, default: 0
     field :undo_op_id, :integer
     field :inserted_at, :utc_datetime, autogenerate: false
   end
 
   def changeset(op, attrs) do
     op
-    |> cast(attrs, [:correlation_id, :kind, :payload, :result, :undo_op_id])
+    |> cast(attrs, [:correlation_id, :kind, :payload, :result, :step_index, :undo_op_id])
     |> validate_required([:correlation_id, :kind])
-    |> unique_constraint(:correlation_id)
+    |> unique_constraint([:correlation_id, :step_index],
+         name: :ai_operations_correlation_id_step_index_index)
     |> put_inserted_at()
   end
 
