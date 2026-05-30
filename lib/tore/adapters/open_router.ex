@@ -423,6 +423,14 @@ defmodule Tore.Adapters.OpenRouter do
     %{id: id, name: name, args: args}
   end
 
+  defp decode_tool_call(other) when is_map(other) do
+    %{
+      id: Map.get(other, "id", ""),
+      name: get_in(other, ["function", "name"]) || "",
+      args: %{}
+    }
+  end
+
   @impl Tore.LLM
   def classify_image(image_binary) do
     system = """

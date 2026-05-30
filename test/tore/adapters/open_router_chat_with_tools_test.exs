@@ -6,7 +6,6 @@ defmodule Tore.Adapters.OpenRouterChatWithToolsTest do
   alias Tore.Adapters.OpenRouter
 
   setup do
-    Application.put_env(:tore, :http_client, Tore.MockHTTP)
     Application.put_env(:tore, :openrouter_api_key, "test-key")
     :ok
   end
