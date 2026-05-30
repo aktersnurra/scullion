@@ -19,7 +19,8 @@ defmodule ToreWeb.SettingsLive do
        new_user_name: "",
        revealed_codes: %{},
        add_error: nil,
-       ai: ai
+       ai: ai,
+       memory_insights: Tore.Family.list_active_insights()
      )}
   end
 
@@ -67,6 +68,11 @@ defmodule ToreWeb.SettingsLive do
     {:noreply, assign(socket, revealed_codes: revealed)}
   end
 
+  def handle_event("forget_insight", %{"id" => id}, socket) do
+    Tore.Family.dismiss_insight(String.to_integer(id))
+    {:noreply, assign(socket, memory_insights: Tore.Family.list_active_insights())}
+  end
+
   defp format_code(code) do
     code
     |> String.graphemes()
@@ -77,6 +83,10 @@ defmodule ToreWeb.SettingsLive do
 
   defp format_usd(nil), do: "$0.00"
   defp format_usd(v), do: "$#{:erlang.float_to_binary(v / 1, decimals: 2)}"
+
+  defp confidence_label(c) when c >= 0.8, do: gettext("High confidence")
+  defp confidence_label(c) when c >= 0.5, do: gettext("Medium confidence")
+  defp confidence_label(_c), do: gettext("Low confidence")
 
   defp feature_label("generate_plan"), do: gettext("Plan generation")
   defp feature_label("prep_guide"), do: gettext("Prep guide")
@@ -207,6 +217,39 @@ defmodule ToreWeb.SettingsLive do
                 {gettext("Revoke")}
               </button>
             </div>
+          </section>
+
+          <%!-- Kitchen memory --%>
+          <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
+            <h2
+              class="uppercase tracking-wider text-[color:var(--subtle)] mb-3"
+              style="font-size: var(--t-micro); font-weight: 600;"
+            >
+              {gettext("Things Tore has learned")}
+            </h2>
+            <%= if Enum.empty?(@memory_insights) do %>
+              <p class="text-sm text-zinc-500">{gettext("No memories yet. Tore learns as you cook.")}</p>
+            <% else %>
+              <ul class="space-y-2">
+                <%= for insight <- @memory_insights do %>
+                  <li class="flex items-start justify-between gap-3 rounded-lg border border-zinc-200 p-3">
+                    <div class="flex-1">
+                      <p class="text-sm">{insight.body}</p>
+                      <span class="mt-1 inline-block rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
+                        {confidence_label(insight.confidence)}
+                      </span>
+                    </div>
+                    <button
+                      phx-click="forget_insight"
+                      phx-value-id={insight.id}
+                      class="text-xs text-red-500 hover:text-red-700 shrink-0 mt-0.5"
+                    >
+                      {gettext("Forget")}
+                    </button>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
           </section>
 
           <%!-- AI usage --%>

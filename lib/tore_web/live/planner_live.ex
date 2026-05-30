@@ -28,7 +28,9 @@ defmodule ToreWeb.PlannerLive do
        slot_action: nil,
        counter_notes: Tore.CounterNotes.list_for_surface("week"),
        plan_health: PlanHealth.compute(plan_state),
-       current_week_mode: Tore.WeekMode.get_current_mode()
+       current_week_mode: Tore.WeekMode.get_current_mode(),
+       quick_reply: nil,
+       quick_loading: false
      )}
   end
 
@@ -198,6 +200,21 @@ defmodule ToreWeb.PlannerLive do
     end
   end
 
+  def handle_event("quick_command", %{"command" => command}, socket) when command != "" do
+    {:noreply,
+     socket
+     |> assign(quick_loading: true, quick_reply: nil)
+     |> then(fn s -> send(self(), {:run_quick_command, command}); s end)}
+  end
+
+  def handle_event("quick_command", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("dismiss_quick_reply", _params, socket) do
+    {:noreply, assign(socket, quick_reply: nil)}
+  end
+
   def handle_event("open_chat", _params, socket) do
     {:noreply, push_navigate(socket, to: "/chat")}
   end
@@ -257,6 +274,17 @@ defmodule ToreWeb.PlannerLive do
         GroceriesHandler.build_list(grocery_id(week_start), week_start, recipe_ids)
       end)
     end
+  end
+
+  def handle_info({:run_quick_command, command}, socket) do
+    system_prompt = Tore.Chat.SystemPrompt.build()
+    result = Tore.Chat.ChatHandler.handle_text(command, %{system_prompt: system_prompt})
+    reply =
+      case result do
+        {:ok, text, _} -> text
+        {:error, _} -> gettext("Something went wrong. Try again.")
+      end
+    {:noreply, assign(socket, quick_reply: reply, quick_loading: false)}
   end
 
   def handle_info({:events, _events}, socket) do
@@ -345,6 +373,37 @@ defmodule ToreWeb.PlannerLive do
             <.icon name="hero-chevron-right" class="size-5" />
           </button>
         </header>
+
+        <div class="mb-4">
+          <form phx-submit="quick_command" class="flex gap-2">
+            <input
+              type="text"
+              name="command"
+              placeholder={gettext("Ask about tonight's plan...")}
+              class="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={@quick_loading}
+            />
+            <button
+              type="submit"
+              class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              disabled={@quick_loading}
+            >
+              <%= if @quick_loading, do: gettext("..."), else: gettext("Ask") %>
+            </button>
+          </form>
+
+          <%= if @quick_reply do %>
+            <div class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900 relative">
+              <%= @quick_reply %>
+              <button
+                phx-click="dismiss_quick_reply"
+                class="absolute top-2 right-2 text-blue-400 hover:text-blue-600"
+              >
+                ✕
+              </button>
+            </div>
+          <% end %>
+        </div>
 
         <%!-- Counter notes --%>
         <%= if @counter_notes != [] do %>
