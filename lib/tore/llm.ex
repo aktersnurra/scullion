@@ -41,7 +41,7 @@ defmodule Tore.LLM do
     {:ok, [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]} |
     {:error, term()}
 
-  @type tool_call :: %{id: String.t(), name: String.t(), args: map()}
+  @type tool_call :: %{id: String.t(), name: String.t(), args: %{String.t() => term()}}
   @type tool_response ::
           {:message, String.t()}
           | {:tool_calls, [tool_call()]}
