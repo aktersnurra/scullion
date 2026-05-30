@@ -155,7 +155,7 @@ defmodule Tore.LLM.PlannerTools do
       name: "ask_user",
       description:
         "Surface a clarifying question to the user instead of guessing. Terminal: the agent stops the loop and shows the question.",
-      kind: :action,
+      kind: :read,
       parameters: %{
         type: "object",
         properties: %{question: %{type: "string"}},
