@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>2026-05-28-ai-first-redesign-design</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="/home/aktersnurra/.claude/skills/explain/assets/style.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">2026-05-28-ai-first-redesign-design</h1>
+</header>
+<section id="ai-first-redesign-design-spec" class="level1">
+<h1>AI-First Redesign — Design Spec</h1>
+<p><em>Tore · Brainstorming session 2026-05-28</em></p>
+<hr />
+<section id="core-philosophy" class="level2">
+<h2>Core Philosophy</h2>
+<p><strong>The app has two modes: cooking mode and planning
+mode.</strong> The home screen is cooking mode — tonight, right now, low
+friction. The week view is planning mode — thinking ahead, adjusting the
+plan.</p>
+<p><strong>Risk-tiered actions, not uniform act-then-undo.</strong>
+Actions are classified by reversibility: - <strong>Tier 1 — Trivially
+reversible</strong> (add pantry item, add grocery item): act
+immediately, toast confirmation, undo chip in toast. - <strong>Tier 2 —
+Recoverable with effort</strong> (swap meal slot, skip meal): act
+immediately, toast with undo. Undo is a compensating event. -
+<strong>Tier 3 — Destructive or hard to reverse</strong> (clear pantry,
+delete recipe, purge week plan): confirm before acting. One confirmation
+step, no confirmation theatre for simple things.</p>
+<p><strong>Background AI produces drafts, never silent
+mutations.</strong> Scheduled jobs (plan generation, insights synthesis)
+write to a <code>drafts</code> state. The draft is surfaced to the user
+with a one-tap accept. Once accepted, the plan becomes active. The AI
+never silently replaces an accepted plan. Replanning mid-week always
+produces a draft first.</p>
+<p><strong>The AI is infrastructure, not a feature.</strong> The plan
+exists before you open the app. The grocery list is already built. The
+AI’s work happens in the background — you live with the output and nudge
+when needed.</p>
+<p><strong>The app is not allowed to nag.</strong> No guilt, no streaks,
+no “you haven’t updated your pantry in 14 days.” It is ready when you
+come to it.</p>
+<p><strong>Voice: warm but brief.</strong> The AI speaks like a
+knowledgeable friend who left a note on the counter. “You’ve got a good
+week ahead — roast chicken tonight sets up the next three days.”</p>
+<p><strong>The cascade model is load-bearing.</strong> Weekly meal
+planning follows a batch-cook-and-transform approach: cook a larger
+component on Sunday (roast chicken, a grain, a sauce), then build
+weeknight meals from it. The AI reasons from this model at all times.
+When it reshuffles a slot, it considers what needs to be prepped the day
+before, what downstream meals depend on the change, and whether the
+grocery list needs updating. “I want fried rice Wednesday” means the AI
+also ensures a rice or chicken component is planned for Tuesday, and
+updates everything accordingly.</p>
+<p><strong>Cascade metadata lives in the plan.</strong> Each plan slot
+carries lightweight metadata: <code>role</code> (anchor / derived /
+standalone), <code>produces</code> (list of component tags),
+<code>consumes</code> (list of component tags). This enables downstream
+awareness without re-deriving it from the prompt every time, and lets
+the UI show “uses Sunday’s chicken” without an LLM call.</p>
+<p><strong>Staleness is explicit.</strong> When a plan slot is stale
+(pantry changed, deal expired, ingredient no longer available), the slot
+shows a staleness indicator. Same for grocery lists and prep guides.
+Stale ≠ wrong — it just means a re-check is warranted.</p>
+<p><strong>Recipe generation is guarded.</strong> When the AI suggests
+recipes, it first searches the existing catalog. If no catalog match
+fits, it may generate a new recipe — but only when the user explicitly
+asks to “find something new” or the catalog has no suitable option.
+Catalog-first is always the default.</p>
+<hr />
+</section>
+<section id="phone-ui" class="level2">
+<h2>Phone UI</h2>
+<section id="home-screen-cooking-mode" class="level3">
+<h3>Home Screen (cooking mode)</h3>
+<p><strong>Top half — Tonight:</strong> - Recipe name, large. Food photo
+alongside it (not behind text — accessibility and readability). - One
+line of AI commentary: contextual, warm, specific. “Uses Sunday’s
+chicken — should be quick.” Generated once daily, cached. Never generic.
+- Prepped components visible if relevant: “✓ Chicken already done” if a
+component from an earlier slot is in pantry. - Two buttons: -
+<strong>Start cooking</strong> — opens the recipe detail -
+<strong>Something else</strong> — shuffle. AI picks an alternative that
+works with what’s already prepped, replans downstream if needed, updates
+grocery list, shows toast. No confirmation step (Tier 2 —
+recoverable).</p>
+<p><strong>Bottom half — The week strip:</strong> - Compact horizontal
+day cards. Today highlighted. Each day shows meal name and food photo
+thumbnail. - Tap any day to open an expanded sheet for that slot (same
+structure as tonight’s card, plus slot controls — see Week View). - No
+calendar grid.</p>
+<p><strong>FAB — bottom right:</strong> - Persistent floating action
+button, always accessible. - Labelled “Ask Tore” or “Tell Tore”
+depending on context (cooking question vs action intent). - Opens the AI
+chat interface (see AI Assistant section below).</p>
+<hr />
+</section>
+<section id="week-view-planning-mode" class="level3">
+<h3>Week View (planning mode)</h3>
+<ul>
+<li>Full week as scrollable day cards with food photos.</li>
+<li>Tap a card to expand it as a sheet. The sheet shows: recipe name,
+photo, cascade notes, and three slot action buttons:
+<strong>pin</strong>, <strong>something else</strong>,
+<strong>skip</strong>.</li>
+<li>Inline buttons are NOT shown on the collapsed cards — only in the
+expanded sheet.</li>
+<li><strong>Accept draft</strong> button at the top if a new plan draft
+is pending. One tap to accept.</li>
+<li><strong>Regenerate plan</strong> at the top — full LLM replan
+respecting any pins. Always produces a draft.</li>
+<li>Plan history: navigate to previous weeks.</li>
+<li>Slot state includes: <code>assigned</code>, <code>pinned</code>,
+<code>skipped</code>, <code>flexible</code> (AI may adjust),
+<code>draft</code>.</li>
+</ul>
+<hr />
+</section>
+<section id="grocery-list" class="level3">
+<h3>Grocery List</h3>
+<ul>
+<li>Grouped by category. Check items off. Real-time sync across phone
+and kiosk via PubSub.</li>
+<li>Manual add via text input or via AI chat (“add 1 kg chicken”).</li>
+<li>Checked items flow to pantry automatically.</li>
+<li>Staleness indicator if the list is based on a plan that has since
+changed.</li>
+</ul>
+<hr />
+</section>
+<section id="recipes" class="level3">
+<h3>Recipes</h3>
+<ul>
+<li>Search + filter by tags, time, type. Sort by last used / most used /
+recently added.</li>
+<li>Each recipe shows cascade notes where relevant (“produces leftover
+for Tuesday”).</li>
+<li>Add via URL scrape or via AI chat (“find me a quick pasta
+recipe”).</li>
+<li>AI searches catalog first. New recipe generation requires explicit
+“find something new” intent.</li>
+</ul>
+<hr />
+</section>
+<section id="pantry" class="level3">
+<h3>Pantry</h3>
+<ul>
+<li>Read-only inference view: “here’s what we think you have.” Not a
+management screen.</li>
+<li>Each item carries a confidence level: <code>confirmed</code> (user
+explicitly added), <code>probably_have</code> (checked off grocery
+list), <code>maybe_have</code> (inferred from plan history),
+<code>stale</code> (not seen in &gt;2 weeks), <code>removed</code> (user
+deleted).</li>
+<li>Lightweight correction: tap an item to remove, adjust quantity,
+adjust expiry, or mark as confirmed.</li>
+<li>Primary input: AI chat, checked-off grocery items, or receipt/fridge
+photo via chat.</li>
+<li>Items surface with their confidence level in the AI’s system prompt
+— the AI reasons accordingly (“you probably have chicken”).</li>
+</ul>
+<hr />
+</section>
+<section id="insights-weekly-ai-prose" class="level3">
+<h3>Insights (weekly, AI prose)</h3>
+<ul>
+<li>Natural language observations synthesised from planning events.</li>
+<li>“You skip Thursdays often — the plan has been adjusted to account
+for this.”</li>
+<li>Updated weekly by a background Quantum job. No rating UI, no user
+input required.</li>
+<li>Lives in settings/profile area — not in the main nav. Occasional
+view.</li>
+</ul>
+<section id="memory-model-two-tiers" class="level4">
+<h4>Memory model: two tiers</h4>
+<p><strong>Tier 1 — Stable patterns (weekly LLM synthesis)</strong></p>
+<p>Stored as a set of insight records rather than a single blob. Each
+record carries:</p>
+<pre><code>family_insights (
+  id           INTEGER PRIMARY KEY,
+  family_id    → families,
+  kind         TEXT,   -- &quot;skip_pattern&quot;, &quot;cascade_success&quot;, &quot;time_preference&quot;, etc.
+  body         TEXT,   -- NL observation, LLM-written
+  confidence   REAL,   -- 0.0–1.0
+  evidence     TEXT,   -- JSON array of event IDs that support this insight
+  status       TEXT,   -- &quot;active&quot;, &quot;superseded&quot;, &quot;dismissed&quot;
+  generated_at DATETIME
+)</code></pre>
+<p>Benefits over a single blob: individual insights can be dismissed,
+superseded, or updated independently. Confidence scores inform how
+strongly each insight is injected into the system prompt. Dismissed
+insights are excluded from prompts without losing history.</p>
+<p>Example insight records:</p>
+<pre><code>kind: &quot;skip_pattern&quot;,    body: &quot;You skip Thursday dinners most weeks — likely eating out.&quot;,         confidence: 0.85
+kind: &quot;cascade_success&quot;, body: &quot;Chicken-based cascades work well and typically survive to Wednesday.&quot;, confidence: 0.72
+kind: &quot;time_preference&quot;, body: &quot;Quick weeknight meals (≤30 min) are more likely to actually get cooked.&quot;, confidence: 0.68</code></pre>
+<p><strong>Tier 2 — This week context (free, from event
+store)</strong></p>
+<p>A compact summary of the current week generated cheaply from raw
+events — no LLM call, just a query and a format. Regenerated fresh on
+every chat session open and every planning prompt render.</p>
+<p>Example:</p>
+<pre><code>This week: plan generated Saturday. Mon: Roast chicken (assigned). Tue: skipped.
+Wed: swapped to pasta. Thu–Fri: unplanned.</code></pre>
+<p>Tier 2 is never stored — generated on demand from the event
+store.</p>
+</section>
+<section id="synthesis-cadence" class="level4">
+<h4>Synthesis cadence</h4>
+<p>The weekly job weights events before synthesising: -
+<code>MealSkipped</code>, cascade failures → high importance (deviations
+reveal real patterns) - <code>RecipeAssigned</code> after a swap →
+medium (shows preference) - <code>PlanGenerated</code> with no changes →
+low (routine, little signal)</p>
+<p>This follows the importance-weighted retention approach from the
+Generative Agents research (Park et al., 2023).</p>
+<hr />
+</section>
+</section>
+<section id="out-of-main-nav-adminoccasional" class="level3">
+<h3>Out of main nav (admin/occasional)</h3>
+<ul>
+<li>Cost tracking and analytics (under “More”)</li>
+<li>Store configuration</li>
+<li>User management and device tokens</li>
+<li>OpenRouter / LLM settings + cost visibility</li>
+</ul>
+<p>Settings stays small. Only what’s needed to run the household.</p>
+<hr />
+</section>
+</section>
+<section id="ai-assistant-fab-chat" class="level2">
+<h2>AI Assistant (FAB + Chat)</h2>
+<section id="opening" class="level3">
+<h3>Opening</h3>
+<p>A floating action button, bottom-right, always visible on all
+screens. Tapping it opens a full-screen chat sheet sliding up from the
+bottom. The button is labelled “Ask Tore” when the context is
+informational (browsing recipes, viewing pantry) and “Tell Tore” when
+the context is action-oriented (viewing plan, grocery list).</p>
+</section>
+<section id="photo-upload-entry-points" class="level3">
+<h3>Photo upload entry points</h3>
+<p>Photo upload is available in two ways:</p>
+<ol type="1">
+<li><strong>Via the FAB chat</strong> — always available. Attach one or
+more photos, optionally with a caption. The pipeline classifies, groups,
+and routes them (see Photo input section below).</li>
+<li><strong>Contextual entry points</strong> — recipe page has a “Add
+photo” action, pantry page has a camera shortcut. These are sugar: they
+open the chat with a pre-filled caption (“Here’s a photo of my pantry”)
+and immediately trigger the file picker. The same classification
+pipeline runs regardless of entry point.</li>
+</ol>
+<p>There is no separate upload flow per page. The chat is the pipeline.
+Contextual entry points are shortcuts into it.</p>
+</section>
+<section id="conversation-model" class="level3">
+<h3>Conversation model</h3>
+<ul>
+<li>Message history at top, input + photo button at bottom.</li>
+<li>The AI can both <strong>converse</strong> (“what’s in my pantry?”)
+and <strong>act</strong> (updates app state directly).</li>
+<li>After acting, confirms in chat: “Done — added 1 kg chicken to
+pantry, expires Monday.” The underlying screen updates live via
+PubSub.</li>
+<li><strong>Undo</strong> appears as a tappable chip in the AI’s
+response for Tier 1 and Tier 2 actions.</li>
+<li>No approval step for Tier 1/2. Tier 3 actions surface a confirmation
+chip in chat before executing.</li>
+<li>Act first, undo if wrong (for Tier 1/2).</li>
+</ul>
+</section>
+<section id="aioperation-correlation" class="level3">
+<h3>AIOperation / correlation</h3>
+<p>Every AI action carries a <code>correlation_id</code> and is logged
+to an <code>ai_operations</code> table:</p>
+<pre><code>ai_operations (
+  id              INTEGER PRIMARY KEY,
+  correlation_id  TEXT UNIQUE,
+  family_id       → families,
+  kind            TEXT,    -- &quot;plan_swap&quot;, &quot;pantry_add&quot;, &quot;grocery_add&quot;, etc.
+  payload         TEXT,    -- JSON, input to the action
+  result          TEXT,    -- JSON AIActionResult
+  undo_op_id      INTEGER, -- references ai_operations for compensating operation
+  inserted_at     DATETIME
+)</code></pre>
+<p><code>AIActionResult</code> structure:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;changed&quot;</span><span class="fu">:</span> <span class="ot">[</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span><span class="dt">&quot;entity&quot;</span><span class="fu">:</span> <span class="st">&quot;plan_slot&quot;</span><span class="fu">,</span> <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="dv">42</span><span class="fu">,</span> <span class="dt">&quot;field&quot;</span><span class="fu">:</span> <span class="st">&quot;recipe_id&quot;</span><span class="fu">,</span> <span class="dt">&quot;from&quot;</span><span class="fu">:</span> <span class="dv">7</span><span class="fu">,</span> <span class="dt">&quot;to&quot;</span><span class="fu">:</span> <span class="dv">12</span><span class="fu">}</span><span class="ot">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">{</span><span class="dt">&quot;entity&quot;</span><span class="fu">:</span> <span class="st">&quot;grocery_item&quot;</span><span class="fu">,</span> <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="dv">88</span><span class="fu">,</span> <span class="dt">&quot;op&quot;</span><span class="fu">:</span> <span class="st">&quot;added&quot;</span><span class="fu">}</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;undo_operation_id&quot;</span><span class="fu">:</span> <span class="st">&quot;op_abc123&quot;</span><span class="fu">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;summary&quot;</span><span class="fu">:</span> <span class="st">&quot;Swapped Monday dinner to pasta. Added pasta and parmesan to grocery list.&quot;</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>This enables CRUD undo (pantry updates, grocery adds) that don’t have
+a compensating event in the event store. The <code>undo_op_id</code>
+points to a pre-computed compensating operation that can be replayed
+directly.</p>
+<p>AI operations are idempotent: replaying the same
+<code>correlation_id</code> is a no-op. The photo pipeline also
+generates a <code>correlation_id</code> per upload batch — re-submitting
+the same photo set returns the cached result.</p>
+</section>
+<section id="actions-the-ai-can-take" class="level3">
+<h3>Actions the AI can take</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Domain</th>
+<th>Actions</th>
+<th>Tier</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Planning</td>
+<td>Assign recipe to slot, swap recipe, skip meal, pin slot</td>
+<td>2</td>
+</tr>
+<tr class="even">
+<td>Planning</td>
+<td>Reshuffle full week</td>
+<td>3</td>
+</tr>
+<tr class="odd">
+<td>Grocery list</td>
+<td>Add item, remove item</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td>Pantry</td>
+<td>Add item (with quantity + expiry), remove item, update quantity</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td>Pantry</td>
+<td>Clear pantry</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>Recipes</td>
+<td>Suggest alternatives for a slot</td>
+<td>1</td>
+</tr>
+<tr class="odd">
+<td>Recipes</td>
+<td>Answer questions about a recipe</td>
+<td>1 (informational)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="photo-input" class="level3">
+<h3>Photo input</h3>
+<p>Photo upload lives in the chat (or via contextual shortcuts that open
+the chat).</p>
+<p><strong>Flow:</strong> 1. User attaches one or more photos,
+optionally with a caption 2. Each photo is classified independently —
+cheap vision call per photo to identify: receipt / recipe / pantry items
+/ fridge contents. Each classification carries a confidence score
+(0.0–1.0). 3. Low-confidence classifications (below 0.6) surface a
+disambiguation message: “I’m not sure what this is — a receipt or a
+recipe?” with tappable options. 4. Photos are <strong>grouped by
+class</strong> — all photos classified as <code>recipe</code> are sent
+together in one vision LLM call, etc. 5. Grouping enables multi-photo
+use cases: 3 screenshots of a recipe page → one extraction call → one
+complete recipe. 6. Each group routes to its structured output pipeline
+7. AI acts or surfaces a review card per group in chat (see below)</p>
+<p><strong>Classification → pipeline routing:</strong></p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Classified as</th>
+<th>Pipeline</th>
+<th>Default behaviour</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Receipt</td>
+<td>OCR → line items → costs + pantry update</td>
+<td>Surface review card (line items worth checking)</td>
+</tr>
+<tr class="even">
+<td>Recipe (photo or screenshot)</td>
+<td>Recipe extraction → catalog</td>
+<td>Surface review card (validate before saving)</td>
+</tr>
+<tr class="odd">
+<td>Pantry items (packaging, shopping bag)</td>
+<td>Vision → item list with quantities + expiry</td>
+<td>Surface review card (list of items to confirm)</td>
+</tr>
+<tr class="even">
+<td>Fridge / ingredients</td>
+<td>Vision → “what can I make?” suggestions</td>
+<td>Show recipe suggestions in chat, no save</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="review-cards-polymorphic" class="level3">
+<h3>Review cards (polymorphic)</h3>
+<p>The review card appears as a chat message with a
+<strong>“Review”</strong> button. Tapping it opens a full review screen
+at <code>/review/:class/:id</code>. The screen rendered depends on the
+content type:</p>
+<ul>
+<li><strong>Receipt</strong> — editable line items, total, store name.
+“Nothing saved yet.” Confirm → saves to costs, updates pantry.</li>
+<li><strong>Recipe</strong> — recipe card with ingredients,
+instructions, tags. “Nothing saved yet.” Confirm → saves to catalog.
+“Save as-is” skips validation.</li>
+<li><strong>Pantry items</strong> — list of inferred items with
+quantities and expiry dates. “Nothing saved yet.” Confirm → adds to
+pantry.</li>
+<li><strong>Fridge/ingredients</strong> — suggested recipes. No save
+step — just act on a suggestion.</li>
+</ul>
+<p>Review is always optional. Dismiss from the chat without opening it.
+The chat still shows a summary of what was parsed. The review screen
+always shows “nothing saved yet” until the user confirms — there is no
+silent save.</p>
+<hr />
+</section>
+</section>
+<section id="kiosk-ui-10.1-touchscreen" class="level2">
+<h2>Kiosk UI (10.1” touchscreen)</h2>
+<p>Slim and sleek. No nav clutter. Optimised for large touch targets
+with potentially dirty hands.</p>
+<section id="home-screen" class="level3">
+<h3>Home screen</h3>
+<ul>
+<li><strong>Tonight’s dinner</strong> — large, prominent. Recipe name,
+food photo, brief prep note.</li>
+<li><strong>Upcoming dinners</strong> — the rest of the week below,
+compact cards.</li>
+<li><strong>Something else</strong> button — one tap to shuffle
+tonight’s meal. Produces a Tier 2 swap (toast + undo).</li>
+<li><strong>FAB</strong> — “Ask Tore” chat, bottom-right. For: cooking
+questions (“what are the steps for the entrecôte sauce?”), last-minute
+swaps, pantry questions. Opens a simplified chat that is mostly
+read-only (cooking questions, reading back recipes and steps).</li>
+</ul>
+</section>
+<section id="preset-action-buttons" class="level3">
+<h3>Preset action buttons</h3>
+<p>The kiosk exposes a set of large, labelled preset buttons for the
+most common interactions: - “What’s the recipe?” — opens recipe detail
+for tonight - “We’re out of [ingredient]” — opens a quick pantry
+correction flow - “Swap tonight” — equivalent to “Something else” - “I
+cooked it” — marks tonight’s meal as done, flows ingredients to pantry
+depletion</p>
+<p>These reduce the need for free-text input with dirty hands. The FAB
+chat is available for everything else.</p>
+</section>
+<section id="what-the-kiosk-does-not-have" class="level3">
+<h3>What the kiosk does NOT have</h3>
+<ul>
+<li>Insights, cost tracking, user management, settings</li>
+<li>Planning controls (pins, slot toggles, regenerate)</li>
+<li>Receipt or photo upload</li>
+<li>Any admin surface</li>
+</ul>
+<p>The grocery list is accessible (check off items), but nothing else
+from the main nav.</p>
+<hr />
+</section>
+</section>
+<section id="family-hierarchy" class="level2">
+<h2>Family Hierarchy</h2>
+<p>The app is multi-tenant at the family level. A <code>Family</code> is
+the top-level owner of all shared data.</p>
+<pre><code>Family
+  ├── locale (e.g. &quot;sv&quot; — drives recipe translation, ingredient names, UI language)
+  ├── home store(s) (determines which deals are scraped)
+  ├── preferences (dietary constraints, dislikes — shared defaults)
+  ├── recipe catalog
+  ├── pantry
+  ├── deals
+  └── Users (1:n)
+        ├── name, role (admin / member)
+        ├── auth code (16-digit)
+        └── personal preferences (override family defaults)</code></pre>
+<section id="preference-conflict-resolution" class="level3">
+<h3>Preference conflict resolution</h3>
+<p>When a user’s personal preferences conflict with family defaults:</p>
+<ul>
+<li><strong>Hard constraints</strong> (allergies, dietary restrictions):
+union rule. If anyone in the family has a nut allergy, the family-level
+constraint applies to all planning. No overrides.</li>
+<li><strong>Soft preferences</strong> (dislikes, cuisine preferences):
+weighted by recency and frequency. A user who consistently skips
+fish-based meals raises the family-level fish aversion score. The AI
+uses the aggregate signal, not any individual’s raw preference.</li>
+</ul>
+<p>The locale on <code>Family</code> is the single source of truth for
+recipe and ingredient name translation, store scraping targets, UI
+language, and unit conventions (metric/imperial).</p>
+<hr />
+</section>
+</section>
+<section id="object-storage-photos" class="level2">
+<h2>Object Storage (Photos)</h2>
+<p>All photos (receipt images, recipe photos, food images, fridge
+photos) are stored in <strong>Garage</strong> — a self-hosted,
+S3-compatible object store. Runs as a single binary on the same VPS
+alongside Phoenix.</p>
+<ul>
+<li>Elixir client: <code>ex_aws</code> + <code>ex_aws_s3</code> pointing
+at the Garage endpoint</li>
+<li>Same API as real S3 — zero vendor lock-in, swappable</li>
+<li>Replaces the current <code>priv/static/uploads/</code> disk
+approach</li>
+<li>Buckets: <code>tore-recipes</code> (recipe photos),
+<code>tore-receipts</code> (receipt originals),
+<code>tore-uploads</code> (temporary chat uploads before
+classification)</li>
+</ul>
+<p>Temporary chat uploads live in <code>tore-uploads</code> with a short
+TTL — cleaned up after classification and routing. Permanent assets
+(recipe photos, receipt originals) move to their respective buckets on
+confirm.</p>
+<hr />
+</section>
+<section id="chat-system-prompt-composition" class="level2">
+<h2>Chat System Prompt Composition</h2>
+<p>Every chat session is opened with a system prompt assembled from:</p>
+<pre><code>1. Role + app context (static)
+   &quot;You are Tore, the AI assistant for the Rydholm family meal planning app...&quot;
+
+2. Hard constraints (from Family record)
+   Locale, dietary restrictions, allergies — things you must never violate.
+
+3. Stable patterns — Tier 1 (active insight records, sorted by confidence desc)
+   Top N insights injected as NL observations. Dismissed insights excluded.
+
+4. This week context — Tier 2 (live from event store)
+   Current plan state: what&#39;s assigned, skipped, swapped, draft.
+
+5. Situational context (live, per session)
+   Today&#39;s date, pantry snapshot with confidence levels, current deals (compact).</code></pre>
+<p>Full recipe catalog is <strong>not</strong> injected — too large. It
+is passed only when the assistant needs to reason about specific recipes
+(e.g. a reshuffle command), fetched at dispatch time in the handler.</p>
+<hr />
+</section>
+<section id="key-changes-from-current-spec" class="level2">
+<h2>Key Changes from Current SPEC</h2>
+<ol type="1">
+<li><strong>Home screen</strong> is “tonight + week strip” not a planner
+calendar</li>
+<li><strong>Food photo alongside recipe name</strong> — not behind text
+(readability + accessibility)</li>
+<li><strong>“Something else”</strong> replaces “Not feeling it” as the
+shuffle button label</li>
+<li><strong>FAB + chat</strong> is primary entry point; contextual
+shortcuts on recipe/pantry pages open the chat pre-filled</li>
+<li><strong>Photo classification</strong> step before routing to
+structured output pipelines, with confidence scores and disambiguation
+for low-confidence results</li>
+<li><strong>Polymorphic review screen</strong> — one route
+<code>/review/:class/:id</code>, content-driven rendering. “Nothing
+saved yet” until confirmed.</li>
+<li><strong>Pantry confidence model</strong> — confirmed / probably_have
+/ maybe_have / stale / removed</li>
+<li><strong>Insights</strong> demoted from main nav — per-record (not
+single blob), with kind/confidence/evidence/status</li>
+<li><strong>Cost analytics</strong> under “More” — not main nav</li>
+<li><strong>Kiosk</strong> stripped to: tonight, upcoming, preset action
+buttons, “Ask Tore” FAB (mostly read-only)</li>
+<li><strong>Act-then-undo</strong> replaced by <strong>risk-tiered
+model</strong> (Tier 1/2 act-then-undo, Tier 3 confirm-first)</li>
+<li><strong>AIOperation/correlation layer</strong> for CRUD undo,
+idempotency, and audit trail</li>
+<li><strong>Background AI produces drafts</strong> — never silently
+replaces accepted plans</li>
+<li><strong>Cascade metadata</strong> stored in plan slots (role,
+produces, consumes) — not only in prompts</li>
+<li><strong>Slot states</strong> include <code>flexible</code> —
+explicitly planned but AI may adjust</li>
+<li><strong>Staleness indicators</strong> on plans, grocery lists, prep
+guides</li>
+<li><strong>NL commands via chat</strong> map to existing Decider
+commands — chat is a UI layer, not a new architecture</li>
+<li><strong>Family</strong> is a new top-level tenant — owns locale,
+stores, catalog, pantry; users belong to a family</li>
+<li><strong>Preference conflict rules</strong> — hard=union,
+soft=weighted aggregate</li>
+<li><strong>Garage</strong> replaces disk storage for all photos —
+self-hosted S3-compatible object store</li>
+<li><strong>Multi-photo grouping</strong> — photos classified per-image,
+then grouped by class for a single vision LLM call per group</li>
+<li><strong>Family memory</strong> — per-record
+<code>family_insights</code> table with confidence/evidence/status;
+injected into planning prompts</li>
+</ol>
+<hr />
+</section>
+<section id="ai-native-ux-primitives" class="level2">
+<h2>AI-Native UX Primitives</h2>
+<p>The following primitives make the app feel genuinely alive without
+becoming a chatbot. The north star:</p>
+<blockquote>
+<p>Tore should feel like someone quietly left useful notes on the
+kitchen counter.</p>
+</blockquote>
+<p>Not alerts. Not dashboards. Not “AI assistant.” Just useful,
+contextual, low-pressure notes.</p>
+<hr />
+<section id="counter-notes" class="level3">
+<h3>Counter Notes</h3>
+<p>Counter notes are ambient, contextual AI suggestions shown inline on
+relevant screens. They never push notifications and never require
+action.</p>
+<p>A note may propose one or more app commands. If accepted, commands
+are applied through normal handlers and produce a change receipt with
+undo. Notes expire automatically when no longer relevant.</p>
+<p><strong>Example on home screen:</strong></p>
+<pre><code>Tore noticed
+Chicken thighs are on sale at ICA.
+Good fit for Sunday curry → leftovers Tuesday.
+[Add to week]  [Ignore]</code></pre>
+<p><strong>Example on week view:</strong></p>
+<pre><code>This week looks fragile
+Wednesday depends on Sunday prep, but Sunday has no prep block.
+[Fix plan]  [Ignore]</code></pre>
+<p><strong>Example on pantry:</strong></p>
+<pre><code>Probably have rice
+Bought 2 weeks ago. Tore will assume it exists unless corrected.
+[Correct]  [Remove]</code></pre>
+<p>Schema:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode elixir"><code class="sourceCode elixir"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>%<span class="cn">CounterNote</span><span class="fu">{</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">id:</span> <span class="cn">String</span><span class="op">.</span>t<span class="fu">()</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="va">family_id:</span> integer<span class="fu">()</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="va">surface:</span> <span class="va">:home</span> <span class="op">|</span> <span class="va">:week</span> <span class="op">|</span> <span class="va">:groceries</span> <span class="op">|</span> <span class="va">:pantry</span> <span class="op">|</span> <span class="va">:deals</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  <span class="va">kind:</span> <span class="va">:deal_opportunity</span> <span class="op">|</span> <span class="va">:plan_repair</span> <span class="op">|</span> <span class="va">:pantry_assumption</span> <span class="op">|</span> <span class="va">:habit_pattern</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="va">title:</span> <span class="cn">String</span><span class="op">.</span>t<span class="fu">()</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="va">body:</span> <span class="cn">String</span><span class="op">.</span>t<span class="fu">()</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="va">commands:</span> <span class="ot">[</span>struct<span class="fu">()</span><span class="ot">]</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="va">confidence:</span> <span class="va">:low</span> <span class="op">|</span> <span class="va">:medium</span> <span class="op">|</span> <span class="va">:high</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="va">status:</span> <span class="va">:pending</span> <span class="op">|</span> <span class="va">:accepted</span> <span class="op">|</span> <span class="va">:ignored</span> <span class="op">|</span> <span class="va">:expired</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="va">expires_at:</span> <span class="cn">DateTime</span><span class="op">.</span>t<span class="fu">()</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>Notes are generated as a side-effect of plan generation, deal
+scraping, and the weekly synthesis job. They are stored in SQLite and
+are surfaced per-screen by querying on
+<code>surface + status = pending</code>.</p>
+<hr />
+</section>
+<section id="change-receipts" class="level3">
+<h3>Change Receipts</h3>
+<p>Every AI mutation returns a structured change receipt. The receipt
+shows what changed, why (if useful), and an undo chip when
+supported.</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode elixir"><code class="sourceCode elixir"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>%<span class="cn">AIActionResult</span><span class="fu">{</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="va">summary:</span> <span class="st">&quot;Moved salmon to Friday.&quot;</span>,</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="va">reason:</span> <span class="st">&quot;Tuesday fish often gets skipped.&quot;</span>,</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="va">changes:</span> <span class="ot">[</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    %<span class="fu">{</span><span class="va">area:</span> <span class="va">:plan</span>, <span class="va">before:</span> <span class="st">&quot;Tue: Salmon&quot;</span>, <span class="kw">after</span>: <span class="st">&quot;Tue: Pasta&quot;</span><span class="fu">}</span>,</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    %<span class="fu">{</span><span class="va">area:</span> <span class="va">:plan</span>, <span class="va">before:</span> <span class="st">&quot;Fri: Pasta&quot;</span>, <span class="kw">after</span>: <span class="st">&quot;Fri: Salmon&quot;</span><span class="fu">}</span>,</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    %<span class="fu">{</span><span class="va">area:</span> <span class="va">:groceries</span>, <span class="va">before:</span> <span class="cn">nil</span>, <span class="kw">after</span>: <span class="st">&quot;+ pasta&quot;</span><span class="fu">}</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="ot">]</span>,</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  <span class="va">undo_operation_id:</span> <span class="st">&quot;op_123&quot;</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>Receipts appear as: toast (for background actions), chat response
+(for chat-initiated actions), or inline counter note (for plan
+repairs).</p>
+<hr />
+</section>
+<section id="week-modes" class="level3">
+<h3>Week Modes</h3>
+<p>Week modes are temporary planning biases applied to the current week
+only. They do not modify household preferences.</p>
+<p>Available modes: <code>normal</code>, <code>low_effort</code>,
+<code>budget_week</code>, <code>use_pantry</code>,
+<code>more_leftovers</code>, <code>high_protein</code>,
+<code>freezer_week</code>, <code>guest_week</code>.</p>
+<p>Selecting a mode triggers a constrained replan (as a draft)
+respecting pinned meals. The current mode is shown at the top of the
+week view as a subtle badge. Only one mode active at a time; resetting
+to <code>normal</code> removes all biases.</p>
+<p>Prompt fragment injected when a mode is active:</p>
+<pre><code>Current week mode: Low effort.
+Prefer ≤30 minute meals, fewer unique cooking sessions, and more leftovers.
+Do not change pinned slots.</code></pre>
+<hr />
+</section>
+<section id="plan-health" class="level3">
+<h3>Plan Health</h3>
+<p>A compact status for the current plan, shown at the top of the week
+view:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Ready</td>
+<td>Plan is complete, prep is covered, groceries are in order</td>
+</tr>
+<tr class="even">
+<td>Flexible</td>
+<td>Plan exists but has unplanned slots or flexible slots</td>
+</tr>
+<tr class="odd">
+<td>Fragile</td>
+<td>One or more slots depend on missing prep or unavailable
+ingredients</td>
+</tr>
+<tr class="even">
+<td>Stale</td>
+<td>Plan, grocery list, or prep guide changed since last sync</td>
+</tr>
+<tr class="odd">
+<td>Unplanned</td>
+<td>No plan for the week yet</td>
+</tr>
+</tbody>
+</table>
+<p>Plan health is derived cheaply from event store state — no LLM call.
+It updates on any plan event via PubSub.</p>
+<hr />
+</section>
+<section id="week-repair" class="level3">
+<h3>Week Repair</h3>
+<p>When a meal is skipped, swapped, or moved, Tore checks whether
+downstream meals, leftovers, prep guide, or grocery list are
+affected.</p>
+<ul>
+<li><strong>Small repair</strong> (one slot affected): Tore acts
+immediately and shows undo.</li>
+<li><strong>Larger repair</strong> (multiple slots or grocery list
+changes): Tore creates a counter note proposing the repair.</li>
+</ul>
+<p>The user is never punished for skipping. Repair is offered, not
+imposed.</p>
+<hr />
+</section>
+<section id="cascade-map" class="level3">
+<h3>Cascade Map</h3>
+<p>The week view may render a compact cascade map showing base meals and
+derived meals when cascade metadata is present on plan slots.</p>
+<pre><code>Sunday
+Roast chicken  →  Tuesday: Chicken salad  →  Wednesday: Fried rice
+(produces: chicken)    (consumes: chicken)     (consumes: chicken + rice)</code></pre>
+<p>This is explanatory only. Tapping any meal opens the slot sheet to
+change it. If a base meal changes, the planner checks downstream
+dependencies via the slot <code>consumes</code>/<code>produces</code>
+metadata.</p>
+<hr />
+</section>
+<section id="contextual-command-bar" class="level3">
+<h3>Contextual Command Bar</h3>
+<p>Planning surfaces include a one-line natural language command bar. It
+is contextual to the screen — not a general chatbot replacement.</p>
+<pre><code>Tell Tore what to change…</code></pre>
+<p>Examples: “make this week cheaper”, “no fish this week”, “I want
+fried rice Wednesday”, “use the ICA chicken deal”.</p>
+<p>After submit, commands are parsed and dispatched through
+<code>ChatHandler</code>. A change receipt is shown inline.</p>
+<hr />
+</section>
+<section id="cooking-substitution" class="level3">
+<h3>Cooking Substitution</h3>
+<p>On the recipe/cooking screen: “Missing something?” — user taps and
+types what they lack.</p>
+<p>Tore responds with a substitution and optionally rewrites the
+affected steps for tonight:</p>
+<pre><code>No crème fraîche →
+Use Greek yogurt + a little lemon. Add at the end so it doesn&#39;t split.
+[Update steps for tonight]</code></pre>
+<p>This avoids pantry perfection — users correct reality in the moment,
+not in advance.</p>
+<hr />
+</section>
+<section id="cook-mode" class="level3">
+<h3>Cook Mode</h3>
+<p>When opening a recipe from the home screen or kiosk, Tore shows a
+compressed, action-oriented recipe view:</p>
+<pre><code>Do first: potatoes, preheat oven
+While it cooks: sauce, salad
+Finish: plate</code></pre>
+<p>Option: <strong>Make it faster</strong> — Tore rewrites steps with
+shortcuts (skip sides, use store-bought components).</p>
+<hr />
+</section>
+<section id="kitchen-memory-insights-ui" class="level3">
+<h3>Kitchen Memory (Insights UI)</h3>
+<p>The insights page is labelled “Things Tore has learned” — not
+“Insights” or “Analytics”.</p>
+<p>Each memory shows: - The observation - Short evidence summary (“7 of
+10 Thursdays skipped”) - Confidence level - <strong>Keep /
+Forget</strong> controls</p>
+<p>No ratings, no feedback forms. The user edits memory by forgetting
+incorrect observations.</p>
+<hr />
+</section>
+<section id="graceful-degradation" class="level3">
+<h3>Graceful Degradation</h3>
+<p>Every AI-derived feature must work even if ignored.</p>
+<ul>
+<li>If pantry is wrong → grocery list still works.</li>
+<li>If receipts are not scanned → costs page is less complete, nothing
+nags.</li>
+<li>If prep guide is stale → recipe pages still work.</li>
+<li>If weekly plan is ignored → home screen shows best-effort
+suggestions.</li>
+</ul>
+<p>No feature may depend on perfect user maintenance. This is a core
+design law.</p>
+<hr />
+</section>
+<section id="ai-source-of-truth-rule" class="level3">
+<h3>AI Source of Truth Rule</h3>
+<p>The LLM never owns truth. It proposes commands. Handlers validate and
+apply commands. Current state comes from the event store and CRUD
+contexts. AI-generated content is always tagged as such and can be
+rejected or modified.</p>
+<hr />
+</section>
+</section>
+<section id="what-does-not-change" class="level2">
+<h2>What Does NOT Change</h2>
+<ul>
+<li>Core architecture: Decider pattern for planning + groceries, CRUD
+everywhere else</li>
+<li>Event store, PubSub, handler pattern</li>
+<li>Phoenix + LiveView + SQLite stack</li>
+<li>OpenRouter LLM behind behaviour/adapter</li>
+<li>Quantum scheduled jobs (Saturday scrape, Saturday plan
+generation)</li>
+<li>16-digit account codes + device token auth</li>
+<li>The cascade algorithm as a prompt concern, not a data model
+concern</li>
+</ul>
+</section>
+</section>
+</body>
+</html>

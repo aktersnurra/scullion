@@ -47,7 +47,7 @@ llm-native-mock.png
 
 .claude/
 
-/docs/
+/docs/explain/
 
 # Symlink to nuc-setup deploy script
 /deploy
