@@ -370,6 +370,60 @@ defmodule Tore.Adapters.OpenRouter do
 
 
   @impl Tore.LLM
+  def chat_with_tools(system, messages, tools, opts) do
+    model_name = Keyword.get(opts, :model, model())
+
+    body =
+      %{
+        model: model_name,
+        messages: [%{role: "system", content: system} | messages],
+        tools: tools,
+        tool_choice: Keyword.get(opts, :tool_choice, "auto")
+      }
+
+    http = Application.get_env(:tore, :http_client, Tore.Adapters.ReqHTTP)
+
+    case http.post(@api_url,
+           json: body,
+           headers: [
+             {"Authorization", "Bearer #{api_key()}"},
+             {"HTTP-Referer", "https://tore.gustafrydholm.xyz"},
+             {"X-Title", "Tore"}
+           ]
+         ) do
+      {:ok, %{status: 200, body: resp}} ->
+        msg = get_in(resp, ["choices", Access.at(0), "message"]) || %{}
+        usage = extract_usage(resp)
+
+        case msg do
+          %{"tool_calls" => calls} when is_list(calls) and calls != [] ->
+            {:ok, {:tool_calls, Enum.map(calls, &decode_tool_call/1)}, usage}
+
+          %{"content" => content} when is_binary(content) ->
+            {:ok, {:message, content}, usage}
+
+          _ ->
+            {:error, {:unexpected_message, msg}}
+        end
+
+      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
+      {:ok, %{status: 429}} -> {:error, :rate_limited}
+      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
+      {:error, reason} -> {:error, {:http_error, reason}}
+    end
+  end
+
+  defp decode_tool_call(%{"id" => id, "function" => %{"name" => name, "arguments" => raw_args}}) do
+    args =
+      case Jason.decode(raw_args || "{}") do
+        {:ok, m} when is_map(m) -> m
+        _ -> %{}
+      end
+
+    %{id: id, name: name, args: args}
+  end
+
+  @impl Tore.LLM
   def classify_image(image_binary) do
     system = """
     You are an image classifier for a meal planning app.
