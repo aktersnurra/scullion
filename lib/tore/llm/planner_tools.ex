@@ -165,34 +165,116 @@ defmodule Tore.LLM.PlannerTools do
     }
   end
 
-  # ---------- Read tool stubs (implemented in Task 6) ----------
+  # ---------- Read tools ----------
 
-  defp search_recipes,
-    do: %Tool{
+  defp search_recipes do
+    %Tool{
       name: "search_recipes",
-      description: "stub — implemented in Task 6",
+      description:
+        "Search the recipe catalog. Combine query text and max cooking time, plus an optional limit. Use this before assigning a recipe so you have a real recipe_id.",
       kind: :read,
-      parameters: %{type: "object", properties: %{}, required: []},
-      run: fn _, _ -> {:error, :not_implemented} end
-    }
+      parameters: %{
+        type: "object",
+        properties: %{
+          query: %{type: "string", description: "Free-text search across titles and ingredients"},
+          max_minutes: %{type: "integer", minimum: 1},
+          limit: %{type: "integer", minimum: 1, maximum: 25}
+        },
+        required: []
+      },
+      run: fn args, _ctx ->
+        limit = Map.get(args, "limit", 8)
 
-  defp pantry_snapshot,
-    do: %Tool{
+        base =
+          case args["query"] do
+            q when is_binary(q) and byte_size(q) > 0 -> Tore.Recipes.search(q)
+            _ -> Tore.Recipes.list()
+          end
+
+        filtered =
+          case args["max_minutes"] do
+            n when is_integer(n) -> Enum.filter(base, &recipe_under_minutes?(&1, n))
+            _ -> base
+          end
+
+        result =
+          filtered
+          |> Enum.take(limit)
+          |> Enum.map(&summarise_recipe/1)
+
+        {:ok, %{recipes: result}}
+      end
+    }
+  end
+
+  defp pantry_snapshot do
+    %Tool{
       name: "pantry_snapshot",
-      description: "stub — implemented in Task 6",
+      description:
+        "Approximate pantry inventory. Treat results as inexact — items may be missing or stale. Use before suggesting recipes that depend on specific ingredients.",
       kind: :read,
       parameters: %{type: "object", properties: %{}, required: []},
-      run: fn _, _ -> {:error, :not_implemented} end
-    }
+      run: fn _args, _ctx ->
+        items =
+          Tore.Pantry.list_inventory()
+          |> Enum.map(fn it ->
+            %{
+              id: it.id,
+              name: it.name,
+              quantity: it.quantity && Decimal.to_string(it.quantity),
+              unit: it.unit,
+              category: it.category
+            }
+          end)
 
-  defp active_deals,
-    do: %Tool{
+        {:ok, %{items: items}}
+      end
+    }
+  end
+
+  defp active_deals do
+    %Tool{
       name: "active_deals",
-      description: "stub — implemented in Task 6",
+      description: "Currently active store deals across configured stores.",
       kind: :read,
       parameters: %{type: "object", properties: %{}, required: []},
-      run: fn _, _ -> {:error, :not_implemented} end
+      run: fn _args, _ctx ->
+        deals =
+          Tore.Deals.list_current()
+          |> Enum.map(fn d ->
+            %{
+              id: d.id,
+              product_name: d.product_name,
+              brand: d.brand,
+              store: d.store,
+              chain: d.chain,
+              price: d.price && Decimal.to_string(d.price),
+              price_unit: d.price_unit
+            }
+          end)
+
+        {:ok, %{deals: deals}}
+      end
     }
+  end
+
+  defp recipe_under_minutes?(%{prep_time_minutes: p, cook_time_minutes: c}, max) do
+    total = (p || 0) + (c || 0)
+    total <= max
+  end
+
+  defp recipe_under_minutes?(_, _), do: false
+
+  defp summarise_recipe(r) do
+    total = (r.prep_time_minutes || 0) + (r.cook_time_minutes || 0)
+
+    %{
+      id: r.id,
+      title: r.title,
+      base_servings: r.base_servings,
+      total_minutes: total
+    }
+  end
 
   defp wrap_ok({:ok, _}), do: {:ok, %{ok: true}}
   defp wrap_ok({:error, reason}), do: {:error, reason}

@@ -100,4 +100,61 @@ defmodule Tore.LLM.PlannerToolsTest do
     tool = find("ask_user")
     assert {:ok, %{ask_user: "Which salmon?"}} = tool.run.(%{"question" => "Which salmon?"}, ctx)
   end
+
+  describe "read tools" do
+    setup do
+      {:ok, r1} =
+        Tore.Recipes.create(%{
+          title: "Quick Pasta",
+          base_servings: 2,
+          instructions: "x",
+          prep_time_minutes: 5,
+          cook_time_minutes: 15
+        })
+
+      {:ok, r2} =
+        Tore.Recipes.create(%{
+          title: "Slow Stew",
+          base_servings: 4,
+          instructions: "x",
+          prep_time_minutes: 30,
+          cook_time_minutes: 150
+        })
+
+      %{r1: r1, r2: r2, ctx: %{plan_id: "plan:test", week_start: ~D[2026-06-01]}}
+    end
+
+    test "search_recipes returns matches by query", %{r1: r1, ctx: ctx} do
+      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "search_recipes"))
+      assert {:ok, %{recipes: results}} = tool.run.(%{"query" => "pasta"}, ctx)
+      assert Enum.any?(results, fn r -> r.id == r1.id end)
+    end
+
+    test "search_recipes respects max_minutes", %{r1: r1, r2: r2, ctx: ctx} do
+      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "search_recipes"))
+      assert {:ok, %{recipes: results}} = tool.run.(%{"max_minutes" => 30}, ctx)
+      ids = Enum.map(results, & &1.id)
+      assert r1.id in ids
+      refute r2.id in ids
+    end
+
+    test "pantry_snapshot returns inventory", %{ctx: ctx} do
+      {:ok, _} =
+        Tore.Pantry.add_item(%{
+          name: "olive oil",
+          quantity: Decimal.new(1),
+          unit: "bottle"
+        })
+
+      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "pantry_snapshot"))
+      assert {:ok, %{items: items}} = tool.run.(%{}, ctx)
+      assert Enum.any?(items, &(&1.name == "olive oil"))
+    end
+
+    test "active_deals returns deals list", %{ctx: ctx} do
+      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "active_deals"))
+      assert {:ok, %{deals: deals}} = tool.run.(%{}, ctx)
+      assert is_list(deals)
+    end
+  end
 end
