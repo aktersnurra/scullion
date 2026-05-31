@@ -77,6 +77,9 @@ defmodule Tore.LLM.PlannerAgent do
         log(state, usage, "tool_calls", encode_calls(calls))
         state = %{state | step_index: state.step_index + 1, round_trips: state.round_trips + 1}
 
+        # Append a single assistant turn containing all tool_calls before any results.
+        state = append_assistant_tool_calls(state, calls)
+
         case execute_calls(calls, state) do
           {:terminal_question, question, state} ->
             {:ok,
@@ -178,21 +181,24 @@ defmodule Tore.LLM.PlannerAgent do
       content: Jason.encode!(result)
     }
 
-    %{state | messages: state.messages ++ [assistant_tool_call(call), msg]}
+    %{state | messages: state.messages ++ [msg]}
   end
 
-  defp assistant_tool_call(call) do
-    %{
+  defp append_assistant_tool_calls(state, calls) do
+    msg = %{
       role: "assistant",
       content: nil,
-      tool_calls: [
-        %{
-          id: call.id,
-          type: "function",
-          function: %{name: call.name, arguments: Jason.encode!(call.args)}
-        }
-      ]
+      tool_calls:
+        Enum.map(calls, fn call ->
+          %{
+            id: call.id,
+            type: "function",
+            function: %{name: call.name, arguments: Jason.encode!(call.args)}
+          }
+        end)
     }
+
+    %{state | messages: state.messages ++ [msg]}
   end
 
   defp finish(state, final_message) do
@@ -220,8 +226,13 @@ defmodule Tore.LLM.PlannerAgent do
 
   defp encode_calls(calls), do: Jason.encode!(calls)
 
-  defp truncate(s, max) when is_binary(s) and byte_size(s) > max,
-    do: binary_part(s, 0, max) <> "…"
+  defp truncate(s, max) when is_binary(s) do
+    if String.length(s) > max do
+      String.slice(s, 0, max) <> "…"
+    else
+      s
+    end
+  end
 
   defp truncate(s, _), do: s
 
