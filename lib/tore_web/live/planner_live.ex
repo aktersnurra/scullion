@@ -367,7 +367,12 @@ defmodule ToreWeb.PlannerLive do
 
   defp format_agent_error(:provider_budget_exceeded), do: gettext("Monthly LLM budget reached")
   defp format_agent_error(:rate_limited), do: gettext("Please wait a moment before trying again")
-  defp format_agent_error(_), do: gettext("Something went wrong. Try again.")
+
+  defp format_agent_error(reason) do
+    require Logger
+    Logger.error("PlannerAgent failed: #{inspect(reason, limit: :infinity, pretty: true)}")
+    gettext("Something went wrong. Try again.")
+  end
 
   def render(assigns) do
     assigns =
