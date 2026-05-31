@@ -277,14 +277,34 @@ defmodule ToreWeb.PlannerLive do
   end
 
   def handle_info({:run_quick_command, command}, socket) do
-    system_prompt = Tore.Chat.SystemPrompt.build()
-    result = Tore.Chat.ChatHandler.handle_text(command, %{system_prompt: system_prompt})
-    reply =
-      case result do
-        {:ok, text, _} -> text
-        {:error, _} -> gettext("Something went wrong. Try again.")
+    ctx = %{
+      plan_id: socket.assigns.plan_id,
+      week_start: socket.assigns.week_start
+    }
+
+    result =
+      case Tore.LLM.PlannerAgent.run(command, ctx) do
+        {:ok, %{question: q}} when is_binary(q) ->
+          %{kind: :question, text: q}
+
+        {:ok, %{final_message: msg, actions: actions, capped: capped}} ->
+          %{kind: :message, text: msg, actions: actions, capped: capped}
+
+        {:error, reason} ->
+          %{kind: :error, text: format_agent_error(reason)}
       end
-    {:noreply, assign(socket, quick_reply: reply, quick_loading: false)}
+
+    if match?(%{kind: :message, actions: [_ | _]}, result) do
+      {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(socket.assigns.plan_id)
+      {:noreply,
+       assign(socket,
+         quick_reply: result,
+         quick_loading: false,
+         plan_state: plan_state
+       )}
+    else
+      {:noreply, assign(socket, quick_reply: result, quick_loading: false)}
+    end
   end
 
   def handle_info({:events, _events}, socket) do
@@ -333,6 +353,10 @@ defmodule ToreWeb.PlannerLive do
         {:noreply, socket}
     end
   end
+
+  defp format_agent_error(:provider_budget_exceeded), do: gettext("Monthly LLM budget reached")
+  defp format_agent_error(:rate_limited), do: gettext("Please wait a moment before trying again")
+  defp format_agent_error(_), do: gettext("Something went wrong. Try again.")
 
   def render(assigns) do
     assigns =
@@ -392,16 +416,45 @@ defmodule ToreWeb.PlannerLive do
             </button>
           </form>
 
-          <%= if @quick_reply do %>
-            <div class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900 relative">
-              <%= @quick_reply %>
-              <button
-                phx-click="dismiss_quick_reply"
-                class="absolute top-2 right-2 text-blue-400 hover:text-blue-600"
-              >
-                ✕
-              </button>
-            </div>
+          <%= case @quick_reply do %>
+            <% nil -> %>
+            <% %{kind: :message, text: text, actions: actions, capped: capped} -> %>
+              <div class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900 relative">
+                <p><%= text %></p>
+                <%= if actions != [] do %>
+                  <p class="mt-2 text-xs text-blue-700">
+                    <%= length(actions) %>
+                    <%= if length(actions) == 1, do: gettext("change applied"), else: gettext("changes applied") %>
+                    <%= if capped, do: gettext(" (stopped after step limit)") %>
+                  </p>
+                <% end %>
+                <button
+                  phx-click="dismiss_quick_reply"
+                  class="absolute top-2 right-2 text-blue-400 hover:text-blue-600"
+                >
+                  ✕
+                </button>
+              </div>
+            <% %{kind: :question, text: q} -> %>
+              <div class="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 relative">
+                <p><%= q %></p>
+                <button
+                  phx-click="dismiss_quick_reply"
+                  class="absolute top-2 right-2 text-amber-400 hover:text-amber-600"
+                >
+                  ✕
+                </button>
+              </div>
+            <% %{kind: :error, text: text} -> %>
+              <div class="mt-2 rounded-lg bg-red-50 p-3 text-sm text-red-900 relative">
+                <p><%= text %></p>
+                <button
+                  phx-click="dismiss_quick_reply"
+                  class="absolute top-2 right-2 text-red-400 hover:text-red-600"
+                >
+                  ✕
+                </button>
+              </div>
           <% end %>
         </div>
 

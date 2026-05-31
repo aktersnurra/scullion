@@ -128,4 +128,53 @@ defmodule ToreWeb.PlannerLiveTest do
       assert html =~ ~r/>\s*12\s*<\/span>\s*<button[^>]*phx-click="inc_servings"/
     end
   end
+
+  describe "command bar" do
+    setup %{conn: conn, user: user} do
+      %{conn: authed(conn, user)}
+    end
+
+    test "quick command renders a final message", %{conn: conn} do
+      Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+        {:ok, {:message, "Done — skipped Monday dinner."}, %{}}
+      end)
+
+      {:ok, view, _} = live(conn, "/plan")
+
+      view
+      |> form("form[phx-submit=quick_command]", %{command: "skip mon dinner"})
+      |> render_submit()
+
+      assert eventually_renders(view, "Done — skipped Monday dinner.")
+    end
+
+    test "quick command renders an ask_user question", %{conn: conn} do
+      Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+        {:ok,
+         {:tool_calls,
+          [%{id: "c1", name: "ask_user", args: %{"question" => "Which salmon recipe?"}}]},
+         %{}}
+      end)
+
+      {:ok, view, _} = live(conn, "/plan")
+
+      view
+      |> form("form[phx-submit=quick_command]", %{command: "move the salmon"})
+      |> render_submit()
+
+      assert eventually_renders(view, "Which salmon recipe?")
+    end
+  end
+
+  defp eventually_renders(view, substr, attempts \\ 20)
+  defp eventually_renders(_view, _substr, 0), do: false
+
+  defp eventually_renders(view, substr, attempts) do
+    if Phoenix.LiveViewTest.render(view) =~ substr do
+      true
+    else
+      Process.sleep(25)
+      eventually_renders(view, substr, attempts - 1)
+    end
+  end
 end
