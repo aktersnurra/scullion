@@ -377,9 +377,9 @@ defmodule Tore.Adapters.OpenRouter do
       %{
         model: model_name,
         messages: [%{role: "system", content: system} | messages],
-        tools: tools,
-        tool_choice: Keyword.get(opts, :tool_choice, "auto")
+        tools: tools
       }
+      |> maybe_put_tool_choice(tools, opts)
 
     http = Application.get_env(:tore, :http_client, Tore.Adapters.ReqHTTP)
 
@@ -411,6 +411,11 @@ defmodule Tore.Adapters.OpenRouter do
       {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
       {:error, reason} -> {:error, {:http_error, reason}}
     end
+  end
+
+  defp maybe_put_tool_choice(body, [], _opts), do: body
+  defp maybe_put_tool_choice(body, _tools, opts) do
+    Map.put(body, :tool_choice, Keyword.get(opts, :tool_choice, "auto"))
   end
 
   defp decode_tool_call(%{"id" => id, "function" => %{"name" => name, "arguments" => raw_args}}) do

@@ -29,7 +29,7 @@ defmodule Tore.LLM.PlannerAgent do
 
     tools = PlannerTools.all()
     tools_json = Enum.map(tools, &Tool.to_openai/1)
-    system_prompt = Tore.Chat.SystemPrompt.build()
+    system_prompt = agent_preamble() <> "\n\n" <> Tore.Chat.SystemPrompt.build()
 
     state = %{
       ctx: Map.put(ctx, :correlation_id, correlation_id),
@@ -132,7 +132,16 @@ defmodule Tore.LLM.PlannerAgent do
   defp handle_tool(%Tool{kind: :action} = tool, call, rest, state) do
     if state.action_calls >= state.max_action_calls do
       state = append_tool_result(state, call, %{error: "action_cap_reached"})
-      {:cap_hit, %{state | actions: [%{name: call.name, ok: false, error: :cap} | state.actions]}}
+
+      # Close out any remaining unprocessed calls so the assistant turn's
+      # tool_calls array is fully paired with tool-result messages.
+      state =
+        Enum.reduce(rest, state, fn pending, acc ->
+          append_tool_result(acc, pending, %{error: "action_cap_reached"})
+        end)
+
+      {:cap_hit,
+       %{state | actions: [%{name: call.name, ok: false, error: :cap} | state.actions]}}
     else
       run_and_record(tool, call, rest, %{state | action_calls: state.action_calls + 1})
     end
@@ -238,5 +247,25 @@ defmodule Tore.LLM.PlannerAgent do
 
   defp generate_cid do
     "pa-" <> (:crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false))
+  end
+
+  defp agent_preamble do
+    """
+    You are the planner agent for Tore, a family meal planner.
+
+    You operate by calling tools, not by replying in prose. When the user makes a
+    request that maps to a planning action (assign, swap, skip, mark as leftovers,
+    set servings, remove), call the corresponding tool. When you need to look up
+    recipes, pantry, or deals to decide what to do, call the matching read tool
+    first. When the user's request is ambiguous (e.g. multiple recipes match
+    "salmon"), call ask_user with a specific clarifying question instead of
+    guessing.
+
+    After your tool calls succeed, give a one-sentence confirmation of what you
+    did. Do not narrate or restate the plan. If you cannot perform the action
+    (a tool returned an error), explain what went wrong in one sentence.
+
+    Always prefer calling a tool over describing what you would do.
+    """
   end
 end
