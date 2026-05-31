@@ -282,20 +282,31 @@ defmodule ToreWeb.PlannerLive do
       week_start: socket.assigns.week_start
     }
 
-    result =
-      case Tore.LLM.PlannerAgent.run(command, ctx) do
-        {:ok, %{question: q}} when is_binary(q) ->
-          %{kind: :question, text: q}
+    pid = self()
 
-        {:ok, %{final_message: msg, actions: actions, capped: capped}} ->
-          %{kind: :message, text: msg, actions: actions, capped: capped}
+    Task.start(fn ->
+      result =
+        case Tore.LLM.PlannerAgent.run(command, ctx) do
+          {:ok, %{question: q}} when is_binary(q) ->
+            %{kind: :question, text: q}
 
-        {:error, reason} ->
-          %{kind: :error, text: format_agent_error(reason)}
-      end
+          {:ok, %{final_message: msg, actions: actions, capped: capped}} ->
+            %{kind: :message, text: msg, actions: actions, capped: capped}
 
+          {:error, reason} ->
+            %{kind: :error, text: format_agent_error(reason)}
+        end
+
+      send(pid, {:quick_command_result, result})
+    end)
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:quick_command_result, result}, socket) do
     if match?(%{kind: :message, actions: [_ | _]}, result) do
       {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(socket.assigns.plan_id)
+
       {:noreply,
        assign(socket,
          quick_reply: result,

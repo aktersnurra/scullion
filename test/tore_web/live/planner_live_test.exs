@@ -167,7 +167,10 @@ defmodule ToreWeb.PlannerLiveTest do
   end
 
   defp eventually_renders(view, substr, attempts \\ 20)
-  defp eventually_renders(_view, _substr, 0), do: false
+
+  defp eventually_renders(view, substr, 0) do
+    flunk("Timed out waiting for #{inspect(substr)}.\nRendered:\n#{Phoenix.LiveViewTest.render(view)}")
+  end
 
   defp eventually_renders(view, substr, attempts) do
     if Phoenix.LiveViewTest.render(view) =~ substr do
