@@ -1,8 +1,8 @@
-defmodule Tore.Family.FamilyInsight do
+defmodule Tore.Household.HouseholdInsight do
   use Ecto.Schema
   import Ecto.Changeset
 
-  schema "family_insights" do
+  schema "household_insights" do
     field :kind, :string
     field :body, :string
     field :confidence, :float, default: 0.5

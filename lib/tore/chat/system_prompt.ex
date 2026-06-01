@@ -1,5 +1,5 @@
 defmodule Tore.Chat.SystemPrompt do
-  alias Tore.{Family, Pantry, WeekMode}
+  alias Tore.{Household, Pantry, WeekMode}
 
   @spec build() :: String.t()
   def build do
@@ -28,8 +28,8 @@ defmodule Tore.Chat.SystemPrompt do
   end
 
   defp dietary_section do
-    prefs = Family.get_preferences()
-    guidance = Family.prefs_to_dietary_guidance(prefs)
+    prefs = Household.get_preferences()
+    guidance = Household.prefs_to_dietary_guidance(prefs)
     if guidance, do: "Household preferences: #{guidance}.", else: nil
   end
 
@@ -91,7 +91,7 @@ defmodule Tore.Chat.SystemPrompt do
   end
 
   defp insights_section do
-    insights = Family.list_active_insights() |> Enum.take(5)
+    insights = Household.list_active_insights() |> Enum.take(5)
 
     if insights == [] do
       nil

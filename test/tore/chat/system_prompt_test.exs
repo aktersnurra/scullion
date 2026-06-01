@@ -19,7 +19,7 @@ defmodule Tore.Chat.SystemPromptTest do
   end
 
   test "build/0 includes insights when active insights exist" do
-    {:ok, _} = Tore.Family.replace_insights([
+    {:ok, _} = Tore.Household.replace_insights([
       %{kind: "skip_pattern", body: "Mondays are often skipped.", confidence: 0.8, evidence: []}
     ])
 

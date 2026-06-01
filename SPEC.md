@@ -7,9 +7,10 @@
 ## Status
 
 - **Source-of-truth date:** 2026-05-30
+- **2026-05-31:** Reversed the Family→Household naming. `Tore.Household` is canonical; `Tore.Family.*` deleted.
 - **Supersedes:** the original Scullion SPEC.md (2026-05-02), now archived in git history at commit `af0ad48`.
 - **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `PLAN.md` (module-by-module breakdown), `PLAN_FEAT_*.md` (per-feature plans).
-- **Naming:** the project is *Tore*. Any remaining reference to Scullion or Household in code is legacy and slated for deletion (see §Removed in Rewrite).
+- **Naming:** the project is *Tore*. Any remaining reference to Scullion or Family in code is legacy and slated for deletion (see §Removed in Rewrite).
 
 ---
 
@@ -70,7 +71,7 @@ behind a context boundary. LiveViews call context APIs only; Handlers orchestrat
 | Context       | Role                                                              |
 |---------------|-------------------------------------------------------------------|
 | **Accounts**  | Users, sessions, per-user prefs.                                  |
-| **Family**    | Shared family-level state (preferences, insights, members). Replaces the old `Household` shim. |
+| **Household** | Shared household-level state (preferences, insights, members). |
 | **Recipes**   | Reference catalog.                                                |
 | **Deals**     | Scraped weekly, expire automatically.                             |
 | **Pantry**    | Approximate inventory. **No primary management UI.** See §Pantry. |
@@ -99,7 +100,7 @@ natural-language observations about how the family actually eats.
 - `LeftoverDay` patterns → which cascades survive, which don't
 - Slot fill rate by week → "rarely plans past Wednesday"
 
-**Storage:** `family_insights` table — small (max ~10 active observations per family),
+**Storage:** `household_insights` table — small (max ~10 active observations per household),
 text-typed, with a `dismissed` flag and a `superseded_by` link so the synthesiser can
 replace stale insights without losing history.
 
@@ -300,7 +301,7 @@ plans must remove these explicitly — they are not deprecated, they are gone.
 | `pantry_live.ex` full CRUD (add/edit/category management UI) | Read-only inferred pantry view in Settings; receipt + grocery + photo-scan auto-add |
 | `/pantry` in main nav | Removed entirely |
 | `/costs` in main nav | Moved under Settings |
-| `Household` context (kept as deprecated shim alongside `Family`) | `Family` is canonical; `Household` deleted |
+| `Tore.Family` context (introduced as the canonical name in the prior rewrite) | `Tore.Household` is canonical; `Tore.Family.*` deleted |
 | `CounterNotes.build_home_note/1` hardcoded "Ready to cook tonight?" string | `AmbientScan` daily job |
 | Two-step `confirm_receipt` UI as the only receipt → pantry path | Auto-add by default; confirm flow stays only for explicit "review before saving" |
 | Onboarding questionnaire (if/when added) | Inference from events over time |
@@ -313,10 +314,11 @@ plans must remove these explicitly — they are not deprecated, they are gone.
 
 ```
 lib/tore/
-  family.ex                  # canonical family context (preferences, members, insights)
-  family/
-    family_schema.ex
-    family_insight.ex
+  household.ex               # canonical household context (preferences, members, insights)
+  household/
+    household_schema.ex
+    household_insight.ex
+    preferences.ex
   accounts.ex                # users, sessions
   recipes.ex
   deals.ex
@@ -473,12 +475,10 @@ subsumes it.
 
 ## Auth and Multi-Tenancy
 
-- A *family* owns all data: plans, groceries, pantry, costs, insights.
-- *Users* belong to a family. A user is created with a 16-digit code; sessions are
-  long-lived browser cookies.
-- *Kiosks* authenticate with a per-device token, scoped to one family.
-- The current `Household` module is a deprecated shim. Plans (see PLAN_FEAT_demotion)
-  will delete it.
+A *household* owns all data: plans, groceries, pantry, costs, insights.
+*Users* belong to a household. A user is created with a 16-digit code; sessions are long-lived browser cookies.
+*Kiosks* authenticate with a per-device token, scoped to one household.
+`Tore.Household` is the canonical context. There is no `Tore.Family` module.
 
 ---
 
@@ -499,7 +499,7 @@ The rewrite is done when:
 1. The six LLM-native features (§1–§6) each pass an end-to-end test on a real device.
 2. `pantry_live.ex` no longer offers add/edit; the route is gone from main nav.
 3. `cost_live.ex` is reachable only through Settings.
-4. `Household` is deleted.
+4. `Tore.Family.*` is deleted; `Tore.Household` is canonical.
 5. `PlannerAgent` runs a bounded tool-calling loop driven from the planner command bar, with all action tools wired through `PlanningHandler` and at least two read tools (`search_recipes`, `pantry_snapshot`) wired to real context state.
 6. `AmbientScan` runs daily and writes at least one counter-note type when the
    corresponding rule fires.

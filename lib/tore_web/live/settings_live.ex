@@ -20,7 +20,7 @@ defmodule ToreWeb.SettingsLive do
        revealed_codes: %{},
        add_error: nil,
        ai: ai,
-       memory_insights: Tore.Family.list_active_insights()
+       memory_insights: Tore.Household.list_active_insights()
      )}
   end
 
@@ -69,8 +69,8 @@ defmodule ToreWeb.SettingsLive do
   end
 
   def handle_event("forget_insight", %{"id" => id}, socket) do
-    Tore.Family.dismiss_insight(String.to_integer(id))
-    {:noreply, assign(socket, memory_insights: Tore.Family.list_active_insights())}
+    Tore.Household.dismiss_insight(String.to_integer(id))
+    {:noreply, assign(socket, memory_insights: Tore.Household.list_active_insights())}
   end
 
   defp format_code(code) do

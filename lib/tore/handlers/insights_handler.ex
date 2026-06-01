@@ -1,11 +1,11 @@
 defmodule Tore.Handlers.InsightsHandler do
   import Ecto.Query
-  alias Tore.Family
+  alias Tore.Household
 
   @llm Application.compile_env(:tore, :llm_client)
   @high_weight_types ~w[MealSkipped RecipeRemoved]
 
-  @spec synthesise_weekly() :: {:ok, [Family.FamilyInsight.t()]} | {:error, term()}
+  @spec synthesise_weekly() :: {:ok, [Household.HouseholdInsight.t()]} | {:error, term()}
   def synthesise_weekly do
     cutoff =
       DateTime.utc_now()
@@ -22,7 +22,7 @@ defmodule Tore.Handlers.InsightsHandler do
     summary = format_events_summary(events)
 
     with {:ok, insights} <- @llm.synthesise_insights(summary) do
-      Family.replace_insights(insights)
+      Household.replace_insights(insights)
     end
   end
 
