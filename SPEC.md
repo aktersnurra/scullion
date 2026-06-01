@@ -181,8 +181,9 @@ three surfaces: `home`, `plan`, `kiosk`. Notes auto-expire (end of day for daily
 of week for weekly).
 
 **Hard rule:** Counter notes appear inline on the relevant surface. They are never
-delivered as push, email, or any other interruption. `build_home_note/1`'s current
-stub (writes "Ready to cook tonight?" unconditionally) is replaced by this scan.
+delivered as push, email, or any other interruption. `CounterNotes.build_home_note/1`,
+which previously wrote "Ready to cook tonight?" unconditionally, was deleted in the
+§3 demotion. AmbientScan provides the replacement.
 
 ### 4. Pantry as Inference, not Management
 
