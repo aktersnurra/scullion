@@ -307,6 +307,32 @@ defmodule ToreWeb.SettingsLive do
             </div>
           </section>
         </.card>
+
+        <section class="mt-8 border-t border-stone-200 pt-6">
+          <h2 class="text-sm font-semibold text-stone-500 uppercase tracking-widest mb-3">
+            {gettext("More")}
+          </h2>
+          <ul class="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
+            <li>
+              <.link
+                navigate={~p"/settings/pantry"}
+                class="flex items-center justify-between p-4 hover:bg-stone-50"
+              >
+                <span>{gettext("Approximate inventory")}</span>
+                <span aria-hidden="true">→</span>
+              </.link>
+            </li>
+            <li>
+              <.link
+                navigate={~p"/settings/costs"}
+                class="flex items-center justify-between p-4 hover:bg-stone-50"
+              >
+                <span>{gettext("Spending")}</span>
+                <span aria-hidden="true">→</span>
+              </.link>
+            </li>
+          </ul>
+        </section>
       </.page>
     </Layouts.app>
     """

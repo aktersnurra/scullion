@@ -5,45 +5,47 @@ defmodule ToreWeb.PantryLiveTest do
 
   setup do
     {:ok, {user, _code}} = Accounts.create_user(%{name: "Tester"})
-    conn = build_conn() |> Plug.Test.init_test_session(%{user_id: user.id})
-    %{conn: conn, user: user}
+    %{conn: build_conn(), user: user}
   end
 
-  test "renders empty pantry", %{conn: conn} do
-    {:ok, _lv, html} = live(conn, "/pantry")
-    assert html =~ "Skafferi"
-    assert html =~ "Inget i skafferiet"
+  defp authed(conn, user), do: Plug.Test.init_test_session(conn, %{user_id: user.id})
+
+  test "renders empty pantry", %{conn: conn, user: user} do
+    conn = authed(conn, user)
+    {:ok, _lv, html} = live(conn, "/settings/pantry")
+    assert html =~ "Nothing in the pantry yet"
   end
 
-  test "renders existing items", %{conn: conn} do
+  test "renders existing items", %{conn: conn, user: user} do
+    conn = authed(conn, user)
     {:ok, _} = Pantry.add_item(%{name: "Havregryn", quantity: Decimal.new("500"), unit: "g"})
-    {:ok, _lv, html} = live(conn, "/pantry")
+    {:ok, _lv, html} = live(conn, "/settings/pantry")
     assert html =~ "Havregryn"
     assert html =~ "500"
   end
 
-  test "add item via form appears in list", %{conn: conn} do
-    {:ok, lv, _html} = live(conn, "/pantry")
-
-    lv |> element("button[phx-value-cat='canned']") |> render_click()
-
-    html =
-      lv
-      |> form("form[phx-submit='add_item']", %{
-        name: "Linser",
-        quantity: "400",
-        unit: "g",
-        expires_at: ""
-      })
-      |> render_submit()
-
-    assert html =~ "Linser"
-  end
-
-  test "remove item disappears from list", %{conn: conn} do
+  test "remove item disappears from list", %{conn: conn, user: user} do
+    conn = authed(conn, user)
     {:ok, item} = Pantry.add_item(%{name: "Tonfisk"})
-    {:ok, lv, _html} = live(conn, "/pantry")
+    {:ok, lv, _html} = live(conn, "/settings/pantry")
     html = lv |> element("button[phx-value-id='#{item.id}']") |> render_click()
     refute html =~ "Tonfisk"
+  end
+
+  test "old /pantry route no longer exists", %{conn: conn} do
+    import Plug.Conn.Status, only: []
+    conn = get(conn, "/pantry")
+    assert conn.status == 404
+  end
+
+  test "remove_item removes a pantry item", %{conn: conn, user: user} do
+    conn = authed(conn, user)
+    {:ok, item} = Tore.Pantry.add_item(%{name: "olive oil", quantity: Decimal.new(1), unit: "bottle"})
+
+    {:ok, view, _html} = live(conn, "/settings/pantry")
+    assert render(view) =~ "Olive oil"
+
+    view |> element("button[phx-value-id=\"#{item.id}\"]") |> render_click()
+    refute render(view) =~ "Olive oil"
   end
 end

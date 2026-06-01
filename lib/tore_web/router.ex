@@ -55,12 +55,20 @@ defmodule ToreWeb.Router do
       live "/groceries", GroceryLive
       live "/prep", PrepLive
       live "/deals", DealsLive
-      live "/pantry", PantryLive
-      live "/costs", CostLive
       live "/cooking", CookingLive
       live "/settings", SettingsLive
       live "/chat", ChatLive
       live "/review/:class/:id", ReviewLive
+    end
+  end
+
+  scope "/settings", ToreWeb do
+    pipe_through [:browser, :require_auth]
+
+    live_session :settings,
+      on_mount: [{ToreWeb.Live.Auth, :require_authenticated}] do
+      live "/pantry", PantryLive
+      live "/costs", CostLive
     end
   end
 end
