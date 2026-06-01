@@ -57,18 +57,10 @@ defmodule ToreWeb.Router do
       live "/deals", DealsLive
       live "/cooking", CookingLive
       live "/settings", SettingsLive
+      live "/settings/pantry", PantryLive
+      live "/settings/costs", CostLive
       live "/chat", ChatLive
       live "/review/:class/:id", ReviewLive
-    end
-  end
-
-  scope "/settings", ToreWeb do
-    pipe_through [:browser, :require_auth]
-
-    live_session :settings,
-      on_mount: [{ToreWeb.Live.Auth, :require_authenticated}] do
-      live "/pantry", PantryLive
-      live "/costs", CostLive
     end
   end
 end

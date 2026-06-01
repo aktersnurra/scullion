@@ -18,6 +18,7 @@ defmodule ToreWeb.PantryLive do
   @impl true
   def render(assigns) do
     ~H"""
+    <Layouts.app flash={@flash} current_scope={assigns[:current_scope]} current_path={assigns[:current_path] || "/settings/pantry"}>
     <div class="max-w-2xl mx-auto p-4">
       <header class="mb-4">
         <h1 class="text-2xl font-semibold">{gettext("Approximate inventory")}</h1>
@@ -55,6 +56,7 @@ defmodule ToreWeb.PantryLive do
         {gettext("Nothing in the pantry yet. Items appear here when you check off groceries or scan a receipt.")}
       </div>
     </div>
+    </Layouts.app>
     """
   end
 

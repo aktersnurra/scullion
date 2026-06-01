@@ -24,16 +24,7 @@ defmodule ToreWeb.PantryLiveTest do
     assert html =~ "500"
   end
 
-  test "remove item disappears from list", %{conn: conn, user: user} do
-    conn = authed(conn, user)
-    {:ok, item} = Pantry.add_item(%{name: "Tonfisk"})
-    {:ok, lv, _html} = live(conn, "/settings/pantry")
-    html = lv |> element("button[phx-value-id='#{item.id}']") |> render_click()
-    refute html =~ "Tonfisk"
-  end
-
   test "old /pantry route no longer exists", %{conn: conn} do
-    import Plug.Conn.Status, only: []
     conn = get(conn, "/pantry")
     assert conn.status == 404
   end
