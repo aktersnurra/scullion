@@ -57,7 +57,6 @@ config :tore, :http_client, Tore.Adapters.ReqHTTP
 
 config :tore, Tore.Scheduler,
   jobs: [
-    {"0 6 * * *", {Tore.Jobs.HomeNote, :run, []}},
     {"0 3 * * *", {Tore.Deals, :clear_expired, []}},
     {"0 6 * * 6", {Tore.Handlers.InsightsHandler, :synthesise_weekly, []}},
     {"0 8 * * 6", {Tore.Handlers.DealsHandler, :scrape_all, []}},

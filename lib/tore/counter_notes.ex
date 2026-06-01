@@ -40,36 +40,6 @@ defmodule Tore.CounterNotes do
     end
   end
 
-  @spec build_home_note(Date.t()) :: :ok
-  def build_home_note(date) do
-    now = DateTime.utc_now()
-    end_of_day = DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
-
-    existing =
-      Repo.one(
-        from n in CounterNote,
-          where:
-            n.surface == "home" and
-            n.kind == "habit_pattern" and
-            n.status == "pending" and
-            (is_nil(n.expires_at) or n.expires_at > ^now),
-          limit: 1
-      )
-
-    if is_nil(existing) do
-      {:ok, _} =
-        create(%{
-          surface: "home",
-          kind: "habit_pattern",
-          body: "Ready to cook tonight?",
-          expires_at: end_of_day,
-          status: "pending"
-        })
-    end
-
-    :ok
-  end
-
   @spec expire_stale() :: {integer(), nil}
   def expire_stale do
     now = DateTime.utc_now()
