@@ -97,7 +97,7 @@ defmodule Tore.Chat.SystemPrompt do
       nil
     else
       lines = Enum.map(insights, fn i -> "- #{i.body}" end) |> Enum.join("\n")
-      "Family patterns:\n#{lines}"
+      "Household patterns:\n#{lines}"
     end
   rescue
     _ -> nil
