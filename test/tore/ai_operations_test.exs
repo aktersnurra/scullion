@@ -1,54 +1,38 @@
 defmodule Tore.AiOperationsTest do
   use Tore.DataCase, async: false
+  alias Tore.AiOperations
+  alias Tore.AiOperations.AiOperation
 
-  test "log/1 and find_by_correlation/1 round-trip" do
-    correlation_id = "test-#{System.unique_integer()}"
-
-    assert {:ok, op} =
-             Tore.AiOperations.log(%{
-               correlation_id: correlation_id,
-               kind: "chat",
-               payload: "What's for dinner?",
-               result: "Pasta"
-             })
-
-    assert op.kind == "chat"
-    found = Tore.AiOperations.find_by_correlation(correlation_id)
-    assert found.id == op.id
-    assert found.result == "Pasta"
+  test "log/1 with run_stream_id inserts a row" do
+    {:ok, op} =
+      AiOperations.log(%{
+        run_stream_id: "run-abc",
+        kind: "planner_agent.message",
+        step_index: 0,
+        payload: "{}",
+        result: "ok"
+      })
+    assert op.run_stream_id == "run-abc"
+    assert op.kind == "planner_agent.message"
   end
 
-  test "logs multiple steps under one correlation_id" do
-    cid = "test-cid-#{System.unique_integer([:positive])}"
-
-    assert {:ok, _} =
-             Tore.AiOperations.log(%{
-               correlation_id: cid,
-               kind: "planner_agent.turn",
-               step_index: 0,
-               payload: "user msg",
-               result: "tool_calls"
-             })
-
-    assert {:ok, _} =
-             Tore.AiOperations.log(%{
-               correlation_id: cid,
-               kind: "planner_agent.turn",
-               step_index: 1,
-               payload: "tool result",
-               result: "final"
-             })
-
-    rows = Tore.AiOperations.list_by_correlation(cid)
-    assert length(rows) == 2
-    assert Enum.map(rows, & &1.step_index) == [0, 1]
+  test "list_for_run/1 returns rows ordered by step_index" do
+    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 1, payload: "{}", result: "a"})
+    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 0, payload: "{}", result: "b"})
+    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 2, payload: "{}", result: "c"})
+    rows = AiOperations.list_for_run("run-x")
+    assert Enum.map(rows, & &1.step_index) == [0, 1, 2]
   end
 
-  test "rejects duplicate (correlation_id, step_index)" do
-    cid = "dup-cid-#{System.unique_integer([:positive])}"
-    {:ok, _} = Tore.AiOperations.log(%{correlation_id: cid, kind: "k", step_index: 0})
+  test "unique constraint on (run_stream_id, step_index)" do
+    AiOperations.log(%{run_stream_id: "run-y", kind: "k", step_index: 0, payload: "{}", result: "a"})
+    assert {:error, changeset} =
+             AiOperations.log(%{run_stream_id: "run-y", kind: "k", step_index: 0, payload: "{}", result: "b"})
+    refute changeset.valid?
+  end
 
-    assert {:error, %Ecto.Changeset{}} =
-             Tore.AiOperations.log(%{correlation_id: cid, kind: "k", step_index: 0})
+  test "schema has no correlation_id field" do
+    refute :correlation_id in AiOperation.__schema__(:fields)
+    assert :run_stream_id in AiOperation.__schema__(:fields)
   end
 end

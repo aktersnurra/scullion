@@ -9,16 +9,11 @@ defmodule Tore.AiOperations do
     |> Repo.insert()
   end
 
-  @spec find_by_correlation(String.t()) :: AiOperation.t() | nil
-  def find_by_correlation(correlation_id) do
-    Repo.one(from o in AiOperation, where: o.correlation_id == ^correlation_id)
-  end
-
-  @spec list_by_correlation(String.t()) :: [AiOperation.t()]
-  def list_by_correlation(correlation_id) do
+  @spec list_for_run(String.t()) :: [AiOperation.t()]
+  def list_for_run(run_stream_id) do
     Repo.all(
       from o in AiOperation,
-        where: o.correlation_id == ^correlation_id,
+        where: o.run_stream_id == ^run_stream_id,
         order_by: [asc: o.step_index]
     )
   end

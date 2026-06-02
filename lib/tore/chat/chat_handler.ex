@@ -10,7 +10,7 @@ defmodule Tore.Chat.ChatHandler do
     correlation_id = generate_correlation_id()
 
     AiOperations.log(%{
-      correlation_id: correlation_id,
+      run_stream_id: correlation_id,
       kind: "chat",
       payload: text
     })
@@ -18,7 +18,7 @@ defmodule Tore.Chat.ChatHandler do
     case @llm.chat(system, messages) do
       {:ok, reply, _usage} ->
         AiOperations.log(%{
-          correlation_id: "#{correlation_id}:reply",
+          run_stream_id: "#{correlation_id}:reply",
           kind: "chat_reply",
           payload: text,
           result: reply

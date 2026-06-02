@@ -223,7 +223,7 @@ defmodule Tore.LLM.PlannerAgent do
 
   defp log(state, usage, kind, result) do
     Tore.AiOperations.log(%{
-      correlation_id: state.correlation_id,
+      run_stream_id: state.correlation_id,
       kind: "planner_agent." <> kind,
       step_index: state.step_index,
       payload: Jason.encode!(%{messages_count: length(state.messages), usage: usage}),

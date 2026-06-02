@@ -3,7 +3,7 @@ defmodule Tore.AiOperations.AiOperation do
   import Ecto.Changeset
 
   schema "ai_operations" do
-    field :correlation_id, :string
+    field :run_stream_id, :string
     field :kind, :string
     field :payload, :string
     field :result, :string
@@ -14,10 +14,10 @@ defmodule Tore.AiOperations.AiOperation do
 
   def changeset(op, attrs) do
     op
-    |> cast(attrs, [:correlation_id, :kind, :payload, :result, :step_index, :undo_op_id])
-    |> validate_required([:correlation_id, :kind])
-    |> unique_constraint([:correlation_id, :step_index],
-         name: :ai_operations_correlation_id_step_index_index)
+    |> cast(attrs, [:run_stream_id, :kind, :payload, :result, :step_index, :undo_op_id])
+    |> validate_required([:run_stream_id, :kind])
+    |> unique_constraint([:run_stream_id, :step_index],
+         name: :ai_operations_run_stream_id_step_index_index)
     |> put_inserted_at()
   end
 
