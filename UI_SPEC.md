@@ -1,0 +1,1631 @@
+It assumes Tore is **not** a CRUD planner with AI bolted on. It is a **calm, agentic kitchen operating surface**: the plan is already there, the grocery list is reliable, the AI is visible only when useful, and the kiosk stays brutally focused on tonight. That lines up with your current product philosophy: good guesses, easy corrections, no nags, grocery list as reliability anchor, and a two-interface model for phone/laptop plus kiosk. 
+
+---
+
+# Tore UI/UX Spec — Calm Futuristic Kitchen OS
+
+## 1. Product feel
+
+Tore should feel like:
+
+> **A quiet household food-control surface from the near future.**
+
+Not a chatbot.
+Not a spreadsheet.
+Not a recipe Pinterest clone.
+Not a dashboard.
+Not “AI magic.”
+
+The UI should feel **calm, precise, warm, and quietly intelligent**. The app should look futuristic through **layout, motion, restraint, and contextual intelligence**, not through neon gradients, glassmorphism spam, fake 3D, or sci-fi decoration.
+
+The product personality:
+
+```md
+Warm, not cute.
+Futuristic, not cyberpunk.
+Minimal, not empty.
+Intelligent, not chatty.
+Useful, not impressive.
+Calm, not sterile.
+```
+
+The UX foundation is aligned with established usability guidance: users need system status, real-world language, undo/control, consistency, error prevention, recognition over recall, flexibility for power users, and aesthetic/minimal design. ([Nielsen Norman Group][1]) AI-specific UX also needs careful expectation-setting, graceful failure, learning over time, and user control, because AI systems behave probabilistically and change over time. ([Microsoft][2])
+
+---
+
+## 2. Core UX principles
+
+### 2.1 One surface, one job
+
+Every screen must have one primary job.
+
+```md
+Home      → What matters tonight?
+Plan      → What should the week look like?
+Shop      → What do we need to buy?
+Capture   → What can Tore understand from text/photo?
+Cook      → What do I do right now?
+Settings  → What does Tore know and how does it behave?
+Kiosk     → What is dinner tonight?
+```
+
+A screen fails review if it has more than one dominant action.
+
+### 2.2 Agentic, but never mysterious
+
+Tore may act proactively, but every agentic change must have:
+
+```md
+What changed
+Why it changed
+Undo
+Optional detail
+```
+
+Default state:
+
+```md
+Tore adjusted the week
+3 meals updated · grocery list refreshed
+
+[Undo] [See changes]
+```
+
+Expanded state:
+
+```md
+Changed
+- Tuesday: Salmon pasta → Pork skewers
+- Friday: Empty → Leftovers from Wednesday
+- Grocery list: + pork loin, + cucumber, - salmon
+
+Why
+- Pork matched this week's ICA deal
+- Friday is often skipped unless it is leftovers
+- Wednesday recipe scales well to two meals
+```
+
+This follows the same logic as good system-status and user-control design: the system can act, but users must understand outcomes and retain control. ([Nielsen Norman Group][1])
+
+### 2.3 Surface intelligence inline, never as notifications
+
+Ambient intelligence appears only where it helps:
+
+```md
+Home:      "Use the yoghurt before Friday?"
+Plan:      "Thursday is fragile. Make it leftovers?"
+Shop:      "This list changed after Tuesday's swap."
+Kiosk:     "Rice is already prepped."
+```
+
+No push notifications. No nags. No streaks. Your current spec already requires proactive intelligence to appear inline and explicitly forbids interruption. 
+
+### 2.4 The user never has to maintain the machine
+
+The UI must not ask the user to manage pantry, maintain datasets, rate meals, or explain every skip.
+
+Tore learns from behavior. It should infer gently, expose memory when useful, and allow correction. This matches the current spec’s event-stream learning model and its rule that there is no rating UI or “how was dinner?” prompt. 
+
+### 2.5 Chat is a capture surface, not the app
+
+Chat exists, but it should not become the main UI.
+
+The app’s best interactions should be:
+
+```md
+Tap
+Swipe
+Inline command
+Camera capture
+Undo
+```
+
+Chat is for ambiguous input, photos, and complex commands. The main product should remain visual and direct.
+
+---
+
+## 3. Information architecture
+
+### 3.1 Primary nav
+
+Use **four main destinations** on phone/laptop:
+
+```md
+Today
+Plan
+Shop
+Capture
+```
+
+Settings is accessed from the profile/household button, not the main nav.
+
+Do not expose these as primary tabs:
+
+```md
+Recipes
+Pantry
+Deals
+Costs
+Prep
+```
+
+Those are system resources, not user destinations.
+
+### 3.2 Route map
+
+```md
+/              → Today
+/plan          → Plan
+/groceries     → Shop
+/capture       → Capture
+/cook/:id      → Cooking mode
+/settings      → Settings
+/settings/memory
+/settings/pantry
+/settings/spending
+/kiosk         → Kiosk Today
+/kiosk/cook/:id
+/kiosk/chat
+```
+
+This preserves the current spec’s surfaces — Home, Planner, Chat, Groceries, Settings, Kiosk — but makes the nav more product-like and less CRUD-shaped. 
+
+### 3.3 Navigation behavior
+
+On mobile:
+
+```md
+Bottom nav:
+[Today] [Plan] [Shop] [Capture]
+```
+
+On desktop/tablet:
+
+```md
+Left rail:
+Tore
+Today
+Plan
+Shop
+Capture
+
+bottom:
+Settings
+```
+
+On kiosk:
+
+```md
+No nav.
+Only Tonight, Cook, and restricted Kiosk Chat.
+```
+
+The kiosk must remain narrow: tonight’s recipe, prepped components, one counter note, next three days, and no planning/editing. 
+
+---
+
+## 4. Visual design direction
+
+## 4.1 Visual metaphor
+
+Tore should look like **a soft instrument panel for the kitchen**.
+
+Use:
+
+```md
+Large calm surfaces
+Warm near-neutral backgrounds
+Soft depth
+Precise typography
+Sparse accent color
+Generous spacing
+Contextual cards
+Subtle motion
+```
+
+Avoid:
+
+```md
+Harsh white SaaS dashboards
+Generic Tailwind cards everywhere
+Dense tables
+Colorful recipe-app chaos
+Emoji decoration
+Overused glass blur
+Neon cyberpunk gradients
+AI sparkle icons everywhere
+```
+
+## 4.2 Theme name
+
+```md
+Theme: Warm Future
+```
+
+## 4.3 Color tokens
+
+Use a small semantic palette.
+
+```css
+--bg:              #F4EFE7;  /* warm oat */
+--surface:         #FFFCF6;  /* warm porcelain */
+--surface-raised:  #FFFFFF;
+--surface-muted:   #ECE3D7;
+
+--ink:             #1F211D;  /* soft black */
+--ink-muted:       #6C6A61;
+--ink-faint:       #9A9488;
+
+--line:            #DED4C6;
+--line-strong:     #C8BAA8;
+
+--accent:          #556B5F;  /* muted sage */
+--accent-ink:      #F8F4EA;
+--accent-soft:     #DDE7DF;
+
+--attention:       #A56A43;  /* warm copper */
+--attention-soft:  #EFE0D3;
+
+--danger:          #9B3E35;
+--danger-soft:     #F1DAD6;
+
+--success:         #536F4E;
+--success-soft:    #DDE8DA;
+
+--focus:           #1F211D;
+```
+
+Dark mode later:
+
+```css
+--bg:              #171814;
+--surface:         #20211C;
+--surface-raised:  #292A24;
+--surface-muted:   #2F3029;
+
+--ink:             #F6F0E6;
+--ink-muted:       #B8B0A4;
+--ink-faint:       #827B71;
+
+--line:            #3C3A33;
+--line-strong:     #565247;
+
+--accent:          #B9C8B7;
+--accent-ink:      #171814;
+--accent-soft:     #303A32;
+```
+
+Color must communicate hierarchy and state, not decoration. Material Design’s current system guidance emphasizes design tokens and accessible color schemes that communicate hierarchy, state, and brand. ([Material Design][3])
+
+## 4.4 Contrast and accessibility
+
+Minimum requirements:
+
+```md
+Normal text:        4.5:1 contrast minimum
+Large text:         3:1 contrast minimum
+UI components:      3:1 contrast minimum against adjacent colors
+Focus indicator:    visible, high contrast, not color-only
+Touch targets:      44 × 44 px minimum, 48 × 48 preferred
+```
+
+WCAG 2.2 requires at least 4.5:1 contrast for normal text, 3:1 for large text, and 3:1 for UI components and meaningful graphical objects. ([W3C][4]) Apple’s button guidance also uses at least a 44×44 pt hit region as a general rule for selectable controls. ([Apple Developer][5])
+
+## 4.5 Typography
+
+Use one excellent sans-serif, no more.
+
+Recommended:
+
+```md
+Primary: Inter, Geist, SF Pro, or system-ui
+Numbers: tabular figures enabled
+```
+
+Type scale:
+
+```css
+--text-xs:   12px;
+--text-sm:   14px;
+--text-md:   16px;
+--text-lg:   18px;
+--text-xl:   22px;
+--text-2xl:  28px;
+--text-3xl:  36px;
+--text-hero: 52px;
+```
+
+Rules:
+
+```md
+Use large type for decisions.
+Use small type only for metadata.
+Never use low-contrast tiny labels for important information.
+One screen should have one typographic hero.
+Use tabular numbers for servings, times, quantities, prices.
+```
+
+## 4.6 Shape
+
+```css
+--radius-sm:  10px;
+--radius-md:  16px;
+--radius-lg:  24px;
+--radius-xl:  32px;
+--radius-pill: 999px;
+```
+
+Rules:
+
+```md
+Primary cards:      24–32px radius
+Buttons:            pill or 16px radius
+Inputs:             pill for command/capture; 16px for forms
+Images:             20–28px radius
+Bottom sheets:      28px top radius
+```
+
+The style should be soft and physical, but not childish.
+
+## 4.7 Elevation
+
+Use almost no shadow.
+
+```css
+--shadow-soft: 0 12px 40px rgba(31, 33, 29, 0.08);
+--shadow-float: 0 20px 80px rgba(31, 33, 29, 0.14);
+```
+
+Default cards should use border + background. Shadows are reserved for:
+
+```md
+Floating command bar
+Bottom sheets
+Run receipt drawer
+Active dragged meal
+Kiosk hero card
+```
+
+## 4.8 Motion
+
+Motion must explain causality.
+
+Use motion for:
+
+```md
+Plan changes
+Undo
+Opening run receipt
+Moving a meal between days
+Checking grocery items
+Camera capture → parsed result
+AI thinking → applied result
+```
+
+Do not use motion for:
+
+```md
+Decoration
+Looping ambient effects
+Bouncy delight
+Confetti
+```
+
+Timing:
+
+```css
+--ease-standard: cubic-bezier(.2, .8, .2, 1);
+--ease-exit:     cubic-bezier(.4, 0, 1, 1);
+--duration-fast: 120ms;
+--duration-md:   220ms;
+--duration-slow: 360ms;
+```
+
+Material’s interaction guidance emphasizes visible states, consistent state application, and accessible visual indicators. ([Material Design][6])
+
+---
+
+# 5. Component system
+
+## 5.1 App shell
+
+### Mobile shell
+
+```md
+Top:
+- Household name or Tore wordmark
+- Current week/date context
+- Settings/avatar button
+
+Main:
+- Single-column content
+- Max width 480px
+- Bottom padding for nav + command bars
+
+Bottom:
+- 4-tab nav
+```
+
+### Desktop shell
+
+```md
+Left rail:
+- Tore wordmark
+- Today
+- Plan
+- Shop
+- Capture
+- Settings
+
+Main:
+- Max width depends on surface
+- Plan may use full width
+- Today/Shop/Capture stay readable and centered
+```
+
+## 5.2 Card types
+
+### Hero card
+
+Used for the most important thing on a screen.
+
+```md
+Examples:
+- Tonight’s meal
+- Current week plan status
+- Grocery list readiness
+- Kiosk dinner card
+```
+
+Structure:
+
+```md
+Eyebrow
+Title
+One-line summary
+Primary action
+Optional secondary action
+Image or visual anchor
+```
+
+### Decision card
+
+Used when the user must pick or confirm.
+
+```md
+Examples:
+- Three fridge-photo suggestions
+- Swap recipe suggestions
+- Deal opportunity
+```
+
+Rules:
+
+```md
+Max 3 options.
+Each option has one primary action.
+No dense metadata.
+No more than two tags.
+```
+
+### Receipt card
+
+Used after an agentic operation.
+
+```md
+Tore adjusted the plan
+3 meals changed · 12 grocery items updated
+
+[Undo] [See changes]
+```
+
+### Memory card
+
+Used in Settings → Kitchen Memory.
+
+```md
+Thursdays are fragile
+Tore will prefer leftovers or low-effort meals on Thursdays.
+
+Seen 7 times
+[This is wrong]
+```
+
+AI memory needs transparent controls. Microsoft’s Human-AI guidelines emphasize that systems should learn from behavior, adapt cautiously, and convey the consequences of user actions. ([Microsoft][7])
+
+### Counter note
+
+Inline, small, dismissible.
+
+```md
+Use the yoghurt before Friday?
+Chicken marinade would use what Tore thinks is left.
+
+[Add to Wednesday] [Dismiss]
+```
+
+Rules:
+
+```md
+Only one primary counter note per surface.
+Never stack more than two.
+Never interrupt.
+Never use red unless it is truly destructive or unsafe.
+```
+
+## 5.3 Buttons
+
+Button hierarchy:
+
+```md
+Primary:      filled accent
+Secondary:    subtle surface / outline
+Tertiary:     text button
+Danger:       muted red, never screaming red
+Ghost:        icon-only or low emphasis
+```
+
+Button labels must be verbs:
+
+```md
+Start cooking
+Add to tonight
+Use this deal
+Skip dinner
+Undo
+See changes
+```
+
+Avoid:
+
+```md
+Submit
+Confirm
+Proceed
+AI
+Generate
+Execute
+```
+
+## 5.4 Inputs
+
+### Command bar
+
+The command bar is the agentic power path.
+
+```md
+[ Ask Tore to adjust the week…                       ↑ ]
+```
+
+Behavior:
+
+```md
+- Sticky bottom on Plan
+- Expands into a larger composer on focus
+- Supports examples when empty
+- Shows agent status while running
+- Final state becomes a run receipt, not a chat bubble
+```
+
+Examples:
+
+```md
+Make Thursday leftovers
+Find something quick for Tuesday
+Use the pork deal this week
+Move salmon to Friday
+Plan only three dinners
+```
+
+The current spec already defines the planner command bar and `PlannerAgent` tool loop; the UI should make that feel like a direct manipulation surface, not a separate chat mode. 
+
+### Capture input
+
+Capture is for photos and messy input.
+
+```md
+[ Take photo ] [ Paste recipe ] [ Scan receipt ] [ Ask Tore ]
+```
+
+After upload, Tore routes the content:
+
+```md
+Receipt → Review receipt
+Recipe photo/text → Save recipe
+Fridge photo → Suggestions
+Pantry shelf → Pantry belief preview
+Unknown → Ask what to do
+```
+
+This matches the existing photo pipeline goals for receipt, recipe, pantry, and fridge classification. 
+
+---
+
+# 6. Screen specs
+
+## 6.1 Today
+
+### Job
+
+Answer:
+
+```md
+What matters for dinner today?
+```
+
+### Layout
+
+```md
+Header
+- "Today"
+- Date
+- small Settings/avatar button
+
+Hero
+- Tonight’s meal card
+
+Secondary
+- Tomorrow compact card
+- One opportunity/counter note
+- Week strip
+
+Floating
+- Capture/Ask button
+```
+
+### Empty state
+
+```md
+No dinner planned
+Tore can make a good guess for tonight.
+
+[Suggest dinner] [Open plan]
+```
+
+### Hero card content
+
+```md
+Tonight
+Pork skewers with cucumber yoghurt
+
+35 min · 2 servings
+Rice is already prepped
+
+[Start cooking]
+[Swap]
+```
+
+### Week strip
+
+Compact, glanceable:
+
+```md
+M   T   W   T   F   S   S
+✓   ●   ○   L   –   ○   ○
+```
+
+Legend should appear only on long press or info tap. Do not permanently explain obvious visual language.
+
+### Rules
+
+```md
+Today must not show a full calendar.
+Today must not show pantry inventory.
+Today must not show spending charts.
+Today must not show more than one proactive note by default.
+```
+
+## 6.2 Plan
+
+### Job
+
+Answer:
+
+```md
+What should the week look like?
+```
+
+### Layout
+
+```md
+Header
+- "This week"
+- Week range
+- Generate/refresh subtle action
+
+Top
+- One counter note or run receipt
+
+Main
+- Seven-day meal board
+
+Bottom
+- Sticky command bar
+```
+
+### Day slot card
+
+```md
+Tuesday
+Pork skewers
+35 min · 2 servings
+uses ICA pork deal
+
+[⋯]
+```
+
+States:
+
+```md
+planned
+empty
+skipped
+leftover
+locked/pinned
+agent-updated
+needs-attention
+```
+
+### Slot visual language
+
+```md
+planned:       raised card with image/thumb or tonal block
+empty:         quiet dashed surface
+skipped:       flat muted row, no guilt copy
+leftover:      linked chain marker from source meal
+locked:        tiny pin, not loud
+agent-updated: temporary soft glow / marker
+```
+
+### Interactions
+
+Tap slot:
+
+```md
+Assign recipe
+Skip
+Mark leftover
+Set servings
+Pin
+Remove
+```
+
+Drag meal:
+
+```md
+Move meal between days
+Show preview
+Drop applies immediately
+Undo snackbar appears
+```
+
+Command:
+
+```md
+Natural language applies changes
+Run receipt appears
+Changed slots animate subtly
+```
+
+### Critical rule
+
+Skipping is neutral:
+
+```md
+Thursday skipped
+[Undo]
+```
+
+Never:
+
+```md
+Why are you skipping?
+This may affect your plan.
+You are behind.
+```
+
+The current spec explicitly says skipping is first-class and neutral, with no “why?” and no cascade warning. 
+
+## 6.3 Shop
+
+### Job
+
+Answer:
+
+```md
+What do we need to buy?
+```
+
+### Layout
+
+```md
+Header
+- "Shop"
+- Store/week context
+- Add item input
+
+Top
+- List status card
+
+Main
+- Grocery groups
+
+Bottom
+- Manual add
+```
+
+### List status card
+
+```md
+Ready for this week
+42 items · updated after Tuesday’s swap
+
+[See plan changes]
+```
+
+### Grocery item
+
+```md
+[ ] Greek yoghurt
+    Dairy · for Wednesday chicken
+```
+
+Checked state:
+
+```md
+[x] Greek yoghurt
+    Added to pantry belief
+```
+
+### Grouping
+
+Default groups:
+
+```md
+Produce
+Protein
+Dairy
+Dry goods
+Frozen
+Household
+Other
+```
+
+Rules:
+
+```md
+Manual add always works.
+Offline/LLM failure must not block shopping.
+Checked items may update pantry belief silently.
+Do not show pantry as exact truth.
+```
+
+This follows your spec’s rule that groceries are the reliability anchor and must survive missing plans, missing pantry data, and LLM failure. 
+
+## 6.4 Capture
+
+### Job
+
+Answer:
+
+```md
+What can Tore understand from this messy input?
+```
+
+### Layout
+
+```md
+Header
+- "Capture"
+
+Primary actions
+- Scan receipt
+- Add recipe
+- Fridge photo
+- Pantry shelf
+- Ask Tore
+
+Recent captures
+- Receipt parsed
+- Recipe saved
+- Fridge suggestions
+```
+
+### Capture result pattern
+
+```md
+Tore found a receipt
+12 items · 438 kr
+
+[Save] [Review]
+```
+
+```md
+Tore found ingredients
+Chicken · yoghurt · cucumber · rice
+
+Suggested:
+1. Chicken yoghurt skewers
+2. Fried rice
+3. Cucumber chicken bowls
+
+[Add #1 to tonight]
+```
+
+### Rule
+
+The default outcome should be a useful artifact, not a question. Your current spec says the fridge-photo flow must end in three concrete recipe suggestions with “add to tonight,” not stop at “Want me to suggest some recipes?” 
+
+## 6.5 Cooking mode
+
+### Job
+
+Answer:
+
+```md
+What do I do right now?
+```
+
+### Layout
+
+```md
+Top
+- Recipe title
+- Time/servings
+- Exit
+
+Main
+- One current step at a time
+- Ingredients relevant to current step
+- Large next button
+
+Bottom
+- Step progress
+- Ask cooking question
+```
+
+### Visual rules
+
+```md
+High contrast.
+Huge text.
+No tiny metadata.
+No planning controls.
+No shopping controls.
+No unrelated AI notes.
+```
+
+### Step card
+
+```md
+3 / 8
+
+Mix yoghurt, garlic, salt, and lemon.
+
+You need:
+Greek yoghurt · garlic · lemon · salt
+
+[Next]
+```
+
+## 6.6 Kiosk
+
+### Job
+
+Answer in two seconds:
+
+```md
+What is dinner tonight?
+```
+
+### Layout
+
+```md
+Full-screen warm background
+
+Hero:
+- Large meal image or tonal placeholder
+- Recipe name
+- Time
+- Servings
+- Start cooking
+
+Below:
+- Already prepped
+- Next 3 days strip
+- One kiosk note
+```
+
+### Kiosk card
+
+```md
+Tonight
+
+Pork skewers
+35 min · 2 servings
+
+Rice is already prepped
+
+[Start cooking]
+```
+
+### Kiosk rules
+
+```md
+No week calendar.
+No edit controls.
+No grocery management.
+No pantry.
+No spending.
+No settings.
+No multi-card dashboard.
+```
+
+The current spec is already correct here: kiosk root is intentionally narrow and planning happens on phone/laptop. 
+
+## 6.7 Settings
+
+### Job
+
+Answer:
+
+```md
+What does Tore know, and how can I correct it?
+```
+
+### Sections
+
+```md
+Household
+Kitchen Memory
+Devices
+Pantry belief
+Spending
+Account
+```
+
+### Kitchen Memory
+
+```md
+Tore has noticed
+
+Thursdays are fragile
+Tore will prefer leftovers or low-effort meals on Thursdays.
+Seen 7 times
+[This is wrong]
+
+Fish rarely sticks on weekdays
+Tore will avoid weekday fish unless explicitly requested.
+Seen 4 swaps
+[This is wrong]
+```
+
+Rules:
+
+```md
+No rating UI.
+No onboarding questionnaire.
+No forced preference maintenance.
+No AI debug logs for normal users.
+```
+
+Google’s PAIR guidance emphasizes that AI products need clear mental models, staged expectation-setting, and feedback/control mechanisms, especially because AI systems adapt over time. ([Pair][8])
+
+---
+
+# 7. Agentic interaction patterns
+
+## 7.1 Run receipt
+
+Every state-changing agent action ends with a compact receipt.
+
+```md
+Tore adjusted the plan
+3 meals changed · grocery list refreshed
+
+[Undo] [See changes]
+```
+
+Expanded:
+
+```md
+Plan
++ Wednesday: Chicken yoghurt skewers
+~ Friday: Leftovers from Wednesday
+- Thursday: Salmon pasta
+
+Shop
++ chicken thighs
++ Greek yoghurt
+- salmon
+
+Why
+Pork deal was used elsewhere. Wednesday recipe creates leftovers.
+```
+
+## 7.2 Thinking state
+
+Do not show a fake chatbot typing indicator.
+
+Use operational language:
+
+```md
+Checking the week…
+Looking at deals…
+Updating groceries…
+Verifying changes…
+```
+
+Keep it short. No anthropomorphic “I’m thinking.”
+
+## 7.3 Failure state
+
+```md
+Tore couldn’t safely update the plan
+The salmon reference matched two recipes.
+
+[Choose recipe] [Cancel]
+```
+
+Rules:
+
+```md
+Tell the user what blocked the action.
+Offer a repair action.
+Do not expose tool-call internals.
+Do not blame the model.
+```
+
+## 7.4 Undo
+
+Undo must be immediate and visible after any reversible action.
+
+```md
+Thursday skipped
+[Undo]
+```
+
+```md
+Plan updated
+[Undo] [See changes]
+```
+
+NN/g’s usability heuristics explicitly call out undo/redo and clear exits as part of user control and freedom. ([Nielsen Norman Group][1])
+
+## 7.5 “Why this?”
+
+Use tiny, optional explainability.
+
+```md
+Pork skewers
+35 min · uses ICA deal
+
+[Why this?]
+```
+
+Expanded:
+
+```md
+Why Tore picked this
+- Pork is on sale this week
+- Similar recipes were kept recently
+- Works as leftovers for Friday
+```
+
+Do not show reasoning by default. Show just enough to build trust.
+
+---
+
+# 8. Empty states
+
+Empty states must be useful, not decorative.
+
+## Today empty
+
+```md
+No dinner planned
+Tore can make a good guess from your week, pantry belief, and recent meals.
+
+[Suggest dinner]
+```
+
+## Plan empty
+
+```md
+This week is open
+Plan a calm week in one step.
+
+[Plan 4 dinners]
+[Use deals]
+```
+
+## Shop empty
+
+```md
+Nothing to buy yet
+Add items manually or generate from the week.
+
+[Add item]
+[Build from plan]
+```
+
+## Kitchen Memory empty
+
+```md
+No kitchen memory yet
+Tore learns quietly from skips, swaps, leftovers, and repeated choices.
+```
+
+No illustrations unless they are exceptionally tasteful. Most empty states should be typography + one action.
+
+---
+
+# 9. Responsive behavior
+
+## Mobile
+
+```md
+Single column
+Bottom nav
+Sticky command/input surfaces
+Bottom sheets for slot actions
+Large hit targets
+No hover-only affordances
+```
+
+## Tablet
+
+```md
+Two-column Today possible:
+- left: tonight
+- right: tomorrow/week strip
+
+Plan can show 7-day horizontal board.
+```
+
+## Desktop
+
+```md
+Left rail
+Centered content for Today/Shop/Capture
+Full-width board for Plan
+Keyboard shortcuts allowed
+```
+
+## Kiosk
+
+```md
+No scroll on root if possible
+Large typography
+Large buttons
+Touch-first
+Readable at 1–2 meters
+```
+
+WCAG’s reflow guidance also matters for the web app: content should adapt without loss of information/functionality and avoid two-dimensional scrolling except where the layout itself requires it. ([W3C][4])
+
+---
+
+# 10. Microcopy rules
+
+## Voice
+
+Use Swedish in the app, but English examples here.
+
+Tone:
+
+```md
+Matter-of-fact
+Warm
+Brief
+Never guilt-inducing
+Never overly enthusiastic
+Never “AI assistant” theatrical
+```
+
+Good:
+
+```md
+Dinner is planned.
+Rice is already prepped.
+Thursday is open.
+Tore changed 3 meals.
+This is probably in your pantry.
+```
+
+Bad:
+
+```md
+Great job!
+Oopsie!
+Your AI chef has a suggestion!
+You forgot to plan Thursday.
+Let’s optimize your food journey.
+```
+
+## Vocabulary
+
+Use household language:
+
+```md
+Dinner
+Tonight
+Tomorrow
+Leftovers
+Shopping list
+Probably have
+Use before Friday
+Already prepped
+```
+
+Avoid system language:
+
+```md
+LLM
+Agent
+Tool call
+Inference
+CounterNote
+Aggregate
+Decider
+Pipeline
+```
+
+---
+
+# 11. Accessibility requirements
+
+## Baseline
+
+```md
+WCAG 2.2 AA minimum.
+Keyboard navigable.
+Visible focus.
+Screen-reader labels.
+No color-only meaning.
+No text embedded in images.
+Reduced motion support.
+Hit targets 44×44 minimum.
+```
+
+## Focus
+
+Every interactive element must have:
+
+```md
+:focus-visible outline
+minimum 2px visual indicator
+contrast against both element and background
+```
+
+## Reduced motion
+
+When `prefers-reduced-motion: reduce`:
+
+```md
+Disable springy transitions.
+Keep opacity/fade under 120ms.
+Do not animate meal movement across screen.
+Use instant state change + highlight.
+```
+
+## Screen reader language
+
+Expose semantic states:
+
+```md
+"Tuesday, planned, Pork skewers, 35 minutes"
+"Thursday, skipped"
+"Greek yoghurt, checked, added to pantry belief"
+"Plan updated, undo available"
+```
+
+W3C’s WCAG quick reference is the implementation companion for accessibility success criteria and techniques. ([W3C][9])
+
+---
+
+# 12. Implementation guidance for Phoenix LiveView
+
+## 12.1 Components
+
+Create UI primitives:
+
+```elixir
+ToreWeb.UI.Shell
+ToreWeb.UI.TopBar
+ToreWeb.UI.BottomNav
+ToreWeb.UI.LeftRail
+ToreWeb.UI.Card
+ToreWeb.UI.HeroCard
+ToreWeb.UI.DecisionCard
+ToreWeb.UI.CounterNote
+ToreWeb.UI.RunReceipt
+ToreWeb.UI.CommandBar
+ToreWeb.UI.BottomSheet
+ToreWeb.UI.WeekStrip
+ToreWeb.UI.MealSlot
+ToreWeb.UI.GroceryItem
+ToreWeb.UI.EmptyState
+ToreWeb.UI.KioskHero
+```
+
+## 12.2 Design tokens
+
+Create a token file:
+
+```css
+assets/css/tokens.css
+```
+
+With:
+
+```css
+:root {
+  color-scheme: light;
+
+  --bg: #F4EFE7;
+  --surface: #FFFCF6;
+  --surface-raised: #FFFFFF;
+  --surface-muted: #ECE3D7;
+
+  --ink: #1F211D;
+  --ink-muted: #6C6A61;
+  --ink-faint: #9A9488;
+
+  --line: #DED4C6;
+  --line-strong: #C8BAA8;
+
+  --accent: #556B5F;
+  --accent-ink: #F8F4EA;
+  --accent-soft: #DDE7DF;
+
+  --attention: #A56A43;
+  --attention-soft: #EFE0D3;
+
+  --danger: #9B3E35;
+  --danger-soft: #F1DAD6;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  --shadow-soft: 0 12px 40px rgba(31, 33, 29, 0.08);
+  --shadow-float: 0 20px 80px rgba(31, 33, 29, 0.14);
+}
+```
+
+## 12.3 LiveView states
+
+Every async/agentic surface should explicitly model:
+
+```elixir
+:idle
+:submitting
+:running
+:needs_user
+:applied
+:failed
+:reverted
+```
+
+Do not infer UI status from string messages. Use explicit assigns.
+
+## 12.4 Run receipt assign
+
+```elixir
+%{
+  title: "Tore adjusted the plan",
+  summary: "3 meals changed · grocery list refreshed",
+  changes: [
+    %{kind: :plan, label: "Tuesday", before: "Salmon pasta", after: "Pork skewers"},
+    %{kind: :grocery, label: "Greek yoghurt", before: nil, after: "added"}
+  ],
+  reason: [
+    "Pork matches this week's deal",
+    "Friday works better as leftovers"
+  ],
+  undo_event_id: "...",
+  status: :applied
+}
+```
+
+## 12.5 Slots should not be tables
+
+The Plan UI must not render days as equal-weight CRUD cells. A meal slot is a **decision card**, not a database row.
+
+---
+
+# 13. Design review checklist
+
+Before merging UI work, answer:
+
+```md
+Can the screen's primary job be understood in two seconds?
+Is there one dominant action?
+Is there less text than before?
+Can the user undo meaningful changes?
+Does the UI explain AI changes without exposing internals?
+Does the screen work if the LLM fails?
+Does manual grocery add still work?
+Does the kiosk remain edit-free?
+Are pantry and costs still demoted?
+Are touch targets large enough?
+Is focus visible?
+Is important meaning available without color?
+Does it avoid generic SaaS/card/table clutter?
+```
+
+---
+
+# 14. Non-goals
+
+Do not build:
+
+```md
+A recipe discovery social feed
+A pantry management dashboard
+A cost analytics dashboard in main nav
+A chatbot-first app
+Push notifications
+Meal ratings
+A big onboarding questionnaire
+A generic admin settings maze
+AI mascot/personality
+```
+
+Your current spec already removes the primary pantry route, moves costs out of main nav, bans meal ratings, bans “you haven’t logged in” reminders, and treats pantry as approximate inference rather than a management screen. 
+
+---
+
+# 15. The key product move
+
+The most important UI idea is this:
+
+Tore should show outcomes, not process.
+```
+
+The user should mostly see:
+
+```md
+Tonight
+This week
+Shopping list
+Useful opportunity
+Clean undoable changes
+```
+
+Not:
+
+```md
+Prompts
+Agents
+Models
+Pipelines
+Pantry tables
+Debug traces
+Recipe databases
+Cost dashboards
+```
+
+That is how Tore gets the “agentic harness for food” feeling while still being beautiful: **the intelligence is operational, the interface is quiet, and the user remains in control.**
+
+[1]: https://www.nngroup.com/articles/ten-usability-heuristics/ "10 Usability Heuristics for User Interface Design - NN/G"
+[2]: https://www.microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction/ "Guidelines for Human-AI Interaction - Microsoft Research"
+[3]: https://m3.material.io/foundations/design-tokens?utm_source=chatgpt.com "Design tokens – Material Design 3"
+[4]: https://www.w3.org/TR/WCAG22/ "Web Content Accessibility Guidelines (WCAG) 2.2"
+[5]: https://developer.apple.com/design/human-interface-guidelines/buttons?utm_source=chatgpt.com "Buttons | Apple Developer Documentation"
+[6]: https://m3.material.io/foundations/interaction/states?utm_source=chatgpt.com "States – Material Design 3"
+[7]: https://www.microsoft.com/en-us/research/blog/guidelines-for-human-ai-interaction-design/?utm_source=chatgpt.com "Guidelines for human-AI interaction design"
+[8]: https://pair.withgoogle.com/chapter/mental-models/ "Mental Models"
+[9]: https://www.w3.org/WAI/WCAG22/quickref/ "How to Meet WCAG (Quickref Reference)"
