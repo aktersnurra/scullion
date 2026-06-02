@@ -36,8 +36,8 @@ defmodule Tore.EventStore do
     :ok
   end
 
-  @spec append(String.t(), [struct()]) :: :ok | {:error, term()}
-  def append(stream_id, events) do
+  @spec append(String.t(), [struct()], keyword()) :: :ok | {:error, term()}
+  def append(stream_id, events, opts \\ []) do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     rows =
@@ -53,7 +53,20 @@ defmodule Tore.EventStore do
       end)
 
     Repo.insert_all(Event, rows)
-    :ok
+
+    case Keyword.get(opts, :broadcast) do
+      nil ->
+        :ok
+
+      topic when is_binary(topic) ->
+        tag = Keyword.get(opts, :broadcast_tag, :event)
+
+        Enum.each(events, fn ev ->
+          Phoenix.PubSub.broadcast(Tore.PubSub, topic, {tag, stream_id, ev})
+        end)
+
+        :ok
+    end
   rescue
     e -> {:error, e}
   end
