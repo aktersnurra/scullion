@@ -9,6 +9,7 @@
 - **Source-of-truth date:** 2026-05-30
 - **2026-05-31:** Reversed the Family→Household naming. `Tore.Household` is canonical; `Tore.Family.*` deleted.
 - **2026-06-02:** Added §Agent Harness Layer. Tore is reframed as a household food-operations harness; every state-changing AI action is a `KitchenRun` producing typed artifacts, verified deterministically, applied atomically. §The Six LLM-Native Features rewritten in harness terms. Future sub-specs implement the harness primitives, verifiers, capsules, risk tiers, resolved references, and Kitchen Skills.
+- **2026-06-02:** UI/UX vocabulary adopted. Canonical names: `CounterNote` (artifact and code module — replaces the working name `Opportunity` from the first draft of §A), `Shop` (UI surface and route `/shop` — replaces `Groceries` / `/groceries`), `Capture` (UI surface and route `/capture` — replaces `Chat` / `/chat`), `Tore.Capture` (module namespace — replaces `Tore.Chat`). The code rename is a separate sub-plan; SPEC.md uses the new names throughout from this commit forward.
 - **Supersedes:** the original Scullion SPEC.md (2026-05-02), now archived in git history at commit `af0ad48`.
 - **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `UI_SPEC.md` (UI/UX contract — meets this spec at the artifact boundary), `PLAN.md` (module-by-module breakdown), `PLAN_FEAT_*.md` (per-feature plans).
 - **Naming:** the project is *Tore*. Any remaining reference to Scullion or Family in code is legacy and slated for deletion (see §Removed in Rewrite).
@@ -65,7 +66,7 @@ behind a context boundary. LiveViews call context APIs only; Handlers orchestrat
 | Aggregate     | Why                                                                |
 |---------------|--------------------------------------------------------------------|
 | **Planning**  | LLM-orchestrated workflow with frequent user tweaks. Events are the substrate from which insights are synthesised. |
-| **Groceries** | Multi-user real-time checklist. Granular events enable PubSub sync and natural undo. |
+| **Shop** | Multi-user real-time grocery checklist (decider stream stays named `groceries`). Granular events enable PubSub sync and natural undo. |
 
 ### CRUD
 
@@ -78,7 +79,7 @@ behind a context boundary. LiveViews call context APIs only; Handlers orchestrat
 | **Pantry**    | Approximate inventory. **No primary management UI.** See §Pantry. |
 | **Costs**     | Receipts logged for cost tracking. **Not in main nav.**           |
 | **Prep**      | LLM-generated text guides. Read-only.                             |
-| **Opportunities** | Ambient suggestions surfaced on Home/Plan/Kiosk as `Opportunity` artifacts. See §3. Code module is `CounterNotes` until the harness foundation sub-spec migrates it. |
+| **CounterNotes** | Ambient suggestions surfaced inline on Home/Plan/Kiosk as `CounterNote` artifacts. See §3. |
 | **KitchenRuns** | Bounded AI operations (see §Agent Harness Layer). Each run owns multiple `AIOperations` rows by correlation ID. |
 | **AIOperations** | Low-level audit log of every LLM call with correlation IDs, step index, model, and token usage. |
 
@@ -123,6 +124,7 @@ more `AIOperations` rows tied by `correlation_id`.
 - `household_id`
 - `kind` — one of the declared run kinds (see §The Six LLM-Native Features)
 - `status` — `:draft | :running | :needs_user | :applied | :failed | :reverted`
+- `phase` — when `status: :running`, one of `:gathering_context | :proposing | :verifying`; `nil` otherwise. Drives the UI's operational thinking-state strip (UI_SPEC §7.2) — *"Checking the week…", "Looking at deals…", "Verifying changes…"*
 - `started_by` — `:user | :scheduler | :ambient_scan | :opportunity_followup`
 - `surface` — `:home | :plan | :shop | :chat | :kiosk`
 - `input_snapshot` — the typed input the run was started with
@@ -172,12 +174,12 @@ how the other implements its half.
 | `CostEntry` | `:receipt_ingestion_run` | Parsed receipt: store, date, total, line items, optional photo path |
 | `DealsUpdate` | `:deal_capture_run` | New deals parsed from a flyer photo, with provenance `:vision` |
 | `MemoryUpdate` | `:kitchen_memory_synthesis_run` | Insights added / superseded / unchanged, with evidence pointers |
-| `Opportunity` | `:ambient_scan_run`, `:deal_opportunity_run` | A proposed action with title, body, `proposed_run` link, primary + dismiss actions |
-| `RunSummary` | every run | One-line human-readable description; always present |
+| `CounterNote` | `:ambient_scan_run`, `:deal_opportunity_run` | A proposed action with title, body, `proposed_run` link, primary + dismiss actions |
+| `RunSummary` | every run | One-line human-readable description plus structured `counts` (e.g. `%{meals_changed: 4, grocery_items_updated: 17, prep_notes_added: 1}`); always present |
 
 **Renderable contract.** Every artifact must support two render modes:
 
-- **Summary** — at most one short line for the run-receipt strip. Example: *"4 meals changed, 17 grocery items updated, 1 prep note added."*
+- **Summary** — at most one short line for the run-receipt strip, plus a structured `counts` map. The UI assembles the summary string from `counts` using a small renderer (e.g. *"4 meals changed · 17 grocery items updated · 1 prep note added"*), so spacing, separators, and pluralisation are UI concerns and never the harness's prose. The harness guarantees the numbers; the UI guarantees the prose.
 - **Detail** — a structured view the user opens deliberately. Example: the full `PlanDiff` shown as before-and-after slots, with a per-slot rationale.
 
 The UI never reads run internals. It reads artifacts. A new UI surface that
@@ -265,14 +267,14 @@ run.
 | `CostEntryVerifier` | `CostEntry` | Store, date, total are present; line items sum within tolerance of total; date is not in the future |
 | `DealsUpdateVerifier` | `DealsUpdate` | Every deal has product name, price, store, source; `valid_until` is set or defaults to 14 days; no duplicate of a still-active scraped deal |
 | `MemoryVerifier` | `MemoryUpdate` | New insights have `kind`, `confidence`, and `evidence_count`; superseded insights link to a successor; no more than the configured maximum active insights per household |
-| `OpportunityVerifier` | `Opportunity` | Title and body present; `proposed_run` is a declared run kind; primary action is a valid event the harness can dispatch |
+| `CounterNoteVerifier` | `CounterNote` | Title and body present; `proposed_run` is a declared run kind; primary action is a valid event the harness can dispatch; rationale list non-empty |
 
 **Verifier lifecycle.** A run's loop ends. The harness collects
 `proposed_changes` from the loop's `tool_trace`, runs the appropriate
 verifiers, and one of three things happens:
 
 - **All pass.** The harness commits `applied_events` to the event store, persists artifacts, transitions the run to `:applied`, and surfaces the run receipt.
-- **One or more fail.** No events commit. The run transitions to `:failed`. The verifier failure reasons are stored on the run. The surface shows a compact repair state: *"Tore couldn't apply this — [reason]. The plan is unchanged."* The user may retry, edit the proposal manually, or dismiss.
+- **One or more fail.** No events commit. The run transitions to `:failed`. Each verifier failure stores both a structured `code` (e.g. `:slot_locked`, `:ingredient_missing`, `:dup_recipe_in_repeat_window`) and a `user_message` field — a short, human-readable sentence that names what blocked the action without exposing tool-call internals or blaming the model. The surface shows a compact repair state with the `user_message`, a verifier-specified `repair_action` (a `proposed_run` link or a manual-edit affordance), and a dismiss option. *Example: "The salmon reference matched two recipes."* The verifier owning the failure is responsible for both fields.
 - **Run hit a human gate mid-loop.** The verifier did not get a chance to run. The run is `:needs_user`; verification happens after the user answers.
 
 **No partial applies.** A verifier failure is atomic — nothing commits. This
@@ -301,7 +303,7 @@ requires explicit confirmation before any event commits.
 
 | Tier | Examples | Apply policy |
 |---|---|---|
-| **Tier 0 — Surface only** | `:ambient_scan_run`, `:deal_opportunity_run` | The run produces `Opportunity` artifacts but writes no aggregate state on its own. The user opts in by tapping a primary action, which dispatches a follow-up run of higher tier. |
+| **Tier 0 — Surface only** | `:ambient_scan_run`, `:deal_opportunity_run` | The run produces `CounterNote` artifacts but writes no aggregate state on its own. The user opts in by tapping a primary action, which dispatches a follow-up run of higher tier. |
 | **Tier 1 — Reversible domain edits** | `:planner_command_run`, `:weekly_planning_run`, `:prep_generation_run`, `:fridge_rescue_run`, `:pantry_belief_update_run`, `:kitchen_memory_synthesis_run` | Auto-apply after verifier passes. The run receipt is visible. Undo is one tap. |
 | **Tier 2 — Reversible ingestion** | `:receipt_ingestion_run`, `:deal_capture_run`, `:recipe_ingestion_run`, `:grocery_reconciliation_run` | Auto-apply by default, but the proposal artifact is always surfaced as a card the user can review and edit before commit. Becomes `:needs_user` per the rule below. |
 | **Tier 3 — Destructive or sensitive** | `:recipe_generation_run`; bulk operations like *clear the week*; any change touching dietary constraints or allergens | Never auto-applies. Proposal is produced; commit requires explicit user confirmation. |
@@ -395,7 +397,7 @@ and the V1 list only.
 
 **Surface rule.** Skills appear in the UI as small contextual action chips
 on the surfaces where they are relevant (e.g. `PlanMyWeek` on Plan;
-`RescueTheFridge` on Chat). There is no global "skills" management screen.
+`RescueTheFridge` on Capture). There is no global "skills" management screen.
 
 **Hard rule.** A skill is just a pre-declared `KitchenRun` kind with bound
 parameters. It is not a separate primitive. Removing a skill is removing a
@@ -414,7 +416,7 @@ rationale inline.**
 Examples:
 
 - A `PlanDiff` slot change carries a `rationale` field: `"Pork on sale at ICA · matches a high-affinity recipe · Tuesday has no prep dependency"`.
-- An `Opportunity` carries an `evidence` list: `["yoghurt last seen 6 days ago", "chicken marinade recipe uses yoghurt", "chicken slot empty Wednesday"]`.
+- A `CounterNote` carries an `evidence` list: `["yoghurt last seen 6 days ago", "chicken marinade recipe uses yoghurt", "chicken slot empty Wednesday"]`.
 - A `RecipeSuggestion` carries a `rationale` per recipe: `["uses leftover salmon", "30 min total", "household chose this 3× in the last 8 weeks"]`.
 - A `PantryBeliefUpdate` carries `provenance` per item: `:receipt`, `:grocery_checkoff`, `:shelf_photo`, `:manual`.
 
@@ -469,6 +471,30 @@ bill.
 - Every `Tore.LLM` callback is statically annotated with its model tier. The annotation is read at runtime by the adapter; there is no per-call model override.
 - `AIOperations.model` is set on every row. Cost rollups on `KitchenRun.model_usage` aggregate by tier across the run's owned operations.
 - The schema-failure single-retry path is the only place the harness silently uses a different model than the callback declared. The retry is logged distinctly (`AIOperations.kind` ends with `.retry`). The monthly `SpendGuard` cap remains the runaway-cost guard.
+
+### A.9 — Meeting point with UI_SPEC.md
+
+This spec owns the harness contract: run kinds, artifact shapes, capsule
+declarations, verifier checks, risk tiers, resolver handles. `UI_SPEC.md`
+owns the surface contract: how artifacts render across Today / Plan / Shop /
+Capture / Cooking / Kiosk / Settings, the visual system, the run-receipt and
+thinking-state and failure-state and undo and "Why this?" patterns.
+
+The two specs meet at artifact schemas. Concretely:
+
+- `RunSummary.counts` (§A.3) drives UI_SPEC §7.1's run-receipt pluralisation and §5.2's receipt card body.
+- `KitchenRun.phase` (§A.2) drives UI_SPEC §7.2's operational thinking-state strip.
+- Verifier failures' `user_message` + `repair_action` (§A.5) drive UI_SPEC §7.3's failure-state card.
+- Per-item `rationale` and `evidence` on every artifact (§A.7) drive UI_SPEC §7.5's "Why this?" expansion.
+- `CounterNote` fields `title`, `body`, `primary_action`, `dismiss_action` (§A.3) drive UI_SPEC §5.2's counter-note card.
+- `RecipeProposal` fields drive UI_SPEC §6.4's capture-result preview.
+- `MemoryUpdate.evidence_count` drives UI_SPEC §5.2's memory card "Seen 7 times" line.
+
+When UI_SPEC adds a surface that needs an artifact field this spec didn't
+name, that's a SPEC.md amendment, not a UI-side workaround. When this spec
+declares a field that no UI surface consumes, that's a SPEC.md trimming
+opportunity. Both specs evolve together at the artifact-schema boundary; no
+side silently degrades.
 
 ---
 
@@ -544,16 +570,16 @@ Every loop iteration is logged to `AIOperations` with the run's
 
 A daily Quantum job (07:00) starts an `:ambient_scan_run`. A post-scrape
 trigger (after the weekly deal scrape completes) starts a
-`:deal_opportunity_run`. Both produce `Opportunity` artifacts.
+`:deal_opportunity_run`. Both produce `CounterNote` artifacts.
 
 - **Capsules:** `WeekPlanCapsule`, `PantryBeliefsCapsule`, `DealsDigestCapsule`, `RecentHistoryCapsule`, `RecipeAffinityCapsule`, `ActiveInsightsCapsule`.
 - **Tools:** none — Pattern A structured-output calls.
-- **Artifacts:** zero or more `Opportunity`s, each with `kind`, `title`, `body`, `proposed_run` (the run kind dispatched when the user taps the primary action), primary + dismiss actions, and an evidence list.
-- **Verifier:** `OpportunityVerifier`.
+- **Artifacts:** zero or more `CounterNote`s, each with `kind`, `title`, `body`, `proposed_run` (the run kind dispatched when the user taps the primary action), primary + dismiss actions, and an evidence list.
+- **Verifier:** `CounterNoteVerifier`.
 - **Tier:** 0 — surface only. The runs never mutate aggregate state. State mutation happens when the user taps the primary action, which dispatches a follow-up Tier 1+ run with `started_by: :opportunity_followup`.
 - **Model tier:** cheap structured.
 
-**Opportunity kinds (V1):**
+**`CounterNote` kinds (V1):**
 
 | Kind | Trigger | Proposed run |
 |---|---|---|
@@ -564,10 +590,7 @@ trigger (after the weekly deal scrape completes) starts a
 
 New kinds are added by extending the catalog, not by new run kinds.
 
-**Renamed.** Today's `CounterNote` becomes the `Opportunity` artifact. The
-code migration follows in the harness foundation sub-spec.
-
-**Hard rule.** Opportunities appear inline on the relevant surface. They are
+**Hard rule.** `CounterNote`s appear inline on the relevant surface. They are
 never delivered as push, email, or any other interruption.
 
 ### 4. Pantry as Inference → `:pantry_belief_update_run`
@@ -651,7 +674,7 @@ The phone/laptop landing surface, distinct from the planner.
 - Tonight + tomorrow card pair.
 - Active counter notes for surface `home`.
 - A week strip showing this week's plan at a glance.
-- FAB → `/chat`.
+- FAB → `/capture`.
 
 ### Planner (`/plan`)
 
@@ -660,19 +683,20 @@ The phone/laptop landing surface, distinct from the planner.
 - A command bar at the bottom: text input + voice (phase ≥ 8) that runs through `PlannerAgent` (§2).
 - Slot interactions still work via tap (assign, swap, skip, mark leftover, set servings).
 
-### Chat (`/chat`)
+### Capture (`/capture`)
 
-Full-screen chat that accepts text and photos. Photos are classified
-(`receipt | recipe | pantry_items | fridge | unknown`) and routed to the appropriate
-review or suggestion flow. Each conversation has a system prompt built from family
-preferences, family insights, current week context, and approximate pantry state.
+Full-screen capture surface that accepts text and photos. Photos are classified
+(`receipt | recipe | pantry_items | fridge | unknown`) and routed to the
+appropriate run kind. The capture surface is a way to start a `KitchenRun`,
+not a conversation thread: each capture produces a typed artifact (see §A.3)
+and the surface renders it, not a chat reply.
 
-### Groceries (`/groceries`)
+### Shop (`/shop`)
 
-The reliability anchor. Manual add always works. Plan changes broadcast to update the
-list automatically, but the list survives a missing plan, a missing pantry, and a
-missing connection to the LLM. Checking an item writes a `Pantry.add_item` (closed
-loop, see §5).
+The reliability anchor. Manual add always works. Plan changes broadcast to
+update the list automatically, but the list survives a missing plan, a
+missing pantry, and a missing connection to the LLM. Checking an item
+dispatches a `:pantry_belief_update_run` (see §4).
 
 ### Settings (`/settings`)
 
@@ -730,7 +754,7 @@ lib/tore/
     events.ex                # MealSkipped, RecipeRemoved, RecipeSwapped, ...
     decider.ex
     state.ex
-  counter_notes.ex           # legacy name; harness foundation sub-spec migrates to Opportunity
+  counter_notes.ex           # context for CounterNote artifacts (formerly the build_home_note stub home)
   counter_notes/
     counter_note.ex
   ai_operations.ex           # low-level LLM call audit log; owned by KitchenRun
@@ -756,7 +780,7 @@ lib/tore/
       cost_entry_verifier.ex
       deals_update_verifier.ex
       memory_verifier.ex
-      opportunity_verifier.ex
+      counter_note_verifier.ex
     skills.ex                # V1 Kitchen Skills catalog
     resolvers.ex             # resolve_slot, resolve_recipe, resolve_grocery_item, resolve_pantry_item
     handles.ex               # ResolvedSlot, ResolvedRecipe, etc.
