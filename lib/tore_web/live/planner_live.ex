@@ -276,26 +276,11 @@ defmodule ToreWeb.PlannerLive do
     end
   end
 
-  def handle_info({:run_quick_command, command}, socket) do
-    ctx = %{
-      plan_id: socket.assigns.plan_id,
-      week_start: socket.assigns.week_start
-    }
-
+  def handle_info({:run_quick_command, _command}, socket) do
     pid = self()
 
     Task.start(fn ->
-      result =
-        case Tore.LLM.PlannerAgent.run(command, ctx) do
-          {:ok, %{question: q}} when is_binary(q) ->
-            %{kind: :question, text: q}
-
-          {:ok, %{final_message: msg, actions: actions, capped: capped}} ->
-            %{kind: :message, text: msg, actions: actions, capped: capped}
-
-          {:error, reason} ->
-            %{kind: :error, text: format_agent_error(reason)}
-        end
+      result = %{kind: :message, text: "(awaiting harness wiring)", actions: [], capped: false}
 
       send(pid, {:quick_command_result, result})
     end)
@@ -363,15 +348,6 @@ defmodule ToreWeb.PlannerLive do
       _ ->
         {:noreply, socket}
     end
-  end
-
-  defp format_agent_error(:provider_budget_exceeded), do: gettext("Monthly LLM budget reached")
-  defp format_agent_error(:rate_limited), do: gettext("Please wait a moment before trying again")
-
-  defp format_agent_error(reason) do
-    require Logger
-    Logger.error("PlannerAgent failed: #{inspect(reason, limit: :infinity, pretty: true)}")
-    gettext("Something went wrong. Try again.")
   end
 
   def render(assigns) do

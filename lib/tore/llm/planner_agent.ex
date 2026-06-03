@@ -1,17 +1,7 @@
 defmodule Tore.LLM.PlannerAgent do
   @moduledoc """
-  Bounded tool-calling loop for the planner command bar. See SPEC.md §2.
-
-  Returns one of:
-
-      {:ok, %{
-        final_message: String.t() | nil,
-        question:      String.t() | nil,
-        actions:       [%{name: String.t(), ok: boolean(), error: term() | nil}],
-        capped:        boolean(),
-        correlation_id: String.t()
-      }}
-      {:error, term()}
+  Bounded tool-calling loop. Pure: no DB writes, no system-prompt construction,
+  no correlation-id generation. Called by `Tore.Harness.Orchestrator`.
   """
 
   alias Tore.LLM.{Tool, PlannerTools}
@@ -21,30 +11,49 @@ defmodule Tore.LLM.PlannerAgent do
   @default_max_round_trips 6
   @default_max_action_calls 12
 
-  @spec run(String.t(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def run(user_text, ctx, opts \\ []) do
+  @type usage :: %{
+          prompt_tokens: non_neg_integer(),
+          completion_tokens: non_neg_integer(),
+          cost_usd: Decimal.t()
+        }
+
+  @type trace_step :: %{
+          step_index: non_neg_integer(),
+          step_kind: :tool_calls | :tool_result | :message,
+          payload: map()
+        }
+
+  @type result ::
+          {:message, String.t()}
+          | {:question, String.t()}
+          | {:capped, String.t()}
+
+  @type loop_outcome :: %{
+          result: result(),
+          tool_trace: [trace_step()],
+          usage_per_step: [usage()]
+        }
+
+  @spec run(String.t(), String.t(), map(), keyword()) :: {:ok, loop_outcome()} | {:error, term()}
+  def run(system_prompt, user_text, ctx, opts \\ []) do
     max_round_trips = Keyword.get(opts, :max_round_trips, @default_max_round_trips)
     max_action_calls = Keyword.get(opts, :max_action_calls, @default_max_action_calls)
-    correlation_id = Keyword.get(opts, :correlation_id, generate_cid())
 
     tools = PlannerTools.all()
     tools_json = Enum.map(tools, &Tool.to_openai/1)
-    system_prompt = agent_preamble() <> "\n\n" <> Tore.Chat.SystemPrompt.build()
 
     state = %{
-      ctx: Map.put(ctx, :correlation_id, correlation_id),
+      ctx: ctx,
       tools_by_name: Map.new(tools, &{&1.name, &1}),
       tools_json: tools_json,
       messages: [%{role: "user", content: user_text}],
-      actions: [],
+      tool_trace: [],
+      usage_per_step: [],
       step_index: 0,
       action_calls: 0,
       round_trips: 0,
       max_round_trips: max_round_trips,
-      max_action_calls: max_action_calls,
-      correlation_id: correlation_id,
-      capped: false,
-      question: nil
+      max_action_calls: max_action_calls
     }
 
     loop(system_prompt, state)
@@ -55,12 +64,11 @@ defmodule Tore.LLM.PlannerAgent do
   defp loop(system, %{round_trips: rt, max_round_trips: max} = state) when rt >= max do
     case @llm.chat_with_tools(system, state.messages, [], []) do
       {:ok, {:message, text}, usage} ->
-        log(state, usage, "capped_final", text)
-        finish(%{state | capped: true}, text)
+        finish(record_step(state, :message, %{text: text}, usage), {:capped, text})
 
       {:ok, _other, usage} ->
-        log(state, usage, "capped_unknown", "")
-        finish(%{state | capped: true}, "Stopped — too many steps.")
+        finish(record_step(state, :message, %{text: ""}, usage),
+               {:capped, "Stopped — too many steps."})
 
       {:error, reason} ->
         {:error, reason}
@@ -70,26 +78,18 @@ defmodule Tore.LLM.PlannerAgent do
   defp loop(system, state) do
     case @llm.chat_with_tools(system, state.messages, state.tools_json, []) do
       {:ok, {:message, text}, usage} ->
-        log(state, usage, "message", text)
-        finish(state, text)
+        finish(record_step(state, :message, %{text: text}, usage), {:message, text})
 
       {:ok, {:tool_calls, calls}, usage} ->
-        log(state, usage, "tool_calls", encode_calls(calls))
-        state = %{state | step_index: state.step_index + 1, round_trips: state.round_trips + 1}
-
-        # Append a single assistant turn containing all tool_calls before any results.
-        state = append_assistant_tool_calls(state, calls)
+        state =
+          state
+          |> record_step(:tool_calls, %{calls: encode_calls(calls)}, usage)
+          |> Map.update!(:round_trips, &(&1 + 1))
+          |> append_assistant_tool_calls(calls)
 
         case execute_calls(calls, state) do
-          {:terminal_question, question, state} ->
-            {:ok,
-             %{
-               final_message: nil,
-               question: question,
-               actions: Enum.reverse(state.actions),
-               capped: false,
-               correlation_id: state.correlation_id
-             }}
+          {:terminal_question, q, state} ->
+            finish(state, {:question, q})
 
           {:cap_hit, state} ->
             loop(system, %{state | round_trips: state.max_round_trips})
@@ -108,8 +108,7 @@ defmodule Tore.LLM.PlannerAgent do
   defp execute_calls([call | rest], state) do
     case Map.fetch(state.tools_by_name, call.name) do
       :error ->
-        state = append_tool_result(state, call, %{error: "unknown_tool"})
-        execute_calls(rest, state)
+        execute_calls(rest, append_tool_result(state, call, %{error: "unknown_tool"}))
 
       {:ok, tool} ->
         handle_tool(tool, call, rest, state)
@@ -124,8 +123,7 @@ defmodule Tore.LLM.PlannerAgent do
         {:terminal_question, question, state}
 
       {:error, _} = err ->
-        state = append_tool_result(state, call, %{error: inspect(err)})
-        {:continue, state}
+        {:continue, append_tool_result(state, call, %{error: inspect(err)})}
     end
   end
 
@@ -133,15 +131,12 @@ defmodule Tore.LLM.PlannerAgent do
     if state.action_calls >= state.max_action_calls do
       state = append_tool_result(state, call, %{error: "action_cap_reached"})
 
-      # Close out any remaining unprocessed calls so the assistant turn's
-      # tool_calls array is fully paired with tool-result messages.
       state =
         Enum.reduce(rest, state, fn pending, acc ->
           append_tool_result(acc, pending, %{error: "action_cap_reached"})
         end)
 
-      {:cap_hit,
-       %{state | actions: [%{name: call.name, ok: false, error: :cap} | state.actions]}}
+      {:cap_hit, state}
     else
       run_and_record(tool, call, rest, %{state | action_calls: state.action_calls + 1})
     end
@@ -156,29 +151,14 @@ defmodule Tore.LLM.PlannerAgent do
       :ok ->
         case tool.run.(call.args, state.ctx) do
           {:ok, result} ->
-            state = append_tool_result(state, call, result)
-
-            state =
-              if tool.kind == :action,
-                do: %{state | actions: [%{name: call.name, ok: true, error: nil} | state.actions]},
-                else: state
-
-            execute_calls(rest, state)
+            execute_calls(rest, append_tool_result(state, call, result))
 
           {:error, reason} ->
-            state = append_tool_result(state, call, %{error: inspect(reason)})
-
-            state =
-              if tool.kind == :action,
-                do: %{state | actions: [%{name: call.name, ok: false, error: reason} | state.actions]},
-                else: state
-
-            execute_calls(rest, state)
+            execute_calls(rest, append_tool_result(state, call, %{error: inspect(reason)}))
         end
 
       {:error, reason} ->
-        state = append_tool_result(state, call, %{error: inspect(reason)})
-        execute_calls(rest, state)
+        execute_calls(rest, append_tool_result(state, call, %{error: inspect(reason)}))
     end
   end
 
@@ -190,7 +170,9 @@ defmodule Tore.LLM.PlannerAgent do
       content: Jason.encode!(result)
     }
 
-    %{state | messages: state.messages ++ [msg]}
+    state
+    |> Map.update!(:messages, &(&1 ++ [msg]))
+    |> record_trace(:tool_result, %{tool_call_id: call.id, name: call.name, result: result})
   end
 
   defp append_assistant_tool_calls(state, calls) do
@@ -207,65 +189,37 @@ defmodule Tore.LLM.PlannerAgent do
         end)
     }
 
-    %{state | messages: state.messages ++ [msg]}
+    Map.update!(state, :messages, &(&1 ++ [msg]))
   end
 
-  defp finish(state, final_message) do
+  defp finish(state, result) do
     {:ok,
      %{
-       final_message: final_message,
-       question: nil,
-       actions: Enum.reverse(state.actions),
-       capped: state.capped,
-       correlation_id: state.correlation_id
+       result: result,
+       tool_trace: Enum.reverse(state.tool_trace),
+       usage_per_step: Enum.reverse(state.usage_per_step)
      }}
   end
 
-  defp log(state, usage, kind, result) do
-    Tore.AiOperations.log(%{
-      run_stream_id: state.correlation_id,
-      kind: "planner_agent." <> kind,
-      step_index: state.step_index,
-      payload: Jason.encode!(%{messages_count: length(state.messages), usage: usage}),
-      result: truncate(result, 4_000)
-    })
+  defp record_step(state, step_kind, payload, usage) do
+    state
+    |> record_trace(step_kind, payload)
+    |> Map.update!(:usage_per_step, &[usage_struct(usage) | &1])
+    |> Map.update!(:step_index, &(&1 + 1))
+  end
 
-    :ok
+  defp record_trace(state, step_kind, payload) do
+    entry = %{step_index: state.step_index, step_kind: step_kind, payload: payload}
+    Map.update!(state, :tool_trace, &[entry | &1])
+  end
+
+  defp usage_struct(usage) when is_map(usage) do
+    %{
+      prompt_tokens: Map.get(usage, :prompt_tokens, 0),
+      completion_tokens: Map.get(usage, :completion_tokens, 0),
+      cost_usd: Map.get(usage, :cost_usd, Decimal.new(0))
+    }
   end
 
   defp encode_calls(calls), do: Jason.encode!(calls)
-
-  defp truncate(s, max) when is_binary(s) do
-    if String.length(s) > max do
-      String.slice(s, 0, max) <> "…"
-    else
-      s
-    end
-  end
-
-  defp truncate(s, _), do: s
-
-  defp generate_cid do
-    "pa-" <> (:crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false))
-  end
-
-  defp agent_preamble do
-    """
-    You are the planner agent for Tore, a family meal planner.
-
-    You operate by calling tools, not by replying in prose. When the user makes a
-    request that maps to a planning action (assign, swap, skip, mark as leftovers,
-    set servings, remove), call the corresponding tool. When you need to look up
-    recipes, pantry, or deals to decide what to do, call the matching read tool
-    first. When the user's request is ambiguous (e.g. multiple recipes match
-    "salmon"), call ask_user with a specific clarifying question instead of
-    guessing.
-
-    After your tool calls succeed, give a one-sentence confirmation of what you
-    did. Do not narrate or restate the plan. If you cannot perform the action
-    (a tool returned an error), explain what went wrong in one sentence.
-
-    Always prefer calling a tool over describing what you would do.
-    """
-  end
 end

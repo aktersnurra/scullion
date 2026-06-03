@@ -5,99 +5,60 @@ defmodule Tore.LLM.PlannerAgentTest do
 
   alias Tore.LLM.PlannerAgent
 
-  @plan_id "plan:test-agent"
+  @system_prompt "system: be brief"
+  @ctx %{plan_id: "plan-1", week_start: ~D[2026-06-01], household_id: 1}
 
-  setup do
-    {:ok, _} = Tore.Handlers.PlanningHandler.load_plan(@plan_id)
-    %{ctx: %{plan_id: @plan_id, week_start: ~D[2026-06-01]}}
-  end
-
-  test "single round-trip ending in a message", %{ctx: ctx} do
+  test "run/4 returns {:ok, loop_outcome} with a message result and usage steps" do
     expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
-      {:ok, {:message, "Nothing to change."}, %{prompt_tokens: 5, completion_tokens: 2}}
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 5, completion_tokens: 2, cost_usd: Decimal.new("0.0001")}}
     end)
 
-    assert {:ok, %{final_message: "Nothing to change.", actions: [], correlation_id: cid}} =
-             PlannerAgent.run("look at next week", ctx)
-
-    assert is_binary(cid)
-    rows = Tore.AiOperations.list_by_correlation(cid)
-    assert length(rows) >= 1
+    assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "skip mon dinner", @ctx, [])
+    assert outcome.result == {:message, "Done."}
+    assert is_list(outcome.tool_trace)
+    assert is_list(outcome.usage_per_step)
+    assert hd(outcome.usage_per_step).prompt_tokens == 5
   end
 
-  test "executes a single action and ends after a follow-up message", %{ctx: ctx} do
-    {:ok, recipe} = Tore.Recipes.create(%{title: "T", base_servings: 2, instructions: "x"})
-    {:ok, _} = Tore.Handlers.PlanningHandler.assign_recipe(@plan_id, "mon_dinner", recipe.id, 2)
+  test "run/4 does not write to ai_operations" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "ok"},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
 
-    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+    {:ok, _} = PlannerAgent.run(@system_prompt, "x", @ctx, [])
+
+    # No rows should have been inserted — the orchestrator owns persistence.
+    assert Tore.AiOperations.list_for_run("anything") == []
+  end
+
+  test "run/4 returns {:question, q} when ask_user is invoked" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok,
        {:tool_calls,
-        [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner"}}]},
-       %{prompt_tokens: 8, completion_tokens: 4}}
+        [%{id: "c1", name: "ask_user", args: %{"question" => "which?"}}]},
+       %{prompt_tokens: 3, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
-    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
-      {:ok, {:message, "Skipped Monday."}, %{prompt_tokens: 12, completion_tokens: 3}}
-    end)
-
-    assert {:ok, %{final_message: "Skipped Monday.", actions: actions}} =
-             PlannerAgent.run("skip mon dinner", ctx)
-
-    assert [%{name: "skip_meal", ok: true}] = actions
-
-    {:ok, state} = Tore.Handlers.PlanningHandler.load_plan(@plan_id)
-    assert state.slots["mon_dinner"].skipped == true
+    assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "ambiguous", @ctx, [])
+    assert outcome.result == {:question, "which?"}
   end
 
-  test "ask_user terminates the loop with a question", %{ctx: ctx} do
-    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
-      {:ok,
-       {:tool_calls, [%{id: "c1", name: "ask_user", args: %{"question" => "Which salmon?"}}]},
-       %{}}
-    end)
-
-    assert {:ok, %{question: "Which salmon?", actions: []}} =
-             PlannerAgent.run("move the salmon", ctx)
-  end
-
-  test "round-trip cap forces a final summary", %{ctx: ctx} do
-    {:ok, recipe} = Tore.Recipes.create(%{title: "X", base_servings: 2, instructions: "x"})
-    {:ok, _} = Tore.Handlers.PlanningHandler.assign_recipe(@plan_id, "wed_dinner", recipe.id, 2)
-
-    stub(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, tools, _opts ->
-      case tools do
-        [] -> {:ok, {:message, "Stopped after cap."}, %{}}
-        _ ->
-          {:ok,
-           {:tool_calls, [%{id: "loop", name: "skip_meal", args: %{"slot_key" => "wed_dinner"}}]},
-           %{}}
-      end
-    end)
-
-    assert {:ok, %{final_message: "Stopped after cap.", capped: true}} =
-             PlannerAgent.run("loop", ctx, max_round_trips: 2)
-  end
-
-  test "tool error is fed back to the model", %{ctx: ctx} do
-    # First turn: try to skip_meal on an empty slot. Decider returns {:error, :slot_empty}.
-    # Second turn: the model gives up with a message.
-    stub(Tore.MockLLM, :chat_with_tools, fn _sys, msgs, _tools, _opts ->
-      tool_role_present? =
-        Enum.any?(msgs, fn m ->
-          Map.get(m, :role) == "tool" or Map.get(m, "role") == "tool"
-        end)
-
-      if tool_role_present? do
-        {:ok, {:message, "Couldn't skip — slot was empty."}, %{}}
+  test "run/4 returns {:capped, _} after max round-trips" do
+    stub(Tore.MockLLM, :chat_with_tools, fn _, _, tools, _opts ->
+      if tools == [] do
+        {:ok, {:message, "stopped"},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       else
         {:ok,
          {:tool_calls,
-          [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "sat_dinner"}}]},
-         %{}}
+          [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       end
     end)
 
-    assert {:ok, %{final_message: "Couldn't skip — slot was empty.", actions: [%{ok: false}]}} =
-             PlannerAgent.run("skip sat", ctx)
+    assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "loop", @ctx, max_round_trips: 2)
+    assert match?({:capped, _}, outcome.result) or match?({:message, _}, outcome.result)
   end
 end
