@@ -14,6 +14,8 @@ defmodule Tore.Application do
        repos: Application.fetch_env!(:tore, :ecto_repos), skip: skip_migrations?()},
       {DNSCluster, query: Application.get_env(:tore, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tore.PubSub},
+      Tore.Harness.ProjectorRegistry,
+      Tore.Harness.ProjectorSupervisor,
       Tore.Accounts.RateLimiter,
       Tore.Accounts.LoginToken,
       Tore.Scheduler,
