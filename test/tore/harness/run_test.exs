@@ -2,6 +2,7 @@ defmodule Tore.Harness.RunTest do
   use Tore.DataCase, async: false
   alias Tore.Harness.Run
   alias Tore.Harness.Run.{Commands, Events, State}
+  alias Tore.Harness.Artifact.PlanDiff
 
   test "next_stream_id/0 returns a string with 'run-' prefix" do
     id = Run.next_stream_id()
@@ -63,5 +64,30 @@ defmodule Tore.Harness.RunTest do
 
     running = Run.evolve(%State.Draft{stream_id: sid}, opened)
     assert {:ok, []} = Run.decide(%Commands.EnterPhase{phase: :gathering_context}, running)
+  end
+
+  test "load/1 rehydrates ArtifactAdded artifacts via the Registry" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    diff = %PlanDiff{
+      plan_stream_id: "plan-1",
+      week_start: ~D[2026-06-01],
+      events: [%{slot_key: "mon", event_type: "MealSkipped", payload: %{}, rationale: ["why"]}]
+    }
+
+    :ok = Run.append(sid, [opened, %Events.ArtifactAdded{artifact: diff}])
+    {:ok, state} = Run.load(sid)
+
+    assert [%PlanDiff{plan_stream_id: "plan-1"} = reloaded] = state.artifacts
+    assert reloaded.week_start == ~D[2026-06-01]
   end
 end

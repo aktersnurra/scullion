@@ -4,6 +4,7 @@ defmodule Tore.Harness.Artifact.RunSummary do
 
   @type outcome :: :applied | :needs_user | :failed
 
+  @derive Jason.Encoder
   @enforce_keys [:counts, :outcome]
   defstruct [:counts, :outcome]
 

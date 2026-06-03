@@ -17,6 +17,7 @@ defmodule Tore.Harness.Artifact.PlanDiff do
           rationale: [String.t()]
         }
 
+  @derive Jason.Encoder
   @enforce_keys [:plan_stream_id, :week_start, :events]
   defstruct [:plan_stream_id, :week_start, :events]
 

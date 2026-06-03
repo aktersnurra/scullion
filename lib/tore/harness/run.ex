@@ -1,6 +1,7 @@
 defmodule Tore.Harness.Run do
   import Ecto.Query
-  alias Tore.Harness.Run.{Decider, State}
+  alias Tore.Harness.Run.{Decider, Events, State}
+  alias Tore.Harness.Artifact
   alias Tore.EventStore
   alias Tore.EventStore.Event
   alias Tore.Repo
@@ -38,12 +39,39 @@ defmodule Tore.Harness.Run do
         hh -> [broadcast: "harness:household:#{hh}", broadcast_tag: :run_event]
       end
 
-    EventStore.append(stream_id, events, opts)
+    EventStore.append(stream_id, Enum.map(events, &prepare/1), opts)
   end
+
+  defp prepare(%Events.ArtifactAdded{artifact: %_{} = artifact} = ev),
+    do: %Events.ArtifactAdded{ev | artifact: Artifact.to_json(artifact)}
+
+  defp prepare(event), do: event
 
   defp deserialize(event_type, data) do
     module = Module.concat([Tore.Harness.Run.Events, event_type])
     attrs = Jason.decode!(data, keys: :atoms)
-    struct!(module, attrs)
+    rehydrate(struct!(module, attrs))
   end
+
+  defp rehydrate(%Events.ArtifactAdded{artifact: payload}) when is_map(payload) do
+    %Events.ArtifactAdded{artifact: rehydrate_artifact(payload)}
+  end
+
+  defp rehydrate(event), do: event
+
+  defp rehydrate_artifact(payload) do
+    kind = Map.get(payload, :__kind__) || Map.get(payload, "__kind__")
+    {:ok, module} = Artifact.Registry.lookup(kind)
+    module.from_json(stringify_keys(payload))
+  end
+
+  defp stringify_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_atom(k) -> {Atom.to_string(k), stringify_keys(v)}
+      {k, v} -> {k, stringify_keys(v)}
+    end)
+  end
+
+  defp stringify_keys(list) when is_list(list), do: Enum.map(list, &stringify_keys/1)
+  defp stringify_keys(v), do: v
 end
