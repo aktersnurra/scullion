@@ -60,7 +60,7 @@ defmodule Tore.LLM.PlannerTools do
   defp swap_recipe do
     %Tool{
       name: "swap_recipe",
-      description: "Move whatever is in from_slot_key into to_slot_key. The source slot is cleared.",
+      description: "Atomically swap whatever is in from_slot_key and to_slot_key. No data loss.",
       kind: :action,
       parameters: %{
         type: "object",
@@ -71,16 +71,11 @@ defmodule Tore.LLM.PlannerTools do
         required: ["from_slot_key", "to_slot_key"]
       },
       run: fn args, ctx ->
-        with {:ok, state} <- PlanningHandler.load_plan(ctx.plan_id),
-             slot when not is_nil(slot) <- Map.get(state.slots, args["from_slot_key"]),
-             rid when not is_nil(rid) <- Map.get(slot, :recipe_id),
-             servings <- Map.get(slot, :servings) || 2,
-             {:ok, _} <- PlanningHandler.assign_recipe(ctx.plan_id, args["to_slot_key"], rid, servings),
-             {:ok, _} <- PlanningHandler.remove_recipe(ctx.plan_id, args["from_slot_key"]) do
-          {:ok, %{ok: true}}
-        else
-          nil -> {:error, :nothing_to_swap}
-          {:error, reason} -> {:error, reason}
+        with {:ok, _events} <-
+               PlanningHandler.swap_slots(ctx.plan_id, args["from_slot_key"], args["to_slot_key"]),
+             {:ok, state} <- PlanningHandler.load_plan(ctx.plan_id) do
+          to_slot = Map.get(state.slots, args["to_slot_key"]) || %{}
+          {:ok, %{ok: true, label: recipe_title(to_slot[:recipe_id]), recipe_id: to_slot[:recipe_id]}}
         end
       end
     }
@@ -284,6 +279,14 @@ defmodule Tore.LLM.PlannerTools do
   end
 
   defp total_minutes(_), do: 0
+
+  defp recipe_title(nil), do: nil
+
+  defp recipe_title(recipe_id) do
+    Tore.Recipes.get!(recipe_id).title
+  rescue
+    Ecto.NoResultsError -> nil
+  end
 
   defp wrap_ok({:ok, _}), do: {:ok, %{ok: true}}
   defp wrap_ok({:error, reason}), do: {:error, reason}

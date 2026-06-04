@@ -96,6 +96,27 @@ defmodule Tore.LLM.PlannerToolsTest do
     assert is_nil(tue) or is_nil(Map.get(tue, :recipe_id))
   end
 
+  test "swap_recipe performs a true swap with no data loss and returns label", %{ctx: ctx} do
+    %{id: a} = make_recipe(%{title: "Alpha"})
+    %{id: b} = make_recipe(%{title: "Beta"})
+    assign = find("assign_recipe")
+    swap = find("swap_recipe")
+
+    {:ok, _} = assign.run.(%{"slot_key" => "fri_dinner", "recipe_id" => a, "servings" => 4}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "sun_dinner", "recipe_id" => b, "servings" => 2}, ctx)
+
+    assert {:ok, result} =
+             swap.run.(%{"from_slot_key" => "fri_dinner", "to_slot_key" => "sun_dinner",
+                         "rationale" => "weekend"}, ctx)
+
+    assert result.ok == true
+    assert result.label == "Alpha"
+
+    {:ok, state} = PlanningHandler.load_plan(@plan_id)
+    assert state.slots["fri_dinner"].recipe_id == b
+    assert state.slots["sun_dinner"].recipe_id == a
+  end
+
   test "ask_user is terminal-shaped", %{ctx: ctx} do
     tool = find("ask_user")
     assert {:ok, %{ask_user: "Which salmon?"}} = tool.run.(%{"question" => "Which salmon?"}, ctx)
