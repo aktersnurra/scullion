@@ -164,6 +164,20 @@ defmodule ToreWeb.PlannerLiveTest do
 
       assert eventually_renders(view, "Which salmon recipe?")
     end
+
+    test "quick command surfaces a flash when dispatch raises", %{conn: conn} do
+      Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+        raise "boom"
+      end)
+
+      {:ok, view, _} = live(conn, "/plan")
+
+      view
+      |> form("form[phx-submit=quick_command]", %{command: "skip mon dinner"})
+      |> render_submit()
+
+      assert eventually_renders(view, "Tore couldn&#39;t finish that")
+    end
   end
 
   defp eventually_renders(view, substr, attempts \\ 20)

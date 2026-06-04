@@ -217,7 +217,13 @@ defmodule ToreWeb.PlannerLive do
     }
 
     Task.start(fn ->
-      result = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+      result =
+        try do
+          Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+        rescue
+          e -> {:error, e}
+        end
+
       send(pid, {:run_dispatched, result})
     end)
 
@@ -294,7 +300,10 @@ defmodule ToreWeb.PlannerLive do
   end
 
   def handle_info({:run_dispatched, {:error, _reason}}, socket) do
-    {:noreply, assign(socket, quick_loading: false)}
+    {:noreply,
+     socket
+     |> put_flash(:error, gettext("Tore couldn't finish that. Try again in a moment."))
+     |> assign(quick_loading: false)}
   end
 
   def handle_info({:run_state_changed, _stream_id, state}, socket) do
