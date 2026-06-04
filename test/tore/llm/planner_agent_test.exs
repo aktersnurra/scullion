@@ -21,6 +21,18 @@ defmodule Tore.LLM.PlannerAgentTest do
     assert hd(outcome.usage_per_step).prompt_tokens == 5
   end
 
+  test "run/4 coerces a float cost_usd from the LLM into a Decimal" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "ok"},
+       %{prompt_tokens: 5, completion_tokens: 2, cost_usd: 5.04e-4}}
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "x", @ctx, [])
+    usage = hd(outcome.usage_per_step)
+    assert %Decimal{} = usage.cost_usd
+    assert Decimal.equal?(usage.cost_usd, Decimal.from_float(5.04e-4))
+  end
+
   test "run/4 does not write to ai_operations" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok, {:message, "ok"},

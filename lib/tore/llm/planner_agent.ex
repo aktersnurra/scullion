@@ -219,9 +219,13 @@ defmodule Tore.LLM.PlannerAgent do
     %{
       prompt_tokens: Map.get(usage, :prompt_tokens, 0),
       completion_tokens: Map.get(usage, :completion_tokens, 0),
-      cost_usd: Map.get(usage, :cost_usd, Decimal.new(0))
+      cost_usd: to_decimal(Map.get(usage, :cost_usd, 0))
     }
   end
+
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
 
   defp encode_calls(calls), do: Jason.encode!(calls)
 end
