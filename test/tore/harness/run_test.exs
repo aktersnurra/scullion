@@ -66,6 +66,27 @@ defmodule Tore.Harness.RunTest do
     assert {:ok, []} = Run.decide(%Commands.EnterPhase{phase: :gathering_context}, running)
   end
 
+  test "load/1 rehydrates PhaseEntered phase back into an atom" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    {:ok, [phase_entered]} =
+      Run.decide(%Commands.EnterPhase{phase: :proposing}, Run.evolve(%State.Draft{stream_id: sid}, opened))
+
+    :ok = Run.append(sid, [opened, phase_entered])
+    {:ok, state} = Run.load(sid)
+
+    assert state.phase == :proposing
+  end
+
   test "load/1 folds ModelUsageObserved cost_usd back into a Decimal" do
     sid = Run.next_stream_id()
 

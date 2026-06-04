@@ -60,6 +60,9 @@ defmodule Tore.Harness.Run do
   defp rehydrate(%Events.ModelUsageObserved{cost_usd: cost} = event),
     do: %Events.ModelUsageObserved{event | cost_usd: to_decimal(cost)}
 
+  defp rehydrate(%Events.PhaseEntered{phase: phase} = event) when is_binary(phase),
+    do: %Events.PhaseEntered{event | phase: String.to_existing_atom(phase)}
+
   defp rehydrate(event), do: event
 
   defp to_decimal(%Decimal{} = d), do: d
