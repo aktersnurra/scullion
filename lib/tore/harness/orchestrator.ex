@@ -151,6 +151,7 @@ defmodule Tore.Harness.Orchestrator do
     (a tool returned an error), explain what went wrong in one sentence.
 
     Always prefer calling a tool over describing what you would do.
+    When you call an action tool, always include a short `rationale` saying why.
     """
   end
 end

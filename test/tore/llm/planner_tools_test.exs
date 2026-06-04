@@ -23,7 +23,7 @@ defmodule Tore.LLM.PlannerToolsTest do
     %{id: rid} = make_recipe(%{title: "Test Salmon"})
 
     tool = find("assign_recipe")
-    args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 2}
+    args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "good protein"}
 
     assert :ok = Tore.LLM.Tool.validate_args(tool, args)
     assert {:ok, %{ok: true}} = tool.run.(args, ctx)
@@ -48,10 +48,10 @@ defmodule Tore.LLM.PlannerToolsTest do
   test "skip_meal", %{ctx: ctx} do
     %{id: rid} = make_recipe()
     assign = find("assign_recipe")
-    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
 
     tool = find("skip_meal")
-    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "tue_dinner"}, ctx)
+    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "not eating"}, ctx)
     {:ok, state} = PlanningHandler.load_plan(@plan_id)
     assert state.slots["tue_dinner"].skipped == true
   end
@@ -61,8 +61,8 @@ defmodule Tore.LLM.PlannerToolsTest do
     assign = find("assign_recipe")
     remove = find("remove_recipe")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "wed_dinner", "recipe_id" => rid, "servings" => 2}, ctx)
-    {:ok, _} = remove.run.(%{"slot_key" => "wed_dinner"}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "wed_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
+    {:ok, _} = remove.run.(%{"slot_key" => "wed_dinner", "rationale" => "changed mind"}, ctx)
 
     {:ok, state} = PlanningHandler.load_plan(@plan_id)
     # After remove, the slot should either be absent or have nil recipe_id.
@@ -75,8 +75,8 @@ defmodule Tore.LLM.PlannerToolsTest do
     assign = find("assign_recipe")
     set    = find("set_servings")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "thu_dinner", "recipe_id" => rid, "servings" => 2}, ctx)
-    {:ok, _} = set.run.(%{"slot_key" => "thu_dinner", "servings" => 4}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "thu_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
+    {:ok, _} = set.run.(%{"slot_key" => "thu_dinner", "servings" => 4, "rationale" => "more guests"}, ctx)
 
     {:ok, state} = PlanningHandler.load_plan(@plan_id)
     assert state.slots["thu_dinner"].servings == 4
@@ -86,10 +86,10 @@ defmodule Tore.LLM.PlannerToolsTest do
   test "mark_leftover", %{ctx: ctx} do
     %{id: rid} = make_recipe()
     assign = find("assign_recipe")
-    {:ok, _} = assign.run.(%{"slot_key" => "fri_dinner", "recipe_id" => rid, "servings" => 2}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "fri_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
 
     tool = find("mark_leftover")
-    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "fri_dinner"}, ctx)
+    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "fri_dinner", "rationale" => "from thursday"}, ctx)
     {:ok, state} = PlanningHandler.load_plan(@plan_id)
     assert state.slots["fri_dinner"].leftover == true
   end
@@ -99,8 +99,8 @@ defmodule Tore.LLM.PlannerToolsTest do
     assign = find("assign_recipe")
     swap   = find("swap_recipe")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2}, ctx)
-    {:ok, _} = swap.run.(%{"from_slot_key" => "tue_dinner", "to_slot_key" => "fri_dinner"}, ctx)
+    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
+    {:ok, _} = swap.run.(%{"from_slot_key" => "tue_dinner", "to_slot_key" => "fri_dinner", "rationale" => "better timing"}, ctx)
 
     {:ok, state} = PlanningHandler.load_plan(@plan_id)
     assert state.slots["fri_dinner"].recipe_id == rid
@@ -132,6 +132,17 @@ defmodule Tore.LLM.PlannerToolsTest do
   test "ask_user is terminal-shaped", %{ctx: ctx} do
     tool = find("ask_user")
     assert {:ok, %{ask_user: "Which salmon?"}} = tool.run.(%{"question" => "Which salmon?"}, ctx)
+  end
+
+  test "every action tool declares rationale as a required parameter" do
+    action_names = ~w(assign_recipe swap_recipe skip_meal mark_leftover set_servings remove_recipe)
+
+    for name <- action_names do
+      tool = Enum.find(PlannerTools.all(), &(&1.name == name))
+      assert Map.has_key?(tool.parameters.properties, :rationale),
+             "#{name} missing rationale property"
+      assert "rationale" in tool.parameters.required, "#{name} rationale not required"
+    end
   end
 
   describe "read tools" do

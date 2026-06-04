@@ -11,6 +11,8 @@ defmodule Tore.LLM.PlannerTools do
   alias Tore.Handlers.PlanningHandler
 
   @slot_key %{type: "string", description: "Slot identifier like \"mon_dinner\""}
+  @rationale %{type: "string",
+    description: "One short clause explaining why you are making this change."}
 
   @spec all() :: [Tool.t()]
   def all do
@@ -41,9 +43,10 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{
           slot_key: @slot_key,
           recipe_id: %{type: "integer"},
-          servings: %{type: "integer", minimum: 1}
+          servings: %{type: "integer", minimum: 1},
+          rationale: @rationale
         },
-        required: ["slot_key", "recipe_id", "servings"]
+        required: ["slot_key", "recipe_id", "servings", "rationale"]
       },
       run: fn args, ctx ->
         with {:ok, _} <-
@@ -65,9 +68,10 @@ defmodule Tore.LLM.PlannerTools do
         type: "object",
         properties: %{
           from_slot_key: @slot_key,
-          to_slot_key: @slot_key
+          to_slot_key: @slot_key,
+          rationale: @rationale
         },
-        required: ["from_slot_key", "to_slot_key"]
+        required: ["from_slot_key", "to_slot_key", "rationale"]
       },
       run: fn args, ctx ->
         with {:ok, _events} <-
@@ -87,8 +91,8 @@ defmodule Tore.LLM.PlannerTools do
       kind: :action,
       parameters: %{
         type: "object",
-        properties: %{slot_key: @slot_key},
-        required: ["slot_key"]
+        properties: %{slot_key: @slot_key, rationale: @rationale},
+        required: ["slot_key", "rationale"]
       },
       run: fn args, ctx ->
         PlanningHandler.skip_meal(ctx.plan_id, args["slot_key"]) |> wrap_ok()
@@ -103,8 +107,8 @@ defmodule Tore.LLM.PlannerTools do
       kind: :action,
       parameters: %{
         type: "object",
-        properties: %{slot_key: @slot_key},
-        required: ["slot_key"]
+        properties: %{slot_key: @slot_key, rationale: @rationale},
+        required: ["slot_key", "rationale"]
       },
       run: fn args, ctx ->
         PlanningHandler.mark_leftover(ctx.plan_id, args["slot_key"]) |> wrap_ok()
@@ -119,8 +123,8 @@ defmodule Tore.LLM.PlannerTools do
       kind: :action,
       parameters: %{
         type: "object",
-        properties: %{slot_key: @slot_key, servings: %{type: "integer", minimum: 1}},
-        required: ["slot_key", "servings"]
+        properties: %{slot_key: @slot_key, servings: %{type: "integer", minimum: 1}, rationale: @rationale},
+        required: ["slot_key", "servings", "rationale"]
       },
       run: fn args, ctx ->
         PlanningHandler.set_servings(ctx.plan_id, args["slot_key"], args["servings"]) |> wrap_ok()
@@ -135,8 +139,8 @@ defmodule Tore.LLM.PlannerTools do
       kind: :action,
       parameters: %{
         type: "object",
-        properties: %{slot_key: @slot_key},
-        required: ["slot_key"]
+        properties: %{slot_key: @slot_key, rationale: @rationale},
+        required: ["slot_key", "rationale"]
       },
       run: fn args, ctx ->
         PlanningHandler.remove_recipe(ctx.plan_id, args["slot_key"]) |> wrap_ok()
