@@ -57,7 +57,15 @@ defmodule Tore.Harness.Run do
     %Events.ArtifactAdded{artifact: rehydrate_artifact(payload)}
   end
 
+  defp rehydrate(%Events.ModelUsageObserved{cost_usd: cost} = event),
+    do: %Events.ModelUsageObserved{event | cost_usd: to_decimal(cost)}
+
   defp rehydrate(event), do: event
+
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   defp rehydrate_artifact(payload) do
     kind = Map.get(payload, :__kind__) || Map.get(payload, "__kind__")

@@ -66,6 +66,31 @@ defmodule Tore.Harness.RunTest do
     assert {:ok, []} = Run.decide(%Commands.EnterPhase{phase: :gathering_context}, running)
   end
 
+  test "load/1 folds ModelUsageObserved cost_usd back into a Decimal" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    usage = %Events.ModelUsageObserved{
+      prompt_tokens: 5,
+      completion_tokens: 2,
+      cost_usd: Decimal.from_float(5.04e-4)
+    }
+
+    :ok = Run.append(sid, [opened, usage])
+    {:ok, state} = Run.load(sid)
+
+    assert %Decimal{} = state.model_usage.cost_usd
+    assert Decimal.equal?(state.model_usage.cost_usd, Decimal.from_float(5.04e-4))
+  end
+
   test "load/1 rehydrates ArtifactAdded artifacts via the Registry" do
     sid = Run.next_stream_id()
 
