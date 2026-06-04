@@ -1,7 +1,8 @@
 defmodule Tore.Harness.Orchestrator do
   alias Tore.Harness.Run
   alias Tore.Harness.Run.{Commands, State}
-  alias Tore.Harness.Artifact.{PlanDiff, RunSummary}
+  alias Tore.Harness.Artifact.RunSummary
+  alias Tore.Harness.PlanDiffBuilder
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
 
@@ -79,8 +80,8 @@ defmodule Tore.Harness.Orchestrator do
     {:ok, final_state}
   end
 
-  defp close(state, %{result: {:message, _}}, ctx, metadata) do
-    plan_diff = build_plan_diff(ctx)
+  defp close(state, %{result: {:message, _}} = loop, ctx, metadata) do
+    plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
     {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata)
 
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
@@ -92,8 +93,8 @@ defmodule Tore.Harness.Orchestrator do
   defp close(state, %{result: {:question, q}}, _ctx, metadata),
     do: apply_command(state.stream_id, %Commands.RaiseQuestion{question: q}, state, metadata)
 
-  defp close(state, %{result: {:capped, _}}, ctx, metadata) do
-    plan_diff = build_plan_diff(ctx)
+  defp close(state, %{result: {:capped, _}} = loop, ctx, metadata) do
+    plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
     {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata)
     {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata)
@@ -106,21 +107,6 @@ defmodule Tore.Harness.Orchestrator do
       new_state = Enum.reduce(events, state, fn ev, acc -> Run.evolve(acc, ev) end)
       {:ok, new_state}
     end
-  end
-
-  defp build_plan_diff(ctx) do
-    %PlanDiff{
-      plan_stream_id: ctx.plan_stream_id,
-      week_start: ctx.week_start,
-      events: [
-        %{
-          slot_key: "run",
-          event_type: "MealSkipped",
-          payload: %{},
-          rationale: ["planner command applied"]
-        }
-      ]
-    }
   end
 
   defp log_ai_operation(stream_id, entry) do

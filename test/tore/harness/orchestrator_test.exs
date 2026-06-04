@@ -60,6 +60,35 @@ defmodule Tore.Harness.OrchestratorTest do
              Orchestrator.dispatch(:planner_command_run, @ctx)
   end
 
+  test "dispatch builds a real PlanDiff from the planner's skip_meal call" do
+    {:ok, recipe} = Tore.Recipes.create(%{title: "Chili", recipe_type: :meal, base_servings: 4})
+    plan = "plan:2026-06-01"
+    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok,
+       {:tool_calls,
+        [%{id: "c1", name: "skip_meal",
+           args: %{"slot_key" => "mon_dinner", "rationale" => "busy night"}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
+            plan_stream_id: plan, week_start: ~D[2026-06-01]}
+
+    {:ok, state} = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+
+    plan_diff = Enum.find(state.artifacts, &match?(%Tore.Harness.Artifact.PlanDiff{}, &1))
+    assert [%{slot_key: "mon_dinner", event_type: "MealSkipped", rationale: ["busy night"]}] =
+             plan_diff.events
+    refute Enum.any?(plan_diff.events, &(&1.slot_key == "run"))
+  end
+
   test "dispatch broadcasts run events on the household topic" do
     Phoenix.PubSub.subscribe(Tore.PubSub, "harness:household:1")
 
