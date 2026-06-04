@@ -32,6 +32,18 @@ defmodule Tore.LLM.PlannerToolsTest do
     assert %{recipe_id: ^rid, servings: 2} = state.slots["mon_dinner"]
   end
 
+  test "assign_recipe returns the recipe title as label", %{ctx: ctx} do
+    %{id: rid} = make_recipe(%{title: "Roast chicken"})
+    tool = find("assign_recipe")
+
+    assert {:ok, result} =
+             tool.run.(%{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 4,
+                         "rationale" => "easy"}, ctx)
+
+    assert result.ok == true
+    assert result.label == "Roast chicken"
+  end
+
   # SkipMeal requires the slot to exist first (Decider returns :slot_empty otherwise).
   test "skip_meal", %{ctx: ctx} do
     %{id: rid} = make_recipe()

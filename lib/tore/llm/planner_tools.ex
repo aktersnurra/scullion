@@ -46,13 +46,12 @@ defmodule Tore.LLM.PlannerTools do
         required: ["slot_key", "recipe_id", "servings"]
       },
       run: fn args, ctx ->
-        PlanningHandler.assign_recipe(
-          ctx.plan_id,
-          args["slot_key"],
-          args["recipe_id"],
-          args["servings"]
-        )
-        |> wrap_ok()
+        with {:ok, _} <-
+               PlanningHandler.assign_recipe(
+                 ctx.plan_id, args["slot_key"], args["recipe_id"], args["servings"]
+               ) do
+          {:ok, %{ok: true, label: recipe_title(args["recipe_id"])}}
+        end
       end
     }
   end
