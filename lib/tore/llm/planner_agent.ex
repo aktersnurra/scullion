@@ -205,12 +205,14 @@ defmodule Tore.LLM.PlannerAgent do
     state
     |> record_trace(step_kind, payload)
     |> Map.update!(:usage_per_step, &[usage_struct(usage) | &1])
-    |> Map.update!(:step_index, &(&1 + 1))
   end
 
   defp record_trace(state, step_kind, payload) do
     entry = %{step_index: state.step_index, step_kind: step_kind, payload: payload}
-    Map.update!(state, :tool_trace, &[entry | &1])
+
+    state
+    |> Map.update!(:tool_trace, &[entry | &1])
+    |> Map.update!(:step_index, &(&1 + 1))
   end
 
   defp usage_struct(usage) when is_map(usage) do

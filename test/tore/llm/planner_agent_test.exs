@@ -33,6 +33,26 @@ defmodule Tore.LLM.PlannerAgentTest do
     assert Tore.AiOperations.list_for_run("anything") == []
   end
 
+  test "run/4 assigns a unique step_index to every trace entry" do
+    stub(Tore.MockLLM, :chat_with_tools, fn _, _, tools, _opts ->
+      if tools == [] do
+        {:ok, {:message, "stopped"},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      else
+        {:ok,
+         {:tool_calls,
+          [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      end
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "loop", @ctx, max_round_trips: 2)
+
+    indices = Enum.map(outcome.tool_trace, & &1.step_index)
+    assert indices == Enum.uniq(indices)
+    assert indices == Enum.sort(indices)
+  end
+
   test "run/4 returns {:question, q} when ask_user is invoked" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok,
