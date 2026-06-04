@@ -63,7 +63,23 @@ defmodule Tore.Harness.Run do
   defp rehydrate(%Events.PhaseEntered{phase: phase} = event) when is_binary(phase),
     do: %Events.PhaseEntered{event | phase: String.to_existing_atom(phase)}
 
+  defp rehydrate(%Events.Opened{surface: s} = event) when is_binary(s),
+    do: %Events.Opened{event | surface: String.to_existing_atom(s)}
+
+  defp rehydrate(%Events.ToolStepRecorded{step_kind: sk} = event) when is_binary(sk),
+    do: %Events.ToolStepRecorded{event | step_kind: String.to_existing_atom(sk)}
+
+  defp rehydrate(%Events.FailureRecorded{} = event),
+    do: %Events.FailureRecorded{
+      event
+      | code: to_existing_atom(event.code),
+        repair_action: to_existing_atom(event.repair_action)
+    }
+
   defp rehydrate(event), do: event
+
+  defp to_existing_atom(s) when is_binary(s), do: String.to_existing_atom(s)
+  defp to_existing_atom(v), do: v
 
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)

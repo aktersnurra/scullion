@@ -87,6 +87,29 @@ defmodule Tore.Harness.RunTest do
     assert state.phase == :proposing
   end
 
+  test "load/1 rehydrates Opened.surface and ToolStepRecorded.step_kind to atoms" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    step = %Events.ToolStepRecorded{
+      step_index: 0, step_kind: :tool_calls, payload: %{}, ai_operation_id: nil
+    }
+
+    :ok = Run.append(sid, [opened, step])
+    {:ok, state} = Run.load(sid)
+
+    assert state.surface == :plan
+    assert [%{step_kind: :tool_calls}] = state.tool_trace
+  end
+
   test "load/1 folds ModelUsageObserved cost_usd back into a Decimal" do
     sid = Run.next_stream_id()
 
