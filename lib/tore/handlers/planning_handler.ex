@@ -86,6 +86,65 @@ defmodule Tore.Handlers.PlanningHandler do
     end
   end
 
+  @doc """
+  Atomically swaps the recipes (and their servings) between two slots in one
+  append. If one slot is empty, the occupied recipe moves to the empty slot and
+  the source is cleared. If both are empty, returns {:error, :nothing_to_swap}.
+  """
+  def swap_slots(plan_id, slot_a, slot_b) do
+    with {:ok, state} <- EventStore.load(plan_id, Decider) do
+      a = present(Map.get(state.slots, slot_a))
+      b = present(Map.get(state.slots, slot_b))
+
+      case swap_commands(slot_a, a, slot_b, b) do
+        [] ->
+          {:error, :nothing_to_swap}
+
+        commands ->
+          {events, _final} =
+            Enum.reduce(commands, {[], state}, fn cmd, {acc, st} ->
+              {:ok, evts} = Decider.decide(cmd, st)
+              st2 = Enum.reduce(evts, st, &Decider.evolve(&2, &1))
+              {acc ++ evts, st2}
+            end)
+
+          with :ok <- EventStore.append(plan_id, events) do
+            PubSub.broadcast(@pubsub, @topic, {:events, events})
+            {:ok, events}
+          end
+      end
+    end
+  end
+
+  # A slot counts as present only if it actually holds a recipe.
+  defp present(%{recipe_id: rid} = slot) when not is_nil(rid), do: slot
+  defp present(_), do: nil
+
+  # Both slots' values are read into a/b BEFORE any command runs, so the
+  # cross-assign cannot clobber. Servings travel with the recipe.
+  defp swap_commands(_slot_a, nil, _slot_b, nil), do: []
+
+  defp swap_commands(slot_a, a, slot_b, nil) do
+    [
+      %Commands.AssignRecipe{slot_key: slot_b, recipe_id: a.recipe_id, servings: a.servings},
+      %Commands.RemoveRecipe{slot_key: slot_a}
+    ]
+  end
+
+  defp swap_commands(slot_a, nil, slot_b, b) do
+    [
+      %Commands.AssignRecipe{slot_key: slot_a, recipe_id: b.recipe_id, servings: b.servings},
+      %Commands.RemoveRecipe{slot_key: slot_b}
+    ]
+  end
+
+  defp swap_commands(slot_a, a, slot_b, b) do
+    [
+      %Commands.AssignRecipe{slot_key: slot_a, recipe_id: b.recipe_id, servings: b.servings},
+      %Commands.AssignRecipe{slot_key: slot_b, recipe_id: a.recipe_id, servings: a.servings}
+    ]
+  end
+
   def remove_recipe(plan_id, slot_key) do
     run(plan_id, %Commands.RemoveRecipe{slot_key: slot_key})
   end

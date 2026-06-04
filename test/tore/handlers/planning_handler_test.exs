@@ -232,4 +232,48 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       assert length(events) == 1
     end
   end
+
+  describe "swap_slots/3" do
+    test "swaps two occupied slots, preserving both recipes and their servings" do
+      plan = "plan:swap-1"
+      PlanningHandler.assign_recipe(plan, "fri_dinner", 101, 4)
+      PlanningHandler.assign_recipe(plan, "sun_dinner", 202, 2)
+
+      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert state.slots["fri_dinner"].recipe_id == 202
+      assert state.slots["fri_dinner"].servings == 2
+      assert state.slots["sun_dinner"].recipe_id == 101
+      assert state.slots["sun_dinner"].servings == 4
+    end
+
+    test "one slot empty: moves the recipe and clears the source" do
+      plan = "plan:swap-2"
+      PlanningHandler.assign_recipe(plan, "fri_dinner", 101, 4)
+
+      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert state.slots["sun_dinner"].recipe_id == 101
+      assert state.slots["sun_dinner"].servings == 4
+      refute Map.has_key?(state.slots, "fri_dinner")
+    end
+
+    test "empty source, occupied target: moves target into source, clears target" do
+      plan = "plan:swap-2b"
+      PlanningHandler.assign_recipe(plan, "sun_dinner", 202, 2)
+
+      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert state.slots["fri_dinner"].recipe_id == 202
+      refute Map.has_key?(state.slots, "sun_dinner")
+    end
+
+    test "both slots empty returns {:error, :nothing_to_swap}" do
+      plan = "plan:swap-3"
+      assert {:error, :nothing_to_swap} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+    end
+  end
 end
