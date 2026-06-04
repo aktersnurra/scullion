@@ -93,7 +93,15 @@ defmodule Tore.Harness.Artifact.PlanDiff do
 
   defp text_from_counts(counts) do
     counts
-    |> Enum.map(fn {change, n} -> "#{n} #{change}" end)
+    |> Enum.map(fn {change, n} -> "#{n} #{change_label(change)}" end)
     |> Enum.join(", ")
   end
+
+  defp change_label(:added), do: "added"
+  defp change_label(:swapped), do: "swapped"
+  defp change_label(:skipped), do: "skipped"
+  defp change_label(:leftover), do: "leftovers"
+  defp change_label(:removed), do: "removed"
+  defp change_label(:servings), do: "servings adjusted"
+  defp change_label(other), do: to_string(other)
 end

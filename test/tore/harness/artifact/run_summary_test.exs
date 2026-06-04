@@ -46,4 +46,19 @@ defmodule Tore.Harness.Artifact.RunSummaryTest do
     assert decoded.outcome == :applied
     assert decoded.counts == %{added: 2, skipped: 1}
   end
+
+  test "from_artifacts text_fallback uses human wording per change type" do
+    diff = %PlanDiff{
+      plan_stream_id: "p", week_start: ~D[2026-06-01],
+      events: [
+        %{slot_key: "mon_dinner", event_type: "RecipeAssigned", payload: %{}, rationale: ["a"]},
+        %{slot_key: "tue_dinner", event_type: "ServingsChanged", payload: %{"servings" => 6}, rationale: ["b"]}
+      ]
+    }
+    summary = RunSummary.from_artifacts([diff], :applied)
+    text = RunSummary.summary(summary).text_fallback
+    assert text =~ "1 added"
+    assert text =~ "1 servings adjusted"
+    refute text =~ "1 servings,"
+  end
 end

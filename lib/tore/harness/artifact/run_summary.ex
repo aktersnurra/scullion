@@ -52,7 +52,7 @@ defmodule Tore.Harness.Artifact.RunSummary do
   defp text_for(counts, outcome) do
     body =
       counts
-      |> Enum.map(fn {k, v} -> "#{v} #{k}" end)
+      |> Enum.map(fn {k, v} -> "#{v} #{change_label(k)}" end)
       |> Enum.join(", ")
 
     case {body, outcome} do
@@ -62,4 +62,12 @@ defmodule Tore.Harness.Artifact.RunSummary do
       {b, _} -> b
     end
   end
+
+  defp change_label(:added), do: "added"
+  defp change_label(:swapped), do: "swapped"
+  defp change_label(:skipped), do: "skipped"
+  defp change_label(:leftover), do: "leftovers"
+  defp change_label(:removed), do: "removed"
+  defp change_label(:servings), do: "servings adjusted"
+  defp change_label(other), do: to_string(other)
 end
