@@ -11,12 +11,17 @@ defmodule ToreWeb.PlannerLive do
     week_start = week_start(today)
     plan_id = plan_id(week_start)
 
+    household_id = socket.assigns.current_user.household_id
+
     if connected?(socket) do
       PubSub.subscribe(Tore.PubSub, "plan")
+      {:ok, _pid} = Tore.Harness.ProjectorSupervisor.start_or_lookup(household_id)
+      Phoenix.PubSub.subscribe(Tore.PubSub, "harness:household:#{household_id}")
     end
 
     {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
     recipes = Recipes.list(sort: :alphabetical)
+    current_run = Tore.Harness.Projector.latest_on_surface(household_id, :plan)
 
     {:ok,
      assign(socket,
@@ -29,7 +34,7 @@ defmodule ToreWeb.PlannerLive do
        counter_notes: Tore.CounterNotes.list_for_surface("week"),
        plan_health: PlanHealth.compute(plan_state),
        current_week_mode: Tore.WeekMode.get_current_mode(),
-       quick_reply: nil,
+       current_run: current_run,
        quick_loading: false
      )}
   end
@@ -201,18 +206,26 @@ defmodule ToreWeb.PlannerLive do
   end
 
   def handle_event("quick_command", %{"command" => command}, socket) when command != "" do
-    {:noreply,
-     socket
-     |> assign(quick_loading: true, quick_reply: nil)
-     |> then(fn s -> send(self(), {:run_quick_command, command}); s end)}
+    pid = self()
+
+    ctx = %{
+      household_id: socket.assigns.current_user.household_id,
+      user_id: socket.assigns.current_user.id,
+      command: command,
+      plan_stream_id: socket.assigns.plan_id,
+      week_start: socket.assigns.week_start
+    }
+
+    Task.start(fn ->
+      result = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+      send(pid, {:run_dispatched, result})
+    end)
+
+    {:noreply, assign(socket, quick_loading: true)}
   end
 
   def handle_event("quick_command", _params, socket) do
     {:noreply, socket}
-  end
-
-  def handle_event("dismiss_quick_reply", _params, socket) do
-    {:noreply, assign(socket, quick_reply: nil)}
   end
 
   def handle_event("open_chat", _params, socket) do
@@ -276,32 +289,25 @@ defmodule ToreWeb.PlannerLive do
     end
   end
 
-  def handle_info({:run_quick_command, _command}, socket) do
-    pid = self()
-
-    Task.start(fn ->
-      result = %{kind: :message, text: "(awaiting harness wiring)", actions: [], capped: false}
-
-      send(pid, {:quick_command_result, result})
-    end)
-
-    {:noreply, socket}
+  def handle_info({:run_dispatched, {:ok, state}}, socket) do
+    {:noreply, assign(socket, current_run: state, quick_loading: false)}
   end
 
-  def handle_info({:quick_command_result, result}, socket) do
-    if match?(%{kind: :message, actions: [_ | _]}, result) do
-      {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(socket.assigns.plan_id)
+  def handle_info({:run_dispatched, {:error, _reason}}, socket) do
+    {:noreply, assign(socket, quick_loading: false)}
+  end
 
-      {:noreply,
-       assign(socket,
-         quick_reply: result,
-         quick_loading: false,
-         plan_state: plan_state
-       )}
+  def handle_info({:run_state_changed, _stream_id, state}, socket) do
+    current = socket.assigns[:current_run]
+
+    if current && current.stream_id == state.stream_id do
+      {:noreply, assign(socket, current_run: state)}
     else
-      {:noreply, assign(socket, quick_reply: result, quick_loading: false)}
+      {:noreply, socket}
     end
   end
+
+  def handle_info({:run_event, _stream_id, _event}, socket), do: {:noreply, socket}
 
   def handle_info({:events, _events}, socket) do
     {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
@@ -408,45 +414,8 @@ defmodule ToreWeb.PlannerLive do
             </button>
           </form>
 
-          <%= case @quick_reply do %>
-            <% nil -> %>
-            <% %{kind: :message, text: text, actions: actions, capped: capped} -> %>
-              <div class="mt-2 rounded-lg bg-blue-50 p-3 text-sm text-blue-900 relative">
-                <p><%= text %></p>
-                <%= if actions != [] do %>
-                  <p class="mt-2 text-xs text-blue-700">
-                    <%= length(actions) %>
-                    <%= if length(actions) == 1, do: gettext("change applied"), else: gettext("changes applied") %>
-                    <%= if capped, do: gettext(" (stopped after step limit)") %>
-                  </p>
-                <% end %>
-                <button
-                  phx-click="dismiss_quick_reply"
-                  class="absolute top-2 right-2 text-blue-400 hover:text-blue-600"
-                >
-                  ✕
-                </button>
-              </div>
-            <% %{kind: :question, text: q} -> %>
-              <div class="mt-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 relative">
-                <p><%= q %></p>
-                <button
-                  phx-click="dismiss_quick_reply"
-                  class="absolute top-2 right-2 text-amber-400 hover:text-amber-600"
-                >
-                  ✕
-                </button>
-              </div>
-            <% %{kind: :error, text: text} -> %>
-              <div class="mt-2 rounded-lg bg-red-50 p-3 text-sm text-red-900 relative">
-                <p><%= text %></p>
-                <button
-                  phx-click="dismiss_quick_reply"
-                  class="absolute top-2 right-2 text-red-400 hover:text-red-600"
-                >
-                  ✕
-                </button>
-              </div>
+          <%= if @current_run do %>
+            <.live_component module={ToreWeb.Components.ReceiptLive} id="planner-receipt" run={@current_run} />
           <% end %>
         </div>
 
