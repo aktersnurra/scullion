@@ -8,7 +8,7 @@ defmodule Tore.Harness.Artifact.PlanDiff do
           rationale: [String.t()]
         }
 
-  @type rollup_change :: :added | :swapped | :skipped | :leftover | :removed
+  @type rollup_change :: :added | :swapped | :skipped | :leftover | :removed | :servings
 
   @type rollup_entry :: %{
           slot_key: String.t(),
@@ -79,11 +79,12 @@ defmodule Tore.Harness.Artifact.PlanDiff do
 
     change =
       cond do
-        "RecipeRemoved" in types and "RecipeAssigned" in types -> :swapped
+        "RecipeSwapped" in types -> :swapped
         "RecipeAssigned" in types -> :added
         "MealSkipped" in types -> :skipped
         "LeftoverMarked" in types -> :leftover
         "RecipeRemoved" in types -> :removed
+        "ServingsChanged" in types -> :servings
         true -> :added
       end
 
