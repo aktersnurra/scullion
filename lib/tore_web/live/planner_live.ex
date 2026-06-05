@@ -462,7 +462,7 @@ defmodule ToreWeb.PlannerLive do
           elem(@plan_health, 0) == :unplanned && "bg-[color:var(--surface-raised)] text-[color:var(--muted)]"
         ]}>
           <span class="size-1.5 rounded-full inline-block" style={health_dot_color(elem(@plan_health, 0))} />
-          {elem(@plan_health, 1)}
+          {health_message(@plan_health)}
         </div>
 
         <%!-- Week mode selector (placeholder — modes are normal only until Task 4 builds WeekMode) --%>
@@ -1102,4 +1102,13 @@ defmodule ToreWeb.PlannerLive do
   defp health_dot_color(:flexible), do: "background:#ca8a04"
   defp health_dot_color(:fragile), do: "background:#ea580c"
   defp health_dot_color(:unplanned), do: "background:var(--muted)"
+
+  defp health_message({:unplanned, _}), do: gettext("No plan for this week yet.")
+  defp health_message({:ready, _}), do: gettext("Plan looks good for the week.")
+
+  defp health_message({:flexible, n}),
+    do: gettext("%{count} slot(s) unplanned.", count: n)
+
+  defp health_message({:fragile, n}),
+    do: gettext("%{count} slot(s) skipped — plan may need repair.", count: n)
 end

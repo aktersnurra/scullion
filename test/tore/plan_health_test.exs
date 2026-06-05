@@ -11,25 +11,20 @@ defmodule Tore.PlanHealthTest do
   end
 
   test "returns :unplanned when no slots assigned" do
-    {status, msg} = PlanHealth.compute(%{slots: %{}})
-    assert status == :unplanned
-    assert is_binary(msg)
+    assert {:unplanned, 0} = PlanHealth.compute(%{slots: %{}})
   end
 
   test "returns :ready when all 5 weekday slots have recipes" do
     state = make_state(~w(mon tue wed thu fri))
-    {status, _} = PlanHealth.compute(state)
-    assert status == :ready
+    assert {:ready, 0} = PlanHealth.compute(state)
   end
 
-  test "returns :flexible when some weekday slots are unplanned" do
+  test "returns :flexible with the unplanned count when some weekday slots are unplanned" do
     state = make_state(~w(mon tue))
-    {status, msg} = PlanHealth.compute(state)
-    assert status == :flexible
-    assert String.contains?(msg, "3")
+    assert {:flexible, 3} = PlanHealth.compute(state)
   end
 
-  test "returns :fragile when a slot is skipped" do
+  test "returns :fragile with the skipped count when a slot is skipped" do
     slots = %{
       "mon_dinner" => %{recipe_id: 1, skipped: false},
       "tue_dinner" => %{recipe_id: nil, skipped: true},
@@ -37,7 +32,6 @@ defmodule Tore.PlanHealthTest do
       "thu_dinner" => %{recipe_id: 3, skipped: false},
       "fri_dinner" => %{recipe_id: 4, skipped: false}
     }
-    {status, _} = PlanHealth.compute(%{slots: slots})
-    assert status == :fragile
+    assert {:fragile, 1} = PlanHealth.compute(%{slots: slots})
   end
 end

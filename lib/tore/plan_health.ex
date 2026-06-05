@@ -1,6 +1,10 @@
 defmodule Tore.PlanHealth do
   @type status :: :ready | :flexible | :fragile | :unplanned
-  @type result :: {status(), String.t()}
+
+  # The second element is the message-relevant count: skipped slots for
+  # :fragile, unplanned slots for :flexible, 0 otherwise. The view turns
+  # {status, count} into a localized message (gettext lives in the web layer).
+  @type result :: {status(), non_neg_integer()}
 
   @weekdays ~w(mon tue wed thu fri)
 
@@ -23,16 +27,16 @@ defmodule Tore.PlanHealth do
 
     cond do
       length(assigned) == 0 ->
-        {:unplanned, "No plan for this week yet."}
+        {:unplanned, 0}
 
       length(skipped) > 0 ->
-        {:fragile, "#{length(skipped)} slot(s) skipped — plan may need repair."}
+        {:fragile, length(skipped)}
 
       unplanned_count > 0 ->
-        {:flexible, "#{unplanned_count} slot(s) unplanned."}
+        {:flexible, unplanned_count}
 
       true ->
-        {:ready, "Plan looks good for the week."}
+        {:ready, 0}
     end
   end
 end
