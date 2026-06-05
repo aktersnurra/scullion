@@ -61,25 +61,46 @@ defmodule Tore.Harness.Run do
     do: %Events.ModelUsageObserved{event | cost_usd: to_decimal(cost)}
 
   defp rehydrate(%Events.PhaseEntered{phase: phase} = event) when is_binary(phase),
-    do: %Events.PhaseEntered{event | phase: String.to_existing_atom(phase)}
+    do: %Events.PhaseEntered{event | phase: phase_atom(phase)}
 
   defp rehydrate(%Events.Opened{surface: s} = event) when is_binary(s),
-    do: %Events.Opened{event | surface: String.to_existing_atom(s)}
+    do: %Events.Opened{event | surface: surface_atom(s)}
 
   defp rehydrate(%Events.ToolStepRecorded{step_kind: sk} = event) when is_binary(sk),
-    do: %Events.ToolStepRecorded{event | step_kind: String.to_existing_atom(sk)}
+    do: %Events.ToolStepRecorded{event | step_kind: step_kind_atom(sk)}
 
   defp rehydrate(%Events.FailureRecorded{} = event),
     do: %Events.FailureRecorded{
       event
-      | code: to_existing_atom(event.code),
-        repair_action: to_existing_atom(event.repair_action)
+      | code: safe_atom(event.code),
+        repair_action: safe_atom(event.repair_action)
     }
 
   defp rehydrate(event), do: event
 
-  defp to_existing_atom(s) when is_binary(s), do: String.to_existing_atom(s)
-  defp to_existing_atom(v), do: v
+  # Closed enums coerced via explicit maps so rehydration never depends on the
+  # defining module being loaded — the Projector replays open runs at boot,
+  # before PlannerAgent (which defines :tool_calls/:tool_result/:message) loads,
+  # so String.to_existing_atom/1 would raise :badarg on a cold start.
+  defp step_kind_atom("tool_calls"), do: :tool_calls
+  defp step_kind_atom("tool_result"), do: :tool_result
+  defp step_kind_atom("message"), do: :message
+
+  defp phase_atom("gathering_context"), do: :gathering_context
+  defp phase_atom("proposing"), do: :proposing
+  defp phase_atom("verifying"), do: :verifying
+
+  defp surface_atom("plan"), do: :plan
+
+  # failure code/repair_action are more open-ended; tolerate any string without
+  # crashing, and pass non-binaries (e.g. nil) through unchanged.
+  defp safe_atom(s) when is_binary(s) do
+    String.to_existing_atom(s)
+  rescue
+    ArgumentError -> s
+  end
+
+  defp safe_atom(v), do: v
 
   defp to_decimal(%Decimal{} = d), do: d
   defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)

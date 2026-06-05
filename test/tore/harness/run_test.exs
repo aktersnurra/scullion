@@ -110,6 +110,32 @@ defmodule Tore.Harness.RunTest do
     assert [%{step_kind: :tool_calls}] = state.tool_trace
   end
 
+  test "load/1 rehydrates FailureRecorded code without crashing on an unknown string" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    # An atom code that already exists round-trips back to the atom.
+    failure = %Events.FailureRecorded{
+      code: :slot_locked,
+      user_message: "That slot is pinned.",
+      repair_action: nil,
+      at: ~U[2026-06-05 12:00:00Z]
+    }
+
+    :ok = Run.append(sid, [opened, failure])
+    {:ok, state} = Run.load(sid)
+
+    assert %State.Failed{failure_code: :slot_locked, failure_repair_action: nil} = state
+  end
+
   test "load/1 folds ModelUsageObserved cost_usd back into a Decimal" do
     sid = Run.next_stream_id()
 
