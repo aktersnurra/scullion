@@ -53,7 +53,8 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
     html = render_component(ReceiptLive, id: "r", run: applied)
     assert html =~ "Tore adjusted the plan"
-    assert html =~ "skipped"
+    assert html =~ "Skipped"
+    assert html =~ "Monday"
   end
 
   test "renders failure for Failed with header text and user message" do
@@ -84,5 +85,70 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     }
     html = render_component(ReceiptLive, id: "r", run: reverted)
     assert html =~ "Reverted" or html =~ "reverted"
+  end
+
+  defp applied_with_events(events) do
+    diff = %PlanDiff{plan_stream_id: "plan-1", week_start: ~D[2026-06-01], events: events}
+    rs = RunSummary.from_artifacts([diff], :applied)
+
+    %State.Applied{
+      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
+      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z], committed_at: ~U[2026-06-02 12:01:00Z],
+      tool_trace: [], artifacts: [diff, rs],
+      model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
+    }
+  end
+
+  test "Applied renders a named line for a swapped recipe with the day" do
+    events = [%{slot_key: "sat_dinner", event_type: "RecipeSwapped",
+                payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"},
+                rationale: ["x"]}]
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
+    assert html =~ "Ugnsraggmunk"
+    assert html =~ "Saturday"
+  end
+
+  test "Applied renders a day-only line for a skip (no recipe name)" do
+    events = [%{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["x"]}]
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
+    assert html =~ "Skipped"
+    assert html =~ "Sunday"
+  end
+
+  test "Applied renders an added recipe line" do
+    events = [%{slot_key: "mon_dinner", event_type: "RecipeAssigned",
+                payload: %{"label" => "Roast chicken", "recipe_id" => 1, "servings" => 4},
+                rationale: ["x"]}]
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
+    assert html =~ "Added"
+    assert html =~ "Roast chicken"
+    assert html =~ "Monday"
+  end
+
+  test "Applied renders multiple lines, one per change" do
+    events = [
+      %{slot_key: "sat_dinner", event_type: "RecipeSwapped",
+        payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"}, rationale: ["x"]},
+      %{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["y"]}
+    ]
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
+    assert html =~ "Ugnsraggmunk"
+    assert html =~ "Sunday"
+    assert length(Regex.scan(~r/<li/, html)) == 2
+  end
+
+  test "Applied with an added change but nil label falls back to day-only phrasing" do
+    events = [%{slot_key: "mon_dinner", event_type: "RecipeAssigned",
+                payload: %{"recipe_id" => 1, "servings" => 4}, rationale: ["x"]}]
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
+    assert html =~ "Added a meal"
+    assert html =~ "Monday"
+    refute html =~ "nil"
+  end
+
+  test "Applied with no PlanDiff events renders a No changes line" do
+    html = render_component(ReceiptLive, id: "r", run: applied_with_events([]))
+    assert html =~ "No changes"
   end
 end

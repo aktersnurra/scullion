@@ -2,8 +2,7 @@ defmodule ToreWeb.Components.ReceiptLive do
   use ToreWeb, :live_component
 
   alias Tore.Harness.Run.State
-  alias Tore.Harness.Artifact
-  alias Tore.Harness.Artifact.RunSummary
+  alias Tore.Harness.Artifact.PlanDiff
 
   @impl true
   def update(%{run: run} = assigns, socket) do
@@ -11,7 +10,8 @@ defmodule ToreWeb.Components.ReceiptLive do
      socket
      |> assign(assigns)
      |> assign(:header_text, header_for(run))
-     |> assign(:body_html, body(run))}
+     |> assign(:body_html, body(run))
+     |> assign(:body_lines, body_lines(run))}
   end
 
   @impl true
@@ -22,7 +22,13 @@ defmodule ToreWeb.Components.ReceiptLive do
         {@header_text}
       </p>
       <div class="text-sm text-[color:var(--ink)]">
-        {Phoenix.HTML.raw(@body_html)}
+        <ul :if={@body_lines} class="space-y-1">
+          <li :for={line <- @body_lines} class="flex gap-2">
+            <span class="text-[color:var(--subtle)]">·</span>
+            <span>{line}</span>
+          </li>
+        </ul>
+        <span :if={is_nil(@body_lines)}>{Phoenix.HTML.raw(@body_html)}</span>
       </div>
     </div>
     """
@@ -41,9 +47,9 @@ defmodule ToreWeb.Components.ReceiptLive do
 
   defp body(%State.Running{phase: phase}), do: escape(phase_label(phase))
   defp body(%State.NeedsUser{question: q}), do: escape(q)
-  defp body(%State.Applied{artifacts: artifacts}), do: escape(summary_text(artifacts))
   defp body(%State.Failed{failure_user_message: msg}), do: escape(msg)
   defp body(%State.Reverted{}), do: escape(gettext("Changes reverted."))
+  defp body(_), do: ""
 
   defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
@@ -51,10 +57,55 @@ defmodule ToreWeb.Components.ReceiptLive do
   defp phase_label(:proposing), do: gettext("Proposing")
   defp phase_label(:verifying), do: gettext("Verifying")
 
-  defp summary_text(artifacts) do
-    case Enum.find(artifacts, fn a -> match?(%RunSummary{}, a) end) do
-      nil -> gettext("Done.")
-      %RunSummary{} = rs -> Artifact.summary(rs).text_fallback
+  # Applied runs render a list of per-change lines; other variants use body/1.
+  defp body_lines(%State.Applied{} = run), do: applied_lines(run)
+  defp body_lines(_), do: nil
+
+  defp applied_lines(%State.Applied{artifacts: artifacts}) do
+    case Enum.find(artifacts, &match?(%PlanDiff{}, &1)) do
+      %PlanDiff{} = diff ->
+        case PlanDiff.summarise(diff) do
+          [] -> [gettext("No changes")]
+          rollup -> Enum.map(rollup, &line_for/1)
+        end
+
+      nil ->
+        [gettext("No changes")]
     end
   end
+
+  defp line_for(%{change: :added, label: label, slot_key: sk}) when is_binary(label) and label != "",
+    do: gettext("Added %{recipe} on %{day}", recipe: label, day: day_of(sk))
+
+  defp line_for(%{change: :added, slot_key: sk}),
+    do: gettext("Added a meal on %{day}", day: day_of(sk))
+
+  defp line_for(%{change: :swapped, label: label, slot_key: sk}) when is_binary(label) and label != "",
+    do: gettext("Swapped in %{recipe} on %{day}", recipe: label, day: day_of(sk))
+
+  defp line_for(%{change: :swapped, slot_key: sk}),
+    do: gettext("Swapped %{day}", day: day_of(sk))
+
+  defp line_for(%{change: :skipped, slot_key: sk}),
+    do: gettext("Skipped %{day}", day: day_of(sk))
+
+  defp line_for(%{change: :removed, slot_key: sk}),
+    do: gettext("Cleared %{day}", day: day_of(sk))
+
+  defp line_for(%{change: :leftover, slot_key: sk}),
+    do: gettext("Leftovers on %{day}", day: day_of(sk))
+
+  defp line_for(%{change: :servings, slot_key: sk}),
+    do: gettext("Adjusted servings on %{day}", day: day_of(sk))
+
+  defp day_of(slot_key), do: slot_key |> String.split("_", parts: 2) |> hd() |> day_name()
+
+  defp day_name("mon"), do: gettext("Monday")
+  defp day_name("tue"), do: gettext("Tuesday")
+  defp day_name("wed"), do: gettext("Wednesday")
+  defp day_name("thu"), do: gettext("Thursday")
+  defp day_name("fri"), do: gettext("Friday")
+  defp day_name("sat"), do: gettext("Saturday")
+  defp day_name("sun"), do: gettext("Sunday")
+  defp day_name(other), do: String.capitalize(other)
 end
