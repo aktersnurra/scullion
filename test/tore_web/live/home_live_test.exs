@@ -12,12 +12,12 @@ defmodule ToreWeb.HomeLiveTest do
 
   test "mounts without crash and shows tonight section", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")
-    assert html =~ "Tonight"
+    assert html =~ "Ikväll"
   end
 
   test "shows nothing planned when no recipe assigned", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")
-    assert html =~ "Nothing planned for tonight"
+    assert html =~ "Inget planerat ikväll"
   end
 
   test "week strip renders 7 day chips", %{conn: conn} do
@@ -30,6 +30,6 @@ defmodule ToreWeb.HomeLiveTest do
 
   test "FAB renders", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")
-    assert html =~ "Ask Tore"
+    assert html =~ "Fråga Tore"
   end
 end

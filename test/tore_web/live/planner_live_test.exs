@@ -145,7 +145,7 @@ defmodule ToreWeb.PlannerLiveTest do
       |> form("form[phx-submit=quick_command]", %{command: "skip mon dinner"})
       |> render_submit()
 
-      assert eventually_renders(view, "Tore adjusted the plan")
+      assert eventually_renders(view, "Tore justerade planen")
     end
 
     test "quick command renders an ask_user question", %{conn: conn} do
@@ -176,7 +176,7 @@ defmodule ToreWeb.PlannerLiveTest do
       |> form("form[phx-submit=quick_command]", %{command: "skip mon dinner"})
       |> render_submit()
 
-      assert eventually_renders(view, "Tore couldn&#39;t finish that")
+      assert eventually_renders(view, "Tore kunde inte slutföra det")
     end
   end
 

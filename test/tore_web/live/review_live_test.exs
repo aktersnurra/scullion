@@ -20,7 +20,7 @@ defmodule ToreWeb.ReviewLiveTest do
     {:ok, _view, html} = live(conn, ~p"/review/recipe/#{id}")
     assert html =~ "Lasagne"
     assert html =~ "pasta"
-    assert html =~ "Nothing saved yet"
+    assert html =~ "Inget sparat än"
   end
 
   test "unknown review id redirects home", %{conn: conn} do

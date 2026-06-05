@@ -13,7 +13,7 @@ defmodule ToreWeb.PantryLiveTest do
   test "renders empty pantry", %{conn: conn, user: user} do
     conn = authed(conn, user)
     {:ok, _lv, html} = live(conn, "/settings/pantry")
-    assert html =~ "Nothing in the pantry yet"
+    assert html =~ "Inget i skafferiet än"
   end
 
   test "renders existing items", %{conn: conn, user: user} do
