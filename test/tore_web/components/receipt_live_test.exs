@@ -5,6 +5,15 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
   alias Tore.Harness.Run.State
   alias Tore.Harness.Artifact.{PlanDiff, RunSummary}
 
+  # render_component/2 bypasses the LiveView mount (and ToreWeb.Live.Auth's
+  # Gettext.put_locale), so without this it renders in the gettext default
+  # locale instead of the "sv" that real users see. Pin "sv" so these tests
+  # assert the actual rendered Swedish.
+  setup do
+    Gettext.put_locale(ToreWeb.Gettext, "sv")
+    :ok
+  end
+
   defp base_running do
     %State.Running{
       stream_id: "run-x", household_id: 1, kind: "planner_command_run",
@@ -19,7 +28,7 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "renders phase label for Running" do
     html = render_component(ReceiptLive, id: "r", run: base_running())
-    assert html =~ "Proposing" or html =~ "proposing"
+    assert html =~ "Föreslår"
   end
 
   test "renders question for NeedsUser" do
@@ -52,9 +61,9 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     }
 
     html = render_component(ReceiptLive, id: "r", run: applied)
-    assert html =~ "Tore adjusted the plan"
-    assert html =~ "Skipped"
-    assert html =~ "Monday"
+    assert html =~ "Tore justerade planen"
+    assert html =~ "Hoppade över"
+    assert html =~ "Måndag"
   end
 
   test "renders failure for Failed with header text and user message" do
@@ -70,7 +79,7 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
     html = render_component(ReceiptLive, id: "r", run: failed)
-    assert html =~ "couldn"
+    assert html =~ "kunde inte"
     assert html =~ "That slot is pinned."
   end
 
@@ -84,7 +93,7 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
     html = render_component(ReceiptLive, id: "r", run: reverted)
-    assert html =~ "Reverted" or html =~ "reverted"
+    assert html =~ "Återställd"
   end
 
   defp applied_with_events(events) do
@@ -106,14 +115,14 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
                 rationale: ["x"]}]
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "Ugnsraggmunk"
-    assert html =~ "Saturday"
+    assert html =~ "Lördag"
   end
 
   test "Applied renders a day-only line for a skip (no recipe name)" do
     events = [%{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["x"]}]
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
-    assert html =~ "Skipped"
-    assert html =~ "Sunday"
+    assert html =~ "Hoppade över"
+    assert html =~ "Söndag"
   end
 
   test "Applied renders an added recipe line" do
@@ -121,9 +130,9 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
                 payload: %{"label" => "Roast chicken", "recipe_id" => 1, "servings" => 4},
                 rationale: ["x"]}]
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
-    assert html =~ "Added"
+    assert html =~ "La till"
     assert html =~ "Roast chicken"
-    assert html =~ "Monday"
+    assert html =~ "Måndag"
   end
 
   test "Applied renders multiple lines, one per change" do
@@ -134,7 +143,7 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     ]
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "Ugnsraggmunk"
-    assert html =~ "Sunday"
+    assert html =~ "Söndag"
     assert length(Regex.scan(~r/<li/, html)) == 2
   end
 
@@ -142,13 +151,13 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     events = [%{slot_key: "mon_dinner", event_type: "RecipeAssigned",
                 payload: %{"recipe_id" => 1, "servings" => 4}, rationale: ["x"]}]
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
-    assert html =~ "Added a meal"
-    assert html =~ "Monday"
+    assert html =~ "La till en måltid"
+    assert html =~ "Måndag"
     refute html =~ "nil"
   end
 
   test "Applied with no PlanDiff events renders a No changes line" do
     html = render_component(ReceiptLive, id: "r", run: applied_with_events([]))
-    assert html =~ "No changes"
+    assert html =~ "Inga ändringar"
   end
 end
