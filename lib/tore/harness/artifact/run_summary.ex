@@ -44,10 +44,24 @@ defmodule Tore.Harness.Artifact.RunSummary do
   @impl true
   def from_json(%{"outcome" => o, "counts" => c}) do
     %__MODULE__{
-      outcome: String.to_existing_atom(o),
-      counts: Map.new(c, fn {k, v} -> {String.to_existing_atom(k), v} end)
+      outcome: outcome_atom(o),
+      counts: Map.new(c, fn {k, v} -> {count_key_atom(k), v} end)
     }
   end
+
+  # Explicit closed-enum maps (not String.to_existing_atom) so artifact
+  # rehydration during the Projector's boot-time replay can't depend on atom
+  # interning order. See Tore.Harness.Run rehydrate/1 for the same rationale.
+  defp outcome_atom("applied"), do: :applied
+  defp outcome_atom("needs_user"), do: :needs_user
+  defp outcome_atom("failed"), do: :failed
+
+  defp count_key_atom("added"), do: :added
+  defp count_key_atom("swapped"), do: :swapped
+  defp count_key_atom("skipped"), do: :skipped
+  defp count_key_atom("leftover"), do: :leftover
+  defp count_key_atom("removed"), do: :removed
+  defp count_key_atom("servings"), do: :servings
 
   defp text_for(counts, outcome) do
     body =
