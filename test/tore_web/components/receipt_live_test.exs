@@ -80,7 +80,35 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     }
     html = render_component(ReceiptLive, id: "r", run: failed)
     assert html =~ "kunde inte"
-    assert html =~ "That slot is pinned."
+    refute html =~ "That slot is pinned."
+  end
+
+  test "Failed renders the message for :internal_error from failure_code" do
+    failed = %State.Failed{
+      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
+      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z], failed_at: ~U[2026-06-02 12:00:01Z],
+      failure_code: :internal_error, failure_user_message: nil, failure_repair_action: nil,
+      tool_trace: [], artifacts: [],
+      model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
+    }
+    html = render_component(ReceiptLive, id: "r", run: failed)
+    assert html =~ "Tore couldn&#39;t finish that"
+    assert html =~ "nothing was changed"
+  end
+
+  test "Failed renders a fallback message for an unknown failure_code" do
+    failed = %State.Failed{
+      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
+      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z], failed_at: ~U[2026-06-02 12:00:01Z],
+      failure_code: :some_unknown, failure_user_message: nil, failure_repair_action: nil,
+      tool_trace: [], artifacts: [],
+      model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
+    }
+    html = render_component(ReceiptLive, id: "r", run: failed)
+    assert html =~ "Tore couldn&#39;t finish that."
+    refute html =~ "nothing was changed"
   end
 
   test "renders quiet line for Reverted" do

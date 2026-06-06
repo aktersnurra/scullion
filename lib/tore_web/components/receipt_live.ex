@@ -47,9 +47,15 @@ defmodule ToreWeb.Components.ReceiptLive do
 
   defp body(%State.Running{phase: phase}), do: escape(phase_label(phase))
   defp body(%State.NeedsUser{question: q}), do: escape(q)
-  defp body(%State.Failed{failure_user_message: msg}), do: escape(msg)
+  defp body(%State.Failed{failure_code: code}), do: escape(failure_message(code))
   defp body(%State.Reverted{}), do: escape(gettext("Changes reverted."))
   defp body(_), do: ""
+
+  defp failure_message(:internal_error),
+    do: gettext("Tore couldn't finish that — nothing was changed.")
+
+  defp failure_message(_),
+    do: gettext("Tore couldn't finish that.")
 
   defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
