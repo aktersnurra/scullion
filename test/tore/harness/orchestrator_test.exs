@@ -1,6 +1,7 @@
 defmodule Tore.Harness.OrchestratorTest do
   use Tore.DataCase, async: false
   import Mox
+  import Ecto.Query
   setup :verify_on_exit!
 
   alias Tore.Harness.{Orchestrator, Run}
@@ -100,5 +101,43 @@ defmodule Tore.Harness.OrchestratorTest do
 
     assert_receive {:run_event, _sid, %Tore.Harness.Run.Events.Opened{}}, 1_000
     assert_receive {:run_event, _sid, %Tore.Harness.Run.Events.Committed{}}, 1_000
+  end
+
+  test "dispatch returns {:step_failed, reason} and records the run as Failed when a step errors" do
+    Mox.stub(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:error, :boom}
+    end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
+            plan_stream_id: "plan:2026-06-01", week_start: ~D[2026-06-01]}
+
+    assert {:error, {:step_failed, :boom}} = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+
+    sid = latest_run_stream_id()
+    assert {:ok, %Tore.Harness.Run.State.Failed{failure_code: :internal_error}} =
+             Tore.Harness.Run.load(sid)
+  end
+
+  test "dispatch returns {:run_crashed, exception} and records Failed when a step raises" do
+    Mox.stub(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      raise "boom"
+    end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
+            plan_stream_id: "plan:2026-06-01", week_start: ~D[2026-06-01]}
+
+    assert {:error, {:run_crashed, %RuntimeError{message: "boom"}}} =
+             Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+
+    sid = latest_run_stream_id()
+    assert {:ok, %Tore.Harness.Run.State.Failed{}} = Tore.Harness.Run.load(sid)
+  end
+
+  defp latest_run_stream_id do
+    Tore.Repo.one(
+      from e in Tore.EventStore.Event,
+        where: e.stream_type == "run",
+        order_by: [desc: e.id], limit: 1, select: e.stream_id
+    )
   end
 end

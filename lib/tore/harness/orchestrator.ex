@@ -6,20 +6,38 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
 
-  @spec dispatch(atom(), map()) :: {:ok, State.t()} | {:error, term()}
+  @type dispatch_error :: {:step_failed, term()} | {:run_crashed, Exception.t()}
+
+  @spec dispatch(atom(), map()) :: {:ok, State.t()} | {:error, dispatch_error()}
 
   def dispatch(:planner_command_run, ctx) do
     stream_id = Run.next_stream_id()
     metadata = %{household_id: ctx.household_id}
 
-    with {:ok, state} <- open_run(stream_id, ctx, metadata),
-         {:ok, state} <- enter(state, :gathering_context, metadata),
-         {:ok, state} <- enter(state, :proposing, metadata),
-         {:ok, loop} <- PlannerAgent.run(system_prompt(), ctx.command, agent_ctx(ctx, stream_id), []),
-         {:ok, state} <- absorb_loop(state, loop, metadata),
-         {:ok, state} <- enter(state, :verifying, metadata),
-         {:ok, state} <- close(state, loop, ctx, metadata) do
-      {:ok, state}
+    result =
+      try do
+        with {:ok, state} <- open_run(stream_id, ctx, metadata),
+             {:ok, state} <- enter(state, :gathering_context, metadata),
+             {:ok, state} <- enter(state, :proposing, metadata),
+             {:ok, loop} <- PlannerAgent.run(system_prompt(), ctx.command, agent_ctx(ctx, stream_id), []),
+             {:ok, state} <- absorb_loop(state, loop, metadata),
+             {:ok, state} <- enter(state, :verifying, metadata),
+             {:ok, state} <- close(state, loop, ctx, metadata) do
+          {:ok, state}
+        else
+          {:error, reason} -> {:error, {:step_failed, reason}}
+        end
+      rescue
+        e -> {:error, {:run_crashed, e}}
+      end
+
+    case result do
+      {:ok, state} ->
+        {:ok, state}
+
+      {:error, _} = err ->
+        record_failure(stream_id, metadata)
+        err
     end
   end
 
@@ -44,12 +62,13 @@ defmodule Tore.Harness.Orchestrator do
     do: apply_command(state.stream_id, %Commands.EnterPhase{phase: phase}, state, metadata)
 
   defp absorb_loop(state, loop, metadata) do
-    state = absorb_trace(state, loop, metadata)
-    absorb_usage(state, loop, metadata)
+    with {:ok, state} <- absorb_trace(state, loop, metadata) do
+      absorb_usage(state, loop, metadata)
+    end
   end
 
   defp absorb_trace(state, loop, metadata) do
-    Enum.reduce(loop.tool_trace, state, fn entry, acc ->
+    Enum.reduce_while(loop.tool_trace, {:ok, state}, fn entry, {:ok, acc} ->
       ai_op_id = log_ai_operation(acc.stream_id, entry)
 
       cmd = %Commands.RecordToolStep{
@@ -59,35 +78,36 @@ defmodule Tore.Harness.Orchestrator do
         ai_operation_id: ai_op_id
       }
 
-      {:ok, acc} = apply_command(acc.stream_id, cmd, acc, metadata)
-      acc
+      case apply_command(acc.stream_id, cmd, acc, metadata) do
+        {:ok, next} -> {:cont, {:ok, next}}
+        {:error, _} = err -> {:halt, err}
+      end
     end)
   end
 
   defp absorb_usage(state, loop, metadata) do
-    final_state =
-      Enum.reduce(loop.usage_per_step, state, fn usage, acc ->
-        cmd = %Commands.ObserveModelUsage{
-          prompt_tokens: usage.prompt_tokens,
-          completion_tokens: usage.completion_tokens,
-          cost_usd: usage.cost_usd
-        }
+    Enum.reduce_while(loop.usage_per_step, {:ok, state}, fn usage, {:ok, acc} ->
+      cmd = %Commands.ObserveModelUsage{
+        prompt_tokens: usage.prompt_tokens,
+        completion_tokens: usage.completion_tokens,
+        cost_usd: usage.cost_usd
+      }
 
-        {:ok, acc} = apply_command(acc.stream_id, cmd, acc, metadata)
-        acc
-      end)
-
-    {:ok, final_state}
+      case apply_command(acc.stream_id, cmd, acc, metadata) do
+        {:ok, next} -> {:cont, {:ok, next}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
   end
 
   defp close(state, %{result: {:message, _}} = loop, ctx, metadata) do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
-    {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata)
-
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
-    {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata)
 
-    apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+    with {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
+         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
+      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+    end
   end
 
   defp close(state, %{result: {:question, q}}, _ctx, metadata),
@@ -96,9 +116,34 @@ defmodule Tore.Harness.Orchestrator do
   defp close(state, %{result: {:capped, _}} = loop, ctx, metadata) do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
-    {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata)
-    {:ok, state} = apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata)
-    apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+
+    with {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
+         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
+      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+    end
+  end
+
+  # On any dispatch failure, close the run as Failed so it isn't a dangling open
+  # run the Projector replays forever. Only valid from Running (the Decider
+  # rejects RecordFailure otherwise); a pre-Running failure persisted nothing to
+  # close. Best-effort: a further append error is swallowed.
+  defp record_failure(stream_id, metadata) do
+    case Run.load(stream_id) do
+      {:ok, %State.Running{} = state} ->
+        cmd = %Commands.RecordFailure{
+          code: :internal_error,
+          user_message: nil,
+          repair_action: nil
+        }
+
+        _ = apply_command(stream_id, cmd, state, metadata)
+        :ok
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
   end
 
   defp apply_command(stream_id, command, state, metadata) do
