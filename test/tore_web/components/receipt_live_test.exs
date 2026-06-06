@@ -93,8 +93,7 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
     html = render_component(ReceiptLive, id: "r", run: failed)
-    assert html =~ "Tore couldn&#39;t finish that"
-    assert html =~ "nothing was changed"
+    assert html =~ "Tore kunde inte slutföra det — inget ändrades"
   end
 
   test "Failed renders a fallback message for an unknown failure_code" do
@@ -107,8 +106,8 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
     html = render_component(ReceiptLive, id: "r", run: failed)
-    assert html =~ "Tore couldn&#39;t finish that."
-    refute html =~ "nothing was changed"
+    assert html =~ "Tore kunde inte slutföra det."
+    refute html =~ "inget ändrades"
   end
 
   test "renders quiet line for Reverted" do
