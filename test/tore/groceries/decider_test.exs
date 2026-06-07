@@ -100,6 +100,7 @@ defmodule Tore.Groceries.DeciderTest do
                name: "Butter",
                quantity: nil,
                unit: "g",
+               section: nil,
                checked: false
              }
     end

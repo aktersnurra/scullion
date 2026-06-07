@@ -1,11 +1,19 @@
 defmodule Tore.Handlers.GroceriesHandlerTest do
   use ExUnit.Case, async: false
 
+  import Mox
+
   alias Tore.{Handlers.GroceriesHandler, Recipes}
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tore.Repo)
     Phoenix.PubSub.subscribe(Tore.PubSub, "grocery_list")
+
+    # GroceriesHandler.add_item/build_list call the LLM to classify items and
+    # filter the pantry; stub them so these tests don't depend on a real model.
+    stub(Tore.MockLLM, :classify_grocery_item, fn _name -> {:ok, :other} end)
+    stub(Tore.MockLLM, :filter_pantry_items, fn items, _pantry -> {:ok, items} end)
+
     :ok
   end
 

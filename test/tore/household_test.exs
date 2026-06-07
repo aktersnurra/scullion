@@ -1,5 +1,8 @@
 defmodule Tore.HouseholdTest do
-  use Tore.DataCase, async: true
+  # Not async: these write the singleton household/preferences row, which has no
+  # per-test isolation key, so running concurrently with other writers deadlocks
+  # SQLite's single write lock (raises `Database busy`). Serialize this module.
+  use Tore.DataCase, async: false
   alias Tore.Household
 
   test "get_household!/0 creates default household when none exists" do
