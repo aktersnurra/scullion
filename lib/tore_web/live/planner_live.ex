@@ -1110,5 +1110,5 @@ defmodule ToreWeb.PlannerLive do
     do: gettext("%{count} slot(s) unplanned.", count: n)
 
   defp health_message({:fragile, n}),
-    do: gettext("%{count} slot(s) skipped — plan may need repair.", count: n)
+    do: gettext("%{count} dinner(s) skipped this week.", count: n)
 end

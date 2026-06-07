@@ -1852,11 +1852,6 @@ msgstr "kvitton"
 msgid "visits"
 msgstr "besök"
 
-#: lib/tore_web/live/planner_live.ex:1113
-#, elixir-autogen, elixir-format
-msgid "%{count} slot(s) skipped — plan may need repair."
-msgstr "%{count} måltid(er) överhoppade — planen kan behöva ses över."
-
 #: lib/tore_web/live/planner_live.ex:1110
 #, elixir-autogen, elixir-format
 msgid "%{count} slot(s) unplanned."
@@ -2336,3 +2331,8 @@ msgstr "Tore kunde inte slutföra det — inget ändrades."
 #, elixir-autogen, elixir-format
 msgid "Tore couldn't finish that."
 msgstr "Tore kunde inte slutföra det."
+
+#: lib/tore_web/live/planner_live.ex:1113
+#, elixir-autogen, elixir-format
+msgid "%{count} dinner(s) skipped this week."
+msgstr "%{count} middag(ar) överhoppade den här veckan."
