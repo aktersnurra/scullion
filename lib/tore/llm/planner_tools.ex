@@ -1,14 +1,16 @@
 defmodule Tore.LLM.PlannerTools do
   @moduledoc """
   Tool catalog for the planner agent. Each tool's `run` function takes
-  string-keyed args from the LLM and a `ctx` map (must include :plan_id
-  and :week_start). Action tools call PlanningHandler; read tools (built
-  in Task 6) call Recipes/Pantry/Deals. `ask_user` is a terminal signal —
-  the agent runtime recognises it and stops the loop.
+  string-keyed args, a `ctx` map (must include :plan_id and :week_start),
+  and a `working_plan` State. Action tools are pure proposals: they call
+  the Decider against the in-memory working_plan and return
+  `{:ok, result, events, next_plan}` — nothing is persisted. Read tools
+  and `ask_user` return `{:ok, result, [], working_plan}`.
   """
 
   alias Tore.LLM.Tool
   alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning.{Decider, Commands}
 
   @slot_key %{type: "string", description: "Slot identifier like \"mon_dinner\""}
   @rationale %{type: "string",
@@ -48,13 +50,9 @@ defmodule Tore.LLM.PlannerTools do
         },
         required: ["slot_key", "recipe_id", "servings", "rationale"]
       },
-      run: fn args, ctx ->
-        with {:ok, _} <-
-               PlanningHandler.assign_recipe(
-                 ctx.plan_id, args["slot_key"], args["recipe_id"], args["servings"]
-               ) do
-          {:ok, %{ok: true, label: recipe_title(args["recipe_id"])}}
-        end
+      run: fn args, _ctx, plan ->
+        cmd = %Commands.AssignRecipe{slot_key: args["slot_key"], recipe_id: args["recipe_id"], servings: args["servings"]}
+        propose(cmd, plan, %{ok: true, label: recipe_title(args["recipe_id"])})
       end
     }
   end
@@ -73,12 +71,14 @@ defmodule Tore.LLM.PlannerTools do
         },
         required: ["from_slot_key", "to_slot_key", "rationale"]
       },
-      run: fn args, ctx ->
-        with {:ok, _events} <-
-               PlanningHandler.swap_slots(ctx.plan_id, args["from_slot_key"], args["to_slot_key"]),
-             {:ok, state} <- PlanningHandler.load_plan(ctx.plan_id) do
-          to_slot = Map.get(state.slots, args["to_slot_key"]) || %{}
-          {:ok, %{ok: true, label: recipe_title(to_slot[:recipe_id]), recipe_id: to_slot[:recipe_id]}}
+      run: fn args, _ctx, plan ->
+        case PlanningHandler.swap_events(plan, args["from_slot_key"], args["to_slot_key"]) do
+          {:ok, events, next} ->
+            to_recipe_id = get_in(next.slots, [args["to_slot_key"], :recipe_id])
+            {:ok, %{ok: true, label: recipe_title(to_recipe_id), recipe_id: to_recipe_id}, events, next}
+
+          {:error, reason} ->
+            {:error, reason}
         end
       end
     }
@@ -94,8 +94,8 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{slot_key: @slot_key, rationale: @rationale},
         required: ["slot_key", "rationale"]
       },
-      run: fn args, ctx ->
-        PlanningHandler.skip_meal(ctx.plan_id, args["slot_key"]) |> wrap_ok()
+      run: fn args, _ctx, plan ->
+        propose(%Commands.SkipMeal{slot_key: args["slot_key"]}, plan, %{ok: true})
       end
     }
   end
@@ -110,8 +110,8 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{slot_key: @slot_key, rationale: @rationale},
         required: ["slot_key", "rationale"]
       },
-      run: fn args, ctx ->
-        PlanningHandler.mark_leftover(ctx.plan_id, args["slot_key"]) |> wrap_ok()
+      run: fn args, _ctx, plan ->
+        propose(%Commands.MarkLeftover{slot_key: args["slot_key"]}, plan, %{ok: true})
       end
     }
   end
@@ -126,8 +126,8 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{slot_key: @slot_key, servings: %{type: "integer", minimum: 1}, rationale: @rationale},
         required: ["slot_key", "servings", "rationale"]
       },
-      run: fn args, ctx ->
-        PlanningHandler.set_servings(ctx.plan_id, args["slot_key"], args["servings"]) |> wrap_ok()
+      run: fn args, _ctx, plan ->
+        propose(%Commands.SetServings{slot_key: args["slot_key"], servings: args["servings"]}, plan, %{ok: true})
       end
     }
   end
@@ -142,8 +142,8 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{slot_key: @slot_key, rationale: @rationale},
         required: ["slot_key", "rationale"]
       },
-      run: fn args, ctx ->
-        PlanningHandler.remove_recipe(ctx.plan_id, args["slot_key"]) |> wrap_ok()
+      run: fn args, _ctx, plan ->
+        propose(%Commands.RemoveRecipe{slot_key: args["slot_key"]}, plan, %{ok: true})
       end
     }
   end
@@ -159,7 +159,7 @@ defmodule Tore.LLM.PlannerTools do
         properties: %{question: %{type: "string"}},
         required: ["question"]
       },
-      run: fn args, _ctx -> {:ok, %{ask_user: args["question"]}} end
+      run: fn args, _ctx, plan -> {:ok, %{ask_user: args["question"]}, [], plan} end
     }
   end
 
@@ -180,7 +180,7 @@ defmodule Tore.LLM.PlannerTools do
         },
         required: []
       },
-      run: fn args, _ctx ->
+      run: fn args, _ctx, plan ->
         limit = Map.get(args, "limit", 8)
         max_minutes = args["max_minutes"]
 
@@ -205,7 +205,7 @@ defmodule Tore.LLM.PlannerTools do
           |> Enum.take(limit)
           |> Enum.map(&summarise_recipe/1)
 
-        {:ok, %{recipes: result}}
+        {:ok, %{recipes: result}, [], plan}
       end
     }
   end
@@ -217,7 +217,7 @@ defmodule Tore.LLM.PlannerTools do
         "Approximate pantry inventory. Treat results as inexact — items may be missing or stale. Use before suggesting recipes that depend on specific ingredients.",
       kind: :read,
       parameters: %{type: "object", properties: %{}, required: []},
-      run: fn _args, _ctx ->
+      run: fn _args, _ctx, plan ->
         items =
           Tore.Pantry.list_inventory()
           |> Enum.map(fn it ->
@@ -230,7 +230,7 @@ defmodule Tore.LLM.PlannerTools do
             }
           end)
 
-        {:ok, %{items: items}}
+        {:ok, %{items: items}, [], plan}
       end
     }
   end
@@ -242,7 +242,7 @@ defmodule Tore.LLM.PlannerTools do
         "Currently active store deals across configured stores. Use before suggesting recipes that align with current promotions.",
       kind: :read,
       parameters: %{type: "object", properties: %{}, required: []},
-      run: fn _args, _ctx ->
+      run: fn _args, _ctx, plan ->
         deals =
           Tore.Deals.list_current()
           |> Enum.map(fn d ->
@@ -257,7 +257,7 @@ defmodule Tore.LLM.PlannerTools do
             }
           end)
 
-        {:ok, %{deals: deals}}
+        {:ok, %{deals: deals}, [], plan}
       end
     }
   end
@@ -291,6 +291,15 @@ defmodule Tore.LLM.PlannerTools do
     Ecto.NoResultsError -> nil
   end
 
-  defp wrap_ok({:ok, _}), do: {:ok, %{ok: true}}
-  defp wrap_ok({:error, reason}), do: {:error, reason}
+  # Decide one command against the working plan; on success evolve it and return events.
+  defp propose(cmd, plan, result) do
+    case Decider.decide(cmd, plan) do
+      {:ok, events} ->
+        next = Enum.reduce(events, plan, fn ev, acc -> Decider.evolve(acc, ev) end)
+        {:ok, result, events, next}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 end

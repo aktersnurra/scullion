@@ -16,7 +16,8 @@ defmodule Tore.LLM.Tool do
           description: String.t(),
           parameters: map(),
           kind: :action | :read,
-          run: (map(), map() -> {:ok, term()} | {:error, term()})
+          run: (map(), map(), term() ->
+                  {:ok, term(), [struct()], term()} | {:error, term()})
         }
 
   @spec to_openai(t()) :: map()

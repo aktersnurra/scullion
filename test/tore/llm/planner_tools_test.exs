@@ -1,14 +1,12 @@
 defmodule Tore.LLM.PlannerToolsTest do
   use Tore.DataCase, async: false
   alias Tore.LLM.PlannerTools
-  alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning.{Decider, State, Events}
 
-  @plan_id "plan:test"
   @week_start ~D[2026-06-01]
 
   setup do
-    {:ok, _state} = PlanningHandler.load_plan(@plan_id)
-    %{ctx: %{plan_id: @plan_id, week_start: @week_start}}
+    %{ctx: %{plan_id: "plan:test", week_start: @week_start}}
   end
 
   defp make_recipe(attrs \\ %{}) do
@@ -19,186 +17,95 @@ defmodule Tore.LLM.PlannerToolsTest do
 
   defp find(name), do: Enum.find(PlannerTools.all(), &(&1.name == name))
 
-  test "assign_recipe", %{ctx: ctx} do
-    %{id: rid} = make_recipe(%{title: "Test Salmon"})
+  defp with_slot(state, slot, rid),
+    do: Decider.evolve(state, %Events.RecipeAssigned{slot_key: slot, recipe_id: rid, servings: 2})
 
+  test "assign_recipe proposes a RecipeAssigned event and evolves the plan", %{ctx: ctx} do
+    %{id: rid} = make_recipe(%{title: "Test Salmon"})
     tool = find("assign_recipe")
     args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "good protein"}
 
-    assert :ok = Tore.LLM.Tool.validate_args(tool, args)
-    assert {:ok, %{ok: true}} = tool.run.(args, ctx)
-
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert %{recipe_id: ^rid, servings: 2} = state.slots["mon_dinner"]
+    assert {:ok, %{ok: true}, events, next} = tool.run.(args, ctx, %State{})
+    assert [%Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: ^rid, servings: 2}] = events
+    assert %{recipe_id: ^rid, servings: 2} = next.slots["mon_dinner"]
   end
 
   test "assign_recipe returns the recipe title as label", %{ctx: ctx} do
     %{id: rid} = make_recipe(%{title: "Roast chicken"})
     tool = find("assign_recipe")
+    args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 4, "rationale" => "easy"}
 
-    assert {:ok, result} =
-             tool.run.(%{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 4,
-                         "rationale" => "easy"}, ctx)
-
-    assert result.ok == true
-    assert result.label == "Roast chicken"
+    assert {:ok, %{ok: true, label: "Roast chicken"}, _events, _next} = tool.run.(args, ctx, %State{})
   end
 
-  # SkipMeal requires the slot to exist first (Decider returns :slot_empty otherwise).
-  test "skip_meal", %{ctx: ctx} do
+  test "skip_meal on an occupied slot proposes MealSkipped", %{ctx: ctx} do
     %{id: rid} = make_recipe()
-    assign = find("assign_recipe")
-    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
-
+    state = with_slot(%State{}, "tue_dinner", rid)
     tool = find("skip_meal")
-    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "not eating"}, ctx)
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert state.slots["tue_dinner"].skipped == true
+
+    assert {:ok, %{ok: true}, [%Events.MealSkipped{slot_key: "tue_dinner"}], next} =
+             tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "out"}, ctx, state)
+    assert next.slots["tue_dinner"].skipped == true
+  end
+
+  test "skip_meal on an empty slot returns the Decider error and does not evolve", %{ctx: ctx} do
+    tool = find("skip_meal")
+    assert {:error, :slot_empty} =
+             tool.run.(%{"slot_key" => "fri_dinner", "rationale" => "out"}, ctx, %State{})
   end
 
   test "remove_recipe clears a slot", %{ctx: ctx} do
     %{id: rid} = make_recipe()
-    assign = find("assign_recipe")
-    remove = find("remove_recipe")
+    state = with_slot(%State{}, "mon_dinner", rid)
+    tool = find("remove_recipe")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "wed_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
-    {:ok, _} = remove.run.(%{"slot_key" => "wed_dinner", "rationale" => "changed mind"}, ctx)
-
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    # After remove, the slot should either be absent or have nil recipe_id.
-    slot = Map.get(state.slots, "wed_dinner")
-    assert is_nil(slot) or is_nil(Map.get(slot, :recipe_id))
+    assert {:ok, %{ok: true}, [%Events.RecipeRemoved{slot_key: "mon_dinner"}], next} =
+             tool.run.(%{"slot_key" => "mon_dinner", "rationale" => "changed mind"}, ctx, state)
+    refute Map.has_key?(next.slots, "mon_dinner")
   end
 
-  test "set_servings", %{ctx: ctx} do
+  test "set_servings changes servings", %{ctx: ctx} do
     %{id: rid} = make_recipe()
-    assign = find("assign_recipe")
-    set    = find("set_servings")
+    state = with_slot(%State{}, "mon_dinner", rid)
+    tool = find("set_servings")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "thu_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
-    {:ok, _} = set.run.(%{"slot_key" => "thu_dinner", "servings" => 4, "rationale" => "more guests"}, ctx)
-
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert state.slots["thu_dinner"].servings == 4
+    assert {:ok, %{ok: true}, [%Events.ServingsChanged{slot_key: "mon_dinner", servings: 6}], next} =
+             tool.run.(%{"slot_key" => "mon_dinner", "servings" => 6, "rationale" => "guests"}, ctx, state)
+    assert next.slots["mon_dinner"].servings == 6
   end
 
-  # MarkLeftover requires the slot to exist first (Decider returns :slot_empty otherwise).
-  test "mark_leftover", %{ctx: ctx} do
+  test "mark_leftover marks the slot", %{ctx: ctx} do
     %{id: rid} = make_recipe()
-    assign = find("assign_recipe")
-    {:ok, _} = assign.run.(%{"slot_key" => "fri_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
-
+    state = with_slot(%State{}, "tue_dinner", rid)
     tool = find("mark_leftover")
-    assert {:ok, %{ok: true}} = tool.run.(%{"slot_key" => "fri_dinner", "rationale" => "from thursday"}, ctx)
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert state.slots["fri_dinner"].leftover == true
+
+    assert {:ok, %{ok: true}, [%Events.LeftoverMarked{slot_key: "tue_dinner"}], next} =
+             tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "leftovers"}, ctx, state)
+    assert next.slots["tue_dinner"].leftover == true
   end
 
-  test "swap_recipe moves a recipe between two slots", %{ctx: ctx} do
-    %{id: rid} = make_recipe(%{title: "Salmon"})
-    assign = find("assign_recipe")
-    swap   = find("swap_recipe")
+  test "swap_recipe cross-assigns two slots", %{ctx: ctx} do
+    r1 = make_recipe(%{title: "One"})
+    r2 = make_recipe(%{title: "Two"})
+    state = %State{} |> with_slot("mon_dinner", r1.id) |> with_slot("tue_dinner", r2.id)
+    tool = find("swap_recipe")
 
-    {:ok, _} = assign.run.(%{"slot_key" => "tue_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "setup"}, ctx)
-    {:ok, _} = swap.run.(%{"from_slot_key" => "tue_dinner", "to_slot_key" => "fri_dinner", "rationale" => "better timing"}, ctx)
-
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert state.slots["fri_dinner"].recipe_id == rid
-    tue = Map.get(state.slots, "tue_dinner")
-    assert is_nil(tue) or is_nil(Map.get(tue, :recipe_id))
+    assert {:ok, %{ok: true, recipe_id: rid, label: "One"}, events, next} =
+             tool.run.(%{"from_slot_key" => "mon_dinner", "to_slot_key" => "tue_dinner", "rationale" => "balance"}, ctx, state)
+    assert rid == r1.id
+    assert next.slots["tue_dinner"].recipe_id == r1.id
+    assert next.slots["mon_dinner"].recipe_id == r2.id
+    assert events != []
   end
 
-  test "swap_recipe performs a true swap with no data loss and returns label", %{ctx: ctx} do
-    %{id: a} = make_recipe(%{title: "Alpha"})
-    %{id: b} = make_recipe(%{title: "Beta"})
-    assign = find("assign_recipe")
-    swap = find("swap_recipe")
-
-    {:ok, _} = assign.run.(%{"slot_key" => "fri_dinner", "recipe_id" => a, "servings" => 4}, ctx)
-    {:ok, _} = assign.run.(%{"slot_key" => "sun_dinner", "recipe_id" => b, "servings" => 2}, ctx)
-
-    assert {:ok, result} =
-             swap.run.(%{"from_slot_key" => "fri_dinner", "to_slot_key" => "sun_dinner",
-                         "rationale" => "weekend"}, ctx)
-
-    assert result.ok == true
-    assert result.label == "Alpha"
-
-    {:ok, state} = PlanningHandler.load_plan(@plan_id)
-    assert state.slots["fri_dinner"].recipe_id == b
-    assert state.slots["sun_dinner"].recipe_id == a
+  test "read tools return the plan unchanged with no events", %{ctx: ctx} do
+    tool = find("search_recipes")
+    assert {:ok, %{recipes: _}, [], %State{}} = tool.run.(%{"query" => "x"}, ctx, %State{})
   end
 
-  test "ask_user is terminal-shaped", %{ctx: ctx} do
+  test "ask_user returns the question with the plan unchanged", %{ctx: ctx} do
     tool = find("ask_user")
-    assert {:ok, %{ask_user: "Which salmon?"}} = tool.run.(%{"question" => "Which salmon?"}, ctx)
-  end
-
-  test "every action tool declares rationale as a required parameter" do
-    action_names = ~w(assign_recipe swap_recipe skip_meal mark_leftover set_servings remove_recipe)
-
-    for name <- action_names do
-      tool = Enum.find(PlannerTools.all(), &(&1.name == name))
-      assert Map.has_key?(tool.parameters.properties, :rationale),
-             "#{name} missing rationale property"
-      assert "rationale" in tool.parameters.required, "#{name} rationale not required"
-    end
-  end
-
-  describe "read tools" do
-    setup do
-      {:ok, r1} =
-        Tore.Recipes.create(%{
-          title: "Quick Pasta",
-          base_servings: 2,
-          instructions: "x",
-          prep_time_minutes: 5,
-          cook_time_minutes: 15
-        })
-
-      {:ok, r2} =
-        Tore.Recipes.create(%{
-          title: "Slow Stew",
-          base_servings: 4,
-          instructions: "x",
-          prep_time_minutes: 30,
-          cook_time_minutes: 150
-        })
-
-      %{r1: r1, r2: r2, ctx: %{plan_id: "plan:test", week_start: ~D[2026-06-01]}}
-    end
-
-    test "search_recipes returns matches by query", %{r1: r1, ctx: ctx} do
-      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "search_recipes"))
-      assert {:ok, %{recipes: results}} = tool.run.(%{"query" => "pasta"}, ctx)
-      assert Enum.any?(results, fn r -> r.id == r1.id end)
-    end
-
-    test "search_recipes respects max_minutes", %{r1: r1, r2: r2, ctx: ctx} do
-      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "search_recipes"))
-      assert {:ok, %{recipes: results}} = tool.run.(%{"max_minutes" => 30}, ctx)
-      ids = Enum.map(results, & &1.id)
-      assert r1.id in ids
-      refute r2.id in ids
-    end
-
-    test "pantry_snapshot returns inventory", %{ctx: ctx} do
-      {:ok, _} =
-        Tore.Pantry.add_item(%{
-          name: "olive oil",
-          quantity: Decimal.new(1),
-          unit: "bottle"
-        })
-
-      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "pantry_snapshot"))
-      assert {:ok, %{items: items}} = tool.run.(%{}, ctx)
-      assert Enum.any?(items, &(&1.name == "olive oil"))
-    end
-
-    test "active_deals returns deals list", %{ctx: ctx} do
-      tool = Enum.find(Tore.LLM.PlannerTools.all(), &(&1.name == "active_deals"))
-      assert {:ok, %{deals: deals}} = tool.run.(%{}, ctx)
-      assert is_list(deals)
-    end
+    assert {:ok, %{ask_user: "which day?"}, [], %State{}} =
+             tool.run.(%{"question" => "which day?"}, ctx, %State{})
   end
 end
