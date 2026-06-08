@@ -233,6 +233,30 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     end
   end
 
+  describe "swap_events/3 (pure)" do
+    alias Tore.Planning.{Decider, State}
+
+    test "returns cross-assign events and the evolved state without persisting" do
+      {:ok, r1} = Tore.Recipes.create(%{title: "A", base_servings: 2, instructions: "x"})
+      {:ok, r2} = Tore.Recipes.create(%{title: "B", base_servings: 2, instructions: "x"})
+
+      state =
+        %State{}
+        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: r1.id, servings: 2})
+        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{slot_key: "tue_dinner", recipe_id: r2.id, servings: 2})
+
+      assert {:ok, events, next} = PlanningHandler.swap_events(state, "mon_dinner", "tue_dinner")
+      assert events != []
+      assert next.slots["mon_dinner"].recipe_id == r2.id
+      assert next.slots["tue_dinner"].recipe_id == r1.id
+    end
+
+    test "returns :nothing_to_swap when both slots are empty" do
+      assert {:error, :nothing_to_swap} =
+               PlanningHandler.swap_events(%State{}, "mon_dinner", "tue_dinner")
+    end
+  end
+
   describe "swap_slots/3" do
     test "swaps two occupied slots, preserving both recipes and their servings" do
       plan = "plan:swap-1"

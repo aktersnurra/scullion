@@ -86,6 +86,29 @@ defmodule Tore.Handlers.PlanningHandler do
     end
   end
 
+  @doc "Pure: cross-assign events for swapping two slots in a given plan state."
+  @spec swap_events(Tore.Planning.State.t(), String.t(), String.t()) ::
+          {:ok, [Tore.Planning.Events.t()], Tore.Planning.State.t()} | {:error, :nothing_to_swap}
+  def swap_events(state, slot_a, slot_b) do
+    a = present(Map.get(state.slots, slot_a))
+    b = present(Map.get(state.slots, slot_b))
+
+    case swap_commands(slot_a, a, slot_b, b) do
+      [] ->
+        {:error, :nothing_to_swap}
+
+      commands ->
+        {events, final} =
+          Enum.reduce(commands, {[], state}, fn cmd, {acc, st} ->
+            {:ok, evts} = Decider.decide(cmd, st)
+            st2 = Enum.reduce(evts, st, &Decider.evolve(&2, &1))
+            {acc ++ evts, st2}
+          end)
+
+        {:ok, events, final}
+    end
+  end
+
   @doc """
   Atomically swaps the recipes (and their servings) between two slots in one
   append. If one slot is empty, the occupied recipe moves to the empty slot and
@@ -93,21 +116,11 @@ defmodule Tore.Handlers.PlanningHandler do
   """
   def swap_slots(plan_id, slot_a, slot_b) do
     with {:ok, state} <- EventStore.load(plan_id, Decider) do
-      a = present(Map.get(state.slots, slot_a))
-      b = present(Map.get(state.slots, slot_b))
+      case swap_events(state, slot_a, slot_b) do
+        {:error, :nothing_to_swap} = err ->
+          err
 
-      case swap_commands(slot_a, a, slot_b, b) do
-        [] ->
-          {:error, :nothing_to_swap}
-
-        commands ->
-          {events, _final} =
-            Enum.reduce(commands, {[], state}, fn cmd, {acc, st} ->
-              {:ok, evts} = Decider.decide(cmd, st)
-              st2 = Enum.reduce(evts, st, &Decider.evolve(&2, &1))
-              {acc ++ evts, st2}
-            end)
-
+        {:ok, events, _final} ->
           with :ok <- EventStore.append(plan_id, events) do
             PubSub.broadcast(@pubsub, @topic, {:events, events})
             {:ok, events}
