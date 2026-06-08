@@ -133,6 +133,38 @@ defmodule Tore.Harness.OrchestratorTest do
     assert {:ok, %Tore.Harness.Run.State.Failed{}} = Tore.Harness.Run.load(sid)
   end
 
+  test "dispatch applies accumulated plan events to the plan stream exactly once" do
+    {:ok, recipe} = Tore.Recipes.create(%{title: "Stew", recipe_type: :meal, base_servings: 4})
+    plan = "plan:2026-06-08-apply"
+    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+    {:ok, %State.Applied{}} = Orchestrator.dispatch(:planner_command_run, ctx)
+
+    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    assert plan_state.slots["mon_dinner"].skipped == true
+  end
+
+  test "a failed step leaves the plan stream unwritten (nothing applied)" do
+    plan = "plan:2026-06-08-empty"
+    Mox.stub(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ -> {:error, :boom} end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+    assert {:error, {:step_failed, :boom}} = Orchestrator.dispatch(:planner_command_run, ctx)
+
+    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    assert plan_state.slots == %{}
+  end
+
   defp latest_run_stream_id do
     Tore.Repo.one(
       from e in Tore.EventStore.Event,

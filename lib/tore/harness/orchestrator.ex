@@ -5,6 +5,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Harness.PlanDiffBuilder
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
+  alias Tore.Handlers.PlanningHandler
 
   @type dispatch_error :: {:step_failed, term()} | {:run_crashed, Exception.t()}
 
@@ -19,7 +20,8 @@ defmodule Tore.Harness.Orchestrator do
         with {:ok, state} <- open_run(stream_id, ctx, metadata),
              {:ok, state} <- enter(state, :gathering_context, metadata),
              {:ok, state} <- enter(state, :proposing, metadata),
-             {:ok, loop} <- PlannerAgent.run(system_prompt(), ctx.command, agent_ctx(ctx, stream_id), []),
+             {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
+             {:ok, loop} <- PlannerAgent.run(system_prompt(), ctx.command, agent_ctx(ctx, stream_id, working_plan), []),
              {:ok, state} <- absorb_loop(state, loop, metadata),
              {:ok, state} <- enter(state, :verifying, metadata),
              {:ok, state} <- close(state, loop, ctx, metadata) do
@@ -104,7 +106,8 @@ defmodule Tore.Harness.Orchestrator do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
 
-    with {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
+    with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
+         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
          {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
       apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
     end
@@ -117,7 +120,8 @@ defmodule Tore.Harness.Orchestrator do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
     run_summary = RunSummary.from_artifacts([plan_diff], :applied)
 
-    with {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
+    with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
+         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
          {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
       apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
     end
@@ -171,12 +175,13 @@ defmodule Tore.Harness.Orchestrator do
     agent_preamble() <> "\n\n" <> Tore.Chat.SystemPrompt.build()
   end
 
-  defp agent_ctx(ctx, stream_id) do
+  defp agent_ctx(ctx, stream_id, working_plan) do
     %{
       plan_id: ctx.plan_stream_id,
       week_start: ctx.week_start,
       household_id: ctx.household_id,
-      run_stream_id: stream_id
+      run_stream_id: stream_id,
+      working_plan: working_plan
     }
   end
 
