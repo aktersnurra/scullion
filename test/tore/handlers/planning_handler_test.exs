@@ -257,6 +257,24 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     end
   end
 
+  describe "apply_events/2" do
+    test "appends events to the plan stream and returns :ok" do
+      {:ok, r} = Tore.Recipes.create(%{title: "C", base_servings: 2, instructions: "x"})
+      plan = "plan:apply-test"
+      events = [%Tore.Planning.Events.RecipeAssigned{slot_key: "wed_dinner", recipe_id: r.id, servings: 3}]
+
+      assert :ok = PlanningHandler.apply_events(plan, events)
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert state.slots["wed_dinner"].recipe_id == r.id
+    end
+
+    test "is a no-op for an empty event list" do
+      assert :ok = PlanningHandler.apply_events("plan:empty-apply", [])
+      {:ok, state} = PlanningHandler.load_plan("plan:empty-apply")
+      assert state.slots == %{}
+    end
+  end
+
   describe "swap_slots/3" do
     test "swaps two occupied slots, preserving both recipes and their servings" do
       plan = "plan:swap-1"

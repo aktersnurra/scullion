@@ -129,6 +129,17 @@ defmodule Tore.Handlers.PlanningHandler do
     end
   end
 
+  @doc "Persist already-decided plan events in one append. Empty list is a no-op."
+  @spec apply_events(String.t(), [Tore.Planning.Events.t()]) :: :ok | {:error, term()}
+  def apply_events(_plan_id, []), do: :ok
+
+  def apply_events(plan_id, events) do
+    with :ok <- EventStore.append(plan_id, events) do
+      PubSub.broadcast(@pubsub, @topic, {:events, events})
+      :ok
+    end
+  end
+
   # A slot counts as present only if it actually holds a recipe.
   defp present(%{recipe_id: rid} = slot) when not is_nil(rid), do: slot
   defp present(_), do: nil
