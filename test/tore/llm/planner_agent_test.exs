@@ -4,9 +4,13 @@ defmodule Tore.LLM.PlannerAgentTest do
   setup :verify_on_exit!
 
   alias Tore.LLM.PlannerAgent
+  alias Tore.Planning.{State, Events, Decider}
 
   @system_prompt "system: be brief"
-  @ctx %{plan_id: "plan-1", week_start: ~D[2026-06-01], household_id: 1}
+  @ctx %{plan_id: "plan-1", week_start: ~D[2026-06-01], household_id: 1, working_plan: %State{}}
+
+  defp ctx_with_plan(plan),
+    do: %{plan_id: "plan-1", week_start: ~D[2026-06-01], household_id: 1, working_plan: plan}
 
   test "run/4 returns {:ok, loop_outcome} with a message result and usage steps" do
     expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
@@ -92,5 +96,25 @@ defmodule Tore.LLM.PlannerAgentTest do
 
     assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "loop", @ctx, max_round_trips: 2)
     assert match?({:capped, _}, outcome.result) or match?({:message, _}, outcome.result)
+  end
+
+  test "run/4 accumulates plan_events and evolves working_plan across the loop" do
+    {:ok, r} = Tore.Recipes.create(%{title: "Z", base_servings: 2, instructions: "x"})
+    rid = r.id
+    start_plan = Decider.evolve(%State{}, %Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: rid, servings: 2})
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "skip mon", ctx_with_plan(start_plan), [])
+
+    assert [%Events.MealSkipped{slot_key: "mon_dinner"}] = outcome.plan_events
+    assert outcome.working_plan.slots["mon_dinner"].skipped == true
   end
 end

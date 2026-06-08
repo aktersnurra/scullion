@@ -31,7 +31,9 @@ defmodule Tore.LLM.PlannerAgent do
   @type loop_outcome :: %{
           result: result(),
           tool_trace: [trace_step()],
-          usage_per_step: [usage()]
+          usage_per_step: [usage()],
+          working_plan: term(),
+          plan_events: [struct()]
         }
 
   @spec run(String.t(), String.t(), map(), keyword()) :: {:ok, loop_outcome()} | {:error, term()}
@@ -53,7 +55,9 @@ defmodule Tore.LLM.PlannerAgent do
       action_calls: 0,
       round_trips: 0,
       max_round_trips: max_round_trips,
-      max_action_calls: max_action_calls
+      max_action_calls: max_action_calls,
+      working_plan: Map.fetch!(ctx, :working_plan),
+      plan_events: []
     }
 
     loop(system_prompt, state)
@@ -118,7 +122,7 @@ defmodule Tore.LLM.PlannerAgent do
   defp handle_tool(%Tool{name: "ask_user"} = tool, call, _rest, state) do
     case Tool.validate_args(tool, call.args) do
       :ok ->
-        {:ok, %{ask_user: question}} = tool.run.(call.args, state.ctx)
+        {:ok, %{ask_user: question}, [], _plan} = tool.run.(call.args, state.ctx, state.working_plan)
         state = append_tool_result(state, call, %{ok: true, question: question})
         {:terminal_question, question, state}
 
@@ -149,8 +153,9 @@ defmodule Tore.LLM.PlannerAgent do
   defp run_and_record(tool, call, rest, state) do
     case Tool.validate_args(tool, call.args) do
       :ok ->
-        case tool.run.(call.args, state.ctx) do
-          {:ok, result} ->
+        case tool.run.(call.args, state.ctx, state.working_plan) do
+          {:ok, result, events, next_plan} ->
+            state = %{state | working_plan: next_plan, plan_events: state.plan_events ++ events}
             execute_calls(rest, append_tool_result(state, call, result))
 
           {:error, reason} ->
@@ -197,7 +202,9 @@ defmodule Tore.LLM.PlannerAgent do
      %{
        result: result,
        tool_trace: Enum.reverse(state.tool_trace),
-       usage_per_step: Enum.reverse(state.usage_per_step)
+       usage_per_step: Enum.reverse(state.usage_per_step),
+       working_plan: state.working_plan,
+       plan_events: state.plan_events
      }}
   end
 
