@@ -11,7 +11,8 @@ defmodule ToreWeb.Components.ReceiptLive do
      |> assign(assigns)
      |> assign(:header_text, header_for(run))
      |> assign(:body_html, body(run))
-     |> assign(:body_lines, body_lines(run))}
+     |> assign(:body_lines, body_lines(run))
+     |> assign(:focus_param, focus_param(run))}
   end
 
   @impl true
@@ -30,6 +31,13 @@ defmodule ToreWeb.Components.ReceiptLive do
         </ul>
         <span :if={is_nil(@body_lines)}>{Phoenix.HTML.raw(@body_html)}</span>
       </div>
+      <.link
+        :if={@focus_param}
+        navigate={~p"/plan?focus=#{@focus_param}"}
+        class="mt-3 inline-block text-xs font-semibold text-[color:var(--accent)]"
+      >
+        {gettext("Edit the plan")}
+      </.link>
     </div>
     """
   end
@@ -51,11 +59,31 @@ defmodule ToreWeb.Components.ReceiptLive do
   defp body(%State.Reverted{}), do: escape(gettext("Changes reverted."))
   defp body(_), do: ""
 
+  defp failure_message(:slot_pinned),
+    do: gettext("That day is pinned, so Tore left it as it was.")
+
+  defp failure_message(:servings_missing),
+    do: gettext("A meal was missing servings, so nothing was changed.")
+
+  defp failure_message(:skip_not_explicit),
+    do: gettext("Tore couldn't tell which day to skip.")
+
+  defp failure_message(:leftover_no_source),
+    do: gettext("There was no earlier meal to make leftovers from.")
+
+  defp failure_message(:dietary_violation),
+    do: gettext("A suggested recipe didn't fit your household's needs.")
+
   defp failure_message(:internal_error),
     do: gettext("Tore couldn't finish that — nothing was changed.")
 
   defp failure_message(_),
     do: gettext("Tore couldn't finish that.")
+
+  defp focus_param(%State.Failed{failure_repair_action: {:edit_plan, slots}}),
+    do: Enum.join(slots, ",")
+
+  defp focus_param(_), do: nil
 
   defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 

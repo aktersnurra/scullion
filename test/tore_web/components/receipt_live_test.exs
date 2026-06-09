@@ -110,6 +110,42 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     refute html =~ "inget ändrades"
   end
 
+  defp base_failed(code, repair \\ nil) do
+    %State.Failed{
+      stream_id: "run-f", household_id: 1, kind: "planner_command_run",
+      surface: :plan, started_by: "user", user_id: 1, input: %{command: "x"},
+      opened_at: ~U[2026-06-08 12:00:00Z], failed_at: ~U[2026-06-08 12:00:01Z],
+      failure_code: code, failure_user_message: nil, failure_repair_action: repair,
+      tool_trace: [], artifacts: [],
+      model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
+    }
+  end
+
+  test "renders the Swedish message for each verifier failure code" do
+    cases = [
+      {:slot_pinned, "fastlåst"},
+      {:servings_missing, "saknade portioner"},
+      {:skip_not_explicit, "hoppas över"},
+      {:leftover_no_source, "göra rester"},
+      {:dietary_violation, "passade inte hushållets"}
+    ]
+
+    for {code, fragment} <- cases do
+      html = render_component(ReceiptLive, id: "r", run: base_failed(code))
+      assert html =~ fragment, "expected #{code} message to contain #{inspect(fragment)}"
+    end
+  end
+
+  test "renders an Edit-the-plan link when repair_action is {:edit_plan, slots}" do
+    html = render_component(ReceiptLive, id: "r", run: base_failed(:slot_pinned, {:edit_plan, ["mon_dinner"]}))
+    assert html =~ ~s(href="/plan?focus=mon_dinner")
+  end
+
+  test "renders no edit link when repair_action is nil" do
+    html = render_component(ReceiptLive, id: "r", run: base_failed(:internal_error, nil))
+    refute html =~ "focus="
+  end
+
   test "renders quiet line for Reverted" do
     reverted = %State.Reverted{
       stream_id: "run-x", household_id: 1, kind: "planner_command_run",
