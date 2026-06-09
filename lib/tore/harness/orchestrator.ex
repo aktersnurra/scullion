@@ -8,6 +8,21 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.LLM.PlannerAgent
   alias Tore.Handlers.PlanningHandler
   alias Tore.Harness.Verifier.PlanVerifier
+  alias Tore.Harness.Capsules
+
+  alias Tore.Harness.Capsules.{
+    HouseholdPreferencesCapsule,
+    ActiveInsightsCapsule,
+    WeekPlanCapsule,
+    PantryBeliefsCapsule
+  }
+
+  @planner_capsules [
+    HouseholdPreferencesCapsule,
+    ActiveInsightsCapsule,
+    WeekPlanCapsule,
+    PantryBeliefsCapsule
+  ]
 
   @type dispatch_error :: {:step_failed, term()} | {:run_crashed, Exception.t()}
 
@@ -23,7 +38,7 @@ defmodule Tore.Harness.Orchestrator do
              {:ok, state} <- enter(state, :gathering_context, metadata),
              {:ok, state} <- enter(state, :proposing, metadata),
              {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
-             {:ok, loop} <- PlannerAgent.run(system_prompt(), ctx.command, agent_ctx(ctx, stream_id, working_plan), []),
+             {:ok, loop} <- PlannerAgent.run(system_prompt(ctx), ctx.command, agent_ctx(ctx, stream_id, working_plan), []),
              {:ok, state} <- absorb_loop(state, loop, metadata),
              {:ok, state} <- enter(state, :verifying, metadata),
              {:ok, state} <- close(state, loop, ctx, metadata) do
@@ -190,8 +205,35 @@ defmodule Tore.Harness.Orchestrator do
     op.id
   end
 
-  defp system_prompt do
-    agent_preamble() <> "\n\n" <> Tore.Chat.SystemPrompt.build()
+  defp system_prompt(ctx) do
+    [
+      agent_preamble(),
+      date_line(),
+      week_mode_line(),
+      Capsules.compose(@planner_capsules, capsule_ctx(ctx))
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  defp date_line do
+    "Today is #{Calendar.strftime(Date.utc_today(), "%A, %B %-d, %Y")}."
+  end
+
+  defp week_mode_line do
+    case Tore.WeekMode.mode_prompt_fragment(Tore.WeekMode.get_current_mode()) do
+      nil -> nil
+      fragment -> "Current week mode: #{fragment}"
+    end
+  end
+
+  defp capsule_ctx(ctx) do
+    %{
+      household_id: ctx.household_id,
+      plan_stream_id: ctx.plan_stream_id,
+      week_start: ctx.week_start
+    }
   end
 
   defp agent_ctx(ctx, stream_id, working_plan) do
