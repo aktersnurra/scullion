@@ -70,6 +70,35 @@ The receipt now reflects what the planner actually did, not a placeholder.
 - The receipt translates `failure_code` (machine-readable) instead of a baked
   message string; Swedish failure messages added.
 
+### Verify-then-mutate planner + PlanVerifier
+
+The planner is now verify-then-mutate, closing the load-bearing §A.5 atomicity
+gap: the LLM proposes, a deterministic verifier decides, and a failure leaves
+the plan genuinely unchanged.
+
+- Planner action tools are pure: they propose plan changes against an in-memory
+  working `Planning.State` via the existing `Planning.Decider` (preserving the
+  model's mid-loop `:slot_empty`/`:not_pinned` feedback) and return the events
+  they'd produce plus the evolved state — no persistence. `swap_recipe` reuses
+  an extracted pure `PlanningHandler.swap_events/3`.
+- `PlannerAgent` threads a `working_plan` through its loop and accumulates
+  `plan_events`, returning both in its `loop_outcome`. The Orchestrator loads the
+  plan into the agent context and persists the accumulated events exactly once,
+  after the loop, via `PlanningHandler.apply_events/2`.
+- `Tore.Harness.Verifier.PlanVerifier` — deterministic gate over the planner's
+  `PlanDiff` (pinned slot unchanged, every assigned recipe has servings, skips
+  are explicit, leftovers point to an earlier source meal, no banned/allergen/
+  disliked ingredient). First failure wins. The repeat-window check is deferred
+  (it needs a `repeat_window` household preference — a product decision; faking a
+  default would be less correct than not checking).
+- The Orchestrator gates the plan apply on the verifier: pass → apply + commit;
+  fail → record the run as `Failed` with a structured `code` and an
+  `{:edit_plan, slots}` repair action, applying nothing. A verifier failure is a
+  successful dispatch of a failed run, not an infrastructure error.
+- Web: the receipt renders a per-code, localized (en/sv) failure message and an
+  "Edit the plan" link; the planner reads a `focus` query param and highlights
+  the offending slot(s), completing the repair loop.
+
 ### Fixed
 
 - Event-store JSON round-trip downgraded atom/Decimal event fields on replay;
@@ -81,3 +110,8 @@ The receipt now reflects what the planner actually did, not a placeholder.
   `cost_usd` from the LLM into a Decimal.
 - Planner dispatch in `PlannerLive` clears the spinner and flashes on failure
   instead of hanging on a silent crash.
+- `FailureRecorded` round-trip: `repair_action` is encoded as a map on write and
+  decoded back to `{:edit_plan, slots}` via a literal map on read, and
+  `failure_code` decodes via a literal map for the known verifier codes — both
+  cold-boot safe (no `String.to_existing_atom`), so a fresh Projector boot can't
+  downgrade a verifier code to a string the receipt would fail to match.
