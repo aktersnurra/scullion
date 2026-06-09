@@ -51,4 +51,19 @@ defmodule Tore.Chat.ChatHandlerTest do
     assert sys =~ "Tore"
     assert sys =~ "Household preferences:"
   end
+
+  test "the chat system prompt states today's date" do
+    test_pid = self()
+
+    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages ->
+      send(test_pid, {:system_prompt, sys})
+      {:ok, "Hej!", %{}}
+    end)
+
+    {:ok, _reply, nil} = Tore.Chat.ChatHandler.handle_text("hello")
+
+    assert_receive {:system_prompt, sys}
+    expected = "Today is #{Calendar.strftime(Date.utc_today(), "%A, %B %-d, %Y")}."
+    assert sys =~ expected
+  end
 end

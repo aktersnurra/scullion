@@ -23,7 +23,7 @@ defmodule Tore.Chat.ChatHandler do
   @spec handle_text(String.t(), keyword()) :: {:ok, String.t(), nil} | {:error, term()}
   def handle_text(text, _opts \\ []) do
     system =
-      [@role_preamble, Capsules.compose(@chat_capsules, chat_ctx())]
+      [@role_preamble, date_line(), Capsules.compose(@chat_capsules, chat_ctx())]
       |> Enum.reject(&(&1 == ""))
       |> Enum.join("\n\n")
 
@@ -54,6 +54,10 @@ defmodule Tore.Chat.ChatHandler do
 
   defp generate_correlation_id do
     :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  end
+
+  defp date_line do
+    "Today is #{Calendar.strftime(Date.utc_today(), "%A, %B %-d, %Y")}."
   end
 
   defp chat_ctx do
