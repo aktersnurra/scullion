@@ -1,4 +1,5 @@
 defmodule Tore.Harness.Orchestrator do
+  require Logger
   alias Tore.Harness.Run
   alias Tore.Harness.Run.{Commands, State}
   alias Tore.Harness.Artifact.RunSummary
@@ -31,7 +32,13 @@ defmodule Tore.Harness.Orchestrator do
           {:error, reason} -> {:error, {:step_failed, reason}}
         end
       rescue
-        e -> {:error, {:run_crashed, e}}
+        e ->
+          Logger.error(
+            "planner_command_run crashed: " <>
+              Exception.format(:error, e, __STACKTRACE__)
+          )
+
+          {:error, {:run_crashed, e}}
       end
 
     case result do
