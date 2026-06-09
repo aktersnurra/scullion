@@ -35,4 +35,20 @@ defmodule Tore.Chat.ChatHandlerTest do
     assert {:error, :rate_limited} =
              Tore.Chat.ChatHandler.handle_text("hello")
   end
+
+  test "the chat system prompt includes the role preamble and composed household context" do
+    {:ok, _} = Tore.Household.update_preferences(%{dietary_restrictions: ["vegetarian"]})
+    test_pid = self()
+
+    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages ->
+      send(test_pid, {:system_prompt, sys})
+      {:ok, "Hej!", %{}}
+    end)
+
+    {:ok, _reply, nil} = Tore.Chat.ChatHandler.handle_text("hello")
+
+    assert_receive {:system_prompt, sys}
+    assert sys =~ "Tore"
+    assert sys =~ "Household preferences:"
+  end
 end
