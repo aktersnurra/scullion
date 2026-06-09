@@ -6,6 +6,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
   alias Tore.Handlers.PlanningHandler
+  alias Tore.Harness.Verifier.PlanVerifier
 
   @type dispatch_error :: {:step_failed, term()} | {:run_crashed, Exception.t()}
 
@@ -102,29 +103,40 @@ defmodule Tore.Harness.Orchestrator do
     end)
   end
 
-  defp close(state, %{result: {:message, _}} = loop, ctx, metadata) do
-    plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
-    run_summary = RunSummary.from_artifacts([plan_diff], :applied)
+  defp close(state, %{result: {:message, _}} = loop, ctx, metadata),
+    do: verify_and_finish(state, loop, ctx, metadata)
 
-    with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
-         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
-         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
-      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
-    end
-  end
+  defp close(state, %{result: {:capped, _}} = loop, ctx, metadata),
+    do: verify_and_finish(state, loop, ctx, metadata)
 
   defp close(state, %{result: {:question, q}}, _ctx, metadata),
     do: apply_command(state.stream_id, %Commands.RaiseQuestion{question: q}, state, metadata)
 
-  defp close(state, %{result: {:capped, _}} = loop, ctx, metadata) do
+  defp verify_and_finish(state, loop, ctx, metadata) do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
-    run_summary = RunSummary.from_artifacts([plan_diff], :applied)
 
-    with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
-         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
-         {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
-      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+    case PlanVerifier.verify(plan_diff, verify_ctx(loop)) do
+      :ok ->
+        run_summary = RunSummary.from_artifacts([plan_diff], :applied)
+
+        with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
+             {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
+             {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
+          apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+        end
+
+      {:fail, code, repair} ->
+        apply_command(
+          state.stream_id,
+          %Commands.RecordFailure{code: code, user_message: nil, repair_action: repair},
+          state,
+          metadata
+        )
     end
+  end
+
+  defp verify_ctx(loop) do
+    %{plan_state: loop.working_plan, preferences: Tore.Household.get_preferences()}
   end
 
   # On any dispatch failure, close the run as Failed so it isn't a dangling open

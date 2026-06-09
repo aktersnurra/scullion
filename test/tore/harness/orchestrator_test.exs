@@ -165,6 +165,42 @@ defmodule Tore.Harness.OrchestratorTest do
     assert plan_state.slots == %{}
   end
 
+  test "a verifier failure records Failed, applies nothing, commits nothing" do
+    {:ok, recipe} = Tore.Recipes.create(%{title: "Pinned dish", recipe_type: :meal, base_servings: 4})
+    plan = "plan:2026-06-08-pinned"
+    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+    Tore.Handlers.PlanningHandler.pin_slot(plan, "mon_dinner", true)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+
+    assert {:ok, %State.Failed{failure_code: :slot_pinned,
+                               failure_repair_action: {:edit_plan, ["mon_dinner"]}}} =
+             Orchestrator.dispatch(:planner_command_run, ctx)
+
+    # nothing applied: the plan is byte-for-byte its pre-run state — mon_dinner
+    # still holds the original recipe, is not skipped, and no slot was added.
+    # (Proves "not applied", not "applied then undone": the fail branch never
+    # calls apply_events, so the skip event was never written.)
+    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    assert Map.keys(plan_state.slots) == ["mon_dinner"]
+    assert plan_state.slots["mon_dinner"].recipe_id == recipe.id
+    refute plan_state.slots["mon_dinner"].skipped
+
+    # no Committed event on the run stream — the run is Failed
+    sid = latest_run_stream_id()
+    {:ok, run} = Run.load(sid)
+    assert %State.Failed{} = run
+  end
+
   defp latest_run_stream_id do
     Tore.Repo.one(
       from e in Tore.EventStore.Event,
