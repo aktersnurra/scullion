@@ -35,8 +35,19 @@ defmodule ToreWeb.PlannerLive do
        plan_health: PlanHealth.compute(plan_state),
        current_week_mode: Tore.WeekMode.get_current_mode(),
        current_run: current_run,
-       quick_loading: false
+       quick_loading: false,
+       focused_slots: MapSet.new()
      )}
+  end
+
+  def handle_params(params, _uri, socket) do
+    slots =
+      case params["focus"] do
+        f when is_binary(f) and f != "" -> f |> String.split(",", trim: true) |> MapSet.new()
+        _ -> MapSet.new()
+      end
+
+    {:noreply, assign(socket, focused_slots: slots)}
   end
 
   def handle_event("prev_week", _params, socket) do
@@ -495,6 +506,7 @@ defmodule ToreWeb.PlannerLive do
               plan_state={@plan_state}
               recipes={@recipes}
               days={@days}
+              focused={MapSet.member?(@focused_slots, "#{day}_dinner")}
             />
           </ul>
 
@@ -533,6 +545,7 @@ defmodule ToreWeb.PlannerLive do
   attr :plan_state, :any, required: true
   attr :recipes, :list, required: true
   attr :days, :list, required: true
+  attr :focused, :boolean, default: false
 
   defp day_row(assigns) do
     slot = Map.get(assigns.plan_state.slots, assigns.slot_key)
@@ -541,7 +554,14 @@ defmodule ToreWeb.PlannerLive do
     assigns = assign(assigns, slot: slot, recipe: recipe, is_today: is_today)
 
     ~H"""
-    <li class={["transition-colors", @slot && @slot.skipped && "opacity-50"]}>
+    <li
+      id={"slot-#{@slot_key}"}
+      class={[
+        "transition-colors",
+        @slot && @slot.skipped && "opacity-50",
+        @focused && "ring-2 ring-[color:var(--accent)] rounded-xl"
+      ]}
+    >
       <div
         phx-click="open_slot"
         phx-value-slot_key={@slot_key}

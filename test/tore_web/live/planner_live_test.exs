@@ -180,6 +180,23 @@ defmodule ToreWeb.PlannerLiveTest do
     end
   end
 
+  describe "focus param" do
+    test "focus param highlights the named slot and not others", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      {:ok, _lv, html} = live(conn, "/plan?focus=mon_dinner")
+      # the highlight ring is bound to the focused row's <li>, not just present somewhere
+      assert html =~ ~r/id="slot-mon_dinner"[^>]*ring-2 ring-\[color:var\(--accent\)\]/
+      # a non-focused slot's row carries no highlight ring
+      refute html =~ ~r/id="slot-tue_dinner"[^>]*ring-2 ring-\[color:var\(--accent\)\]/
+    end
+
+    test "no focus param highlights nothing", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      {:ok, _lv, html} = live(conn, "/plan")
+      refute html =~ "ring-2 ring-[color:var(--accent)]"
+    end
+  end
+
   defp eventually_renders(view, substr, attempts \\ 20)
 
   defp eventually_renders(view, substr, 0) do
