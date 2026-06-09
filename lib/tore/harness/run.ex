@@ -45,6 +45,9 @@ defmodule Tore.Harness.Run do
   defp prepare(%Events.ArtifactAdded{artifact: %_{} = artifact} = ev),
     do: %Events.ArtifactAdded{ev | artifact: Artifact.to_json(artifact)}
 
+  defp prepare(%Events.FailureRecorded{repair_action: {:edit_plan, slots}} = ev),
+    do: %Events.FailureRecorded{ev | repair_action: %{"action" => "edit_plan", "slots" => slots}}
+
   defp prepare(event), do: event
 
   defp deserialize(event_type, data) do
@@ -72,8 +75,8 @@ defmodule Tore.Harness.Run do
   defp rehydrate(%Events.FailureRecorded{} = event),
     do: %Events.FailureRecorded{
       event
-      | code: safe_atom(event.code),
-        repair_action: safe_atom(event.repair_action)
+      | code: failure_code_atom(event.code),
+        repair_action: decode_repair(event.repair_action)
     }
 
   defp rehydrate(event), do: event
@@ -91,6 +94,26 @@ defmodule Tore.Harness.Run do
   defp phase_atom("verifying"), do: :verifying
 
   defp surface_atom("plan"), do: :plan
+
+  # Failure codes are matched in the receipt as atoms; decode via a literal map so
+  # a cold Projector boot (PlanVerifier not yet loaded) never downgrades them to a
+  # string the way String.to_existing_atom would. Unknown strings fall back to
+  # safe_atom (tolerant). Atoms (warm path) pass through.
+  defp failure_code_atom("internal_error"), do: :internal_error
+  defp failure_code_atom("slot_pinned"), do: :slot_pinned
+  defp failure_code_atom("servings_missing"), do: :servings_missing
+  defp failure_code_atom("skip_not_explicit"), do: :skip_not_explicit
+  defp failure_code_atom("leftover_no_source"), do: :leftover_no_source
+  defp failure_code_atom("dietary_violation"), do: :dietary_violation
+  defp failure_code_atom(code) when is_atom(code), do: code
+  defp failure_code_atom(other), do: safe_atom(other)
+
+  # repair_action round-trips as a map; reconstruct the tuple via a literal map
+  # (cold-boot safe — no String.to_existing_atom). nil passes through.
+  defp decode_repair(%{action: "edit_plan", slots: slots}), do: {:edit_plan, slots}
+  defp decode_repair(%{"action" => "edit_plan", "slots" => slots}), do: {:edit_plan, slots}
+  defp decode_repair(nil), do: nil
+  defp decode_repair(other), do: other
 
   # failure code/repair_action are more open-ended; tolerate any string without
   # crashing, and pass non-binaries (e.g. nil) through unchanged.

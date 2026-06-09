@@ -136,6 +136,66 @@ defmodule Tore.Harness.RunTest do
     assert %State.Failed{failure_code: :slot_locked, failure_repair_action: nil} = state
   end
 
+  test "FailureRecorded with an {:edit_plan, slots} repair_action survives a round-trip" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{command: "x"}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    :ok = Run.append(sid, [opened])
+    {:ok, running} = Run.load(sid)
+
+    {:ok, fail_events} =
+      Run.decide(
+        %Commands.RecordFailure{
+          code: :slot_pinned,
+          user_message: nil,
+          repair_action: {:edit_plan, ["mon_dinner", "fri_dinner"]}
+        },
+        running
+      )
+
+    :ok = Run.append(sid, fail_events)
+
+    assert {:ok, %State.Failed{failure_code: :slot_pinned,
+                               failure_repair_action: {:edit_plan, ["mon_dinner", "fri_dinner"]}}} =
+             Run.load(sid)
+  end
+
+  test "failure_code decodes to an atom for known verifier codes" do
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1, kind: "planner_command_run", surface: :plan,
+          started_by: "user", user_id: 1, input: %{command: "x"}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    :ok = Run.append(sid, [opened])
+    {:ok, running} = Run.load(sid)
+
+    {:ok, fail_events} =
+      Run.decide(
+        %Commands.RecordFailure{code: :dietary_violation, user_message: nil,
+                                repair_action: {:edit_plan, ["mon_dinner"]}},
+        running
+      )
+
+    :ok = Run.append(sid, fail_events)
+    {:ok, loaded} = Run.load(sid)
+    assert loaded.failure_code == :dietary_violation
+    assert is_atom(loaded.failure_code)
+  end
+
   test "load/1 folds ModelUsageObserved cost_usd back into a Decimal" do
     sid = Run.next_stream_id()
 
