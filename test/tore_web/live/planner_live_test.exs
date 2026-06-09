@@ -180,6 +180,33 @@ defmodule ToreWeb.PlannerLiveTest do
     end
   end
 
+  describe "pinning a slot" do
+    test "toggling pin in the modal persists a SlotPinned event", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      plan = this_plan_id()
+      {:ok, lv, _html} = live(conn, "/plan")
+
+      lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
+
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert Map.has_key?(state.pins, "mon_dinner")
+    end
+
+    test "toggling pin off persists a SlotUnpinned event", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      plan = this_plan_id()
+      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      {:ok, lv, _html} = live(conn, "/plan")
+
+      lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
+
+      {:ok, state} = PlanningHandler.load_plan(plan)
+      refute Map.has_key?(state.pins, "mon_dinner")
+    end
+  end
+
   describe "focus param" do
     test "focus param highlights the named slot and not others", %{conn: conn, user: user} do
       conn = authed(conn, user)

@@ -83,7 +83,8 @@ defmodule ToreWeb.PlannerLive do
       servings: (slot && slot.servings) || 4,
       leftover_days: existing_leftover_days,
       skipped: (slot && slot.skipped) || false,
-      flipped: false
+      flipped: false,
+      pinned: Map.has_key?(socket.assigns.plan_state.pins, sk)
     }
 
     parent = self()
@@ -163,6 +164,17 @@ defmodule ToreWeb.PlannerLive do
   def handle_event("toggle_skipped", _, socket) do
     socket = update_slot(socket, fn s -> %{s | skipped: !s.skipped} end)
     {:noreply, auto_save_slot(socket)}
+  end
+
+  def handle_event("toggle_pinned", _, socket) do
+    %{slot_key: sk, pinned: was_pinned} = socket.assigns.slot_action
+    plan_id = socket.assigns.plan_id
+
+    if was_pinned,
+      do: PlanningHandler.unpin_slot(plan_id, sk),
+      else: PlanningHandler.pin_slot(plan_id, sk, true)
+
+    {:noreply, update_slot(socket, fn s -> %{s | pinned: !was_pinned} end)}
   end
 
   def handle_event("save_slot", _, socket) do
@@ -856,6 +868,25 @@ defmodule ToreWeb.PlannerLive do
                   class="size-4"
                 />
                 {if @slot_action.skipped, do: gettext("Skipped"), else: gettext("Skip dinner")}
+              </button>
+
+              <button
+                type="button"
+                phx-click="toggle_pinned"
+                class={[
+                  "inline-flex items-center gap-2 rounded-[var(--r-pill)] px-3 h-8 transition-colors",
+                  @slot_action.pinned &&
+                    "bg-[color:var(--accent-soft)] text-[color:var(--accent)] font-medium",
+                  !@slot_action.pinned &&
+                    "text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)]"
+                ]}
+                style="font-size: var(--t-meta);"
+              >
+                <.icon
+                  name={if @slot_action.pinned, do: "hero-lock-closed", else: "hero-lock-open"}
+                  class="size-4"
+                />
+                {if @slot_action.pinned, do: gettext("Pinned"), else: gettext("Pin this day")}
               </button>
             </div>
           </div>
