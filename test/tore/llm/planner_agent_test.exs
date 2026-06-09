@@ -27,8 +27,7 @@ defmodule Tore.LLM.PlannerAgentTest do
 
   test "run/4 coerces a float cost_usd from the LLM into a Decimal" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "ok"},
-       %{prompt_tokens: 5, completion_tokens: 2, cost_usd: 5.04e-4}}
+      {:ok, {:message, "ok"}, %{prompt_tokens: 5, completion_tokens: 2, cost_usd: 5.04e-4}}
     end)
 
     {:ok, outcome} = PlannerAgent.run(@system_prompt, "x", @ctx, [])
@@ -39,8 +38,7 @@ defmodule Tore.LLM.PlannerAgentTest do
 
   test "run/4 does not write to ai_operations" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "ok"},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok, {:message, "ok"}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     {:ok, _} = PlannerAgent.run(@system_prompt, "x", @ctx, [])
@@ -55,9 +53,7 @@ defmodule Tore.LLM.PlannerAgentTest do
         {:ok, {:message, "stopped"},
          %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       else
-        {:ok,
-         {:tool_calls,
-          [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
+        {:ok, {:tool_calls, [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
          %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       end
     end)
@@ -71,9 +67,7 @@ defmodule Tore.LLM.PlannerAgentTest do
 
   test "run/4 returns {:question, q} when ask_user is invoked" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok,
-       {:tool_calls,
-        [%{id: "c1", name: "ask_user", args: %{"question" => "which?"}}]},
+      {:ok, {:tool_calls, [%{id: "c1", name: "ask_user", args: %{"question" => "which?"}}]},
        %{prompt_tokens: 3, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
@@ -87,9 +81,7 @@ defmodule Tore.LLM.PlannerAgentTest do
         {:ok, {:message, "stopped"},
          %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       else
-        {:ok,
-         {:tool_calls,
-          [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
+        {:ok, {:tool_calls, [%{id: "c1", name: "search_recipes", args: %{"query" => "x"}}]},
          %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
       end
     end)
@@ -101,15 +93,29 @@ defmodule Tore.LLM.PlannerAgentTest do
   test "run/4 accumulates plan_events and evolves working_plan across the loop" do
     {:ok, r} = Tore.Recipes.create(%{title: "Z", base_servings: 2, instructions: "x"})
     rid = r.id
-    start_plan = Decider.evolve(%State{}, %Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: rid, servings: 2})
+
+    start_plan =
+      Decider.evolve(%State{}, %Events.RecipeAssigned{
+        slot_key: "mon_dinner",
+        recipe_id: rid,
+        servings: 2
+      })
 
     expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
-      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "skip_meal",
+            args: %{"slot_key" => "mon_dinner", "rationale" => "out"}
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     {:ok, outcome} = PlannerAgent.run(@system_prompt, "skip mon", ctx_with_plan(start_plan), [])

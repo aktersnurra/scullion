@@ -1,8 +1,14 @@
 defmodule Tore.Harness.Run.Events do
   defmodule Opened do
     defstruct [
-      :stream_id, :household_id, :kind, :surface, :started_by,
-      :user_id, :input, :opened_at
+      :stream_id,
+      :household_id,
+      :kind,
+      :surface,
+      :started_by,
+      :user_id,
+      :input,
+      :opened_at
     ]
   end
 

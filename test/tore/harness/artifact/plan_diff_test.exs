@@ -20,6 +20,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("mon_dinner", "MealSkipped")]
     }
+
     [entry] = PlanDiff.summarise(diff)
     assert entry.slot_key == "mon_dinner"
     assert entry.change == :skipped
@@ -32,6 +33,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("tue_dinner", "RecipeAssigned", %{"label" => "Stew"})]
     }
+
     [entry] = PlanDiff.summarise(diff)
     assert entry.change == :added
     assert entry.label == "Stew"
@@ -43,6 +45,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("wed_dinner", "LeftoverMarked")]
     }
+
     [entry] = PlanDiff.summarise(diff)
     assert entry.change == :leftover
   end
@@ -53,6 +56,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("thu_dinner", "RecipeRemoved")]
     }
+
     [entry] = PlanDiff.summarise(diff)
     assert entry.change == :removed
   end
@@ -67,6 +71,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
         ev("wed", "RecipeAssigned", %{"label" => "y"})
       ]
     }
+
     s = PlanDiff.summary(diff)
     assert s.counts == %{skipped: 1, added: 2}
     assert s.text_fallback =~ "skipped"
@@ -79,6 +84,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("mon", "MealSkipped", %{}, [])]
     }
+
     refute PlanDiff.is_rationale_complete(diff)
   end
 
@@ -88,6 +94,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("mon", "MealSkipped", %{}, ["why"])]
     }
+
     assert PlanDiff.is_rationale_complete(diff)
   end
 
@@ -97,6 +104,7 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
       week_start: ~D[2026-06-01],
       events: [ev("mon", "MealSkipped")]
     }
+
     encoded = PlanDiff.to_json(diff)
     decoded = PlanDiff.from_json(encoded)
     assert decoded.plan_stream_id == "plan-1"
@@ -106,31 +114,48 @@ defmodule Tore.Harness.Artifact.PlanDiffTest do
 
   test "summarise/1 maps RecipeSwapped to :swapped" do
     diff = %PlanDiff{
-      plan_stream_id: "p", week_start: ~D[2026-06-01],
-      events: [%{slot_key: "sun_dinner", event_type: "RecipeSwapped",
-                 payload: %{"from_slot_key" => "fri_dinner", "to_slot_key" => "sun_dinner"},
-                 rationale: ["because"]}]
+      plan_stream_id: "p",
+      week_start: ~D[2026-06-01],
+      events: [
+        %{
+          slot_key: "sun_dinner",
+          event_type: "RecipeSwapped",
+          payload: %{"from_slot_key" => "fri_dinner", "to_slot_key" => "sun_dinner"},
+          rationale: ["because"]
+        }
+      ]
     }
+
     assert [%{slot_key: "sun_dinner", change: :swapped}] = PlanDiff.summarise(diff)
   end
 
   test "summarise/1 maps ServingsChanged to :servings" do
     diff = %PlanDiff{
-      plan_stream_id: "p", week_start: ~D[2026-06-01],
-      events: [%{slot_key: "mon_dinner", event_type: "ServingsChanged",
-                 payload: %{"servings" => 6}, rationale: ["more guests"]}]
+      plan_stream_id: "p",
+      week_start: ~D[2026-06-01],
+      events: [
+        %{
+          slot_key: "mon_dinner",
+          event_type: "ServingsChanged",
+          payload: %{"servings" => 6},
+          rationale: ["more guests"]
+        }
+      ]
     }
+
     assert [%{slot_key: "mon_dinner", change: :servings}] = PlanDiff.summarise(diff)
   end
 
   test "summarise/1 maps a lone RecipeAssigned to :added and lone RecipeRemoved to :removed" do
     diff = %PlanDiff{
-      plan_stream_id: "p", week_start: ~D[2026-06-01],
+      plan_stream_id: "p",
+      week_start: ~D[2026-06-01],
       events: [
         %{slot_key: "mon_dinner", event_type: "RecipeAssigned", payload: %{}, rationale: ["x"]},
         %{slot_key: "tue_dinner", event_type: "RecipeRemoved", payload: %{}, rationale: ["y"]}
       ]
     }
+
     rollup = PlanDiff.summarise(diff)
     assert Enum.find(rollup, &(&1.slot_key == "mon_dinner")).change == :added
     assert Enum.find(rollup, &(&1.slot_key == "tue_dinner")).change == :removed

@@ -31,7 +31,9 @@ defmodule ToreWeb.PantryLiveTest do
 
   test "remove_item removes a pantry item", %{conn: conn, user: user} do
     conn = authed(conn, user)
-    {:ok, item} = Tore.Pantry.add_item(%{name: "olive oil", quantity: Decimal.new(1), unit: "bottle"})
+
+    {:ok, item} =
+      Tore.Pantry.add_item(%{name: "olive oil", quantity: Decimal.new(1), unit: "bottle"})
 
     {:ok, view, _html} = live(conn, "/settings/pantry")
     assert render(view) =~ "Olive oil"

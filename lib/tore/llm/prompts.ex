@@ -215,7 +215,17 @@ defmodule Tore.LLM.Prompts do
             total_price: %{type: ["number", "null"]},
             category: %{
               type: "string",
-              enum: ["dairy", "meat", "produce", "frozen", "dry_goods", "canned", "herbs_spices", "condiments", "other"]
+              enum: [
+                "dairy",
+                "meat",
+                "produce",
+                "frozen",
+                "dry_goods",
+                "canned",
+                "herbs_spices",
+                "condiments",
+                "other"
+              ]
             }
           }
         }
@@ -401,13 +411,17 @@ defmodule Tore.LLM.Prompts do
     properties: %{
       section: %{
         type: "string",
-        enum: ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+        enum:
+          ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
       }
     }
   }
 
   def grocery_section_schema do
-    %{type: "json_schema", json_schema: %{name: "grocery_section", strict: true, schema: @grocery_section_schema}}
+    %{
+      type: "json_schema",
+      json_schema: %{name: "grocery_section", strict: true, schema: @grocery_section_schema}
+    }
   end
 
   @filter_pantry_schema %{
@@ -427,7 +441,8 @@ defmodule Tore.LLM.Prompts do
             unit: %{type: ["string", "null"]},
             section: %{
               type: "string",
-              enum: ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+              enum:
+                ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
             }
           }
         }
@@ -436,7 +451,10 @@ defmodule Tore.LLM.Prompts do
   }
 
   def filter_pantry_schema do
-    %{type: "json_schema", json_schema: %{name: "filter_pantry", strict: true, schema: @filter_pantry_schema}}
+    %{
+      type: "json_schema",
+      json_schema: %{name: "filter_pantry", strict: true, schema: @filter_pantry_schema}
+    }
   end
 
   def filter_pantry_items(ingredients, pantry) do

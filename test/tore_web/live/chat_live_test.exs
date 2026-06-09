@@ -19,7 +19,8 @@ defmodule ToreWeb.ChatLiveTest do
   test "sending a message appends user bubble", %{conn: conn} do
     Tore.MockLLM
     |> expect(:chat, fn _system, _messages ->
-      {:ok, "Try making pasta tonight!", %{prompt_tokens: 10, completion_tokens: 8, cost_usd: 0.0001}}
+      {:ok, "Try making pasta tonight!",
+       %{prompt_tokens: 10, completion_tokens: 8, cost_usd: 0.0001}}
     end)
 
     {:ok, lv, _html} = live(conn, "/chat")

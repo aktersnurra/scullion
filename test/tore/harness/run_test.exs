@@ -17,14 +17,20 @@ defmodule Tore.Harness.RunTest do
 
   test "append/3 persists events and load/1 replays them" do
     sid = Run.next_stream_id()
+
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{command: "x"}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{command: "x"}
         },
         %State.Draft{stream_id: sid}
       )
+
     :ok = Run.append(sid, [opened])
     {:ok, state} = Run.load(sid)
     assert %State.Running{stream_id: ^sid, household_id: 1, kind: "planner_command_run"} = state
@@ -38,8 +44,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: hh, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: hh,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
@@ -56,8 +66,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
@@ -72,14 +86,21 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
 
     {:ok, [phase_entered]} =
-      Run.decide(%Commands.EnterPhase{phase: :proposing}, Run.evolve(%State.Draft{stream_id: sid}, opened))
+      Run.decide(
+        %Commands.EnterPhase{phase: :proposing},
+        Run.evolve(%State.Draft{stream_id: sid}, opened)
+      )
 
     :ok = Run.append(sid, [opened, phase_entered])
     {:ok, state} = Run.load(sid)
@@ -93,14 +114,21 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
 
     step = %Events.ToolStepRecorded{
-      step_index: 0, step_kind: :tool_calls, payload: %{}, ai_operation_id: nil
+      step_index: 0,
+      step_kind: :tool_calls,
+      payload: %{},
+      ai_operation_id: nil
     }
 
     :ok = Run.append(sid, [opened, step])
@@ -116,8 +144,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
@@ -142,8 +174,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{command: "x"}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{command: "x"}
         },
         %State.Draft{stream_id: sid}
       )
@@ -163,8 +199,11 @@ defmodule Tore.Harness.RunTest do
 
     :ok = Run.append(sid, fail_events)
 
-    assert {:ok, %State.Failed{failure_code: :slot_pinned,
-                               failure_repair_action: {:edit_plan, ["mon_dinner", "fri_dinner"]}}} =
+    assert {:ok,
+            %State.Failed{
+              failure_code: :slot_pinned,
+              failure_repair_action: {:edit_plan, ["mon_dinner", "fri_dinner"]}
+            }} =
              Run.load(sid)
   end
 
@@ -174,8 +213,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{command: "x"}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{command: "x"}
         },
         %State.Draft{stream_id: sid}
       )
@@ -185,8 +228,11 @@ defmodule Tore.Harness.RunTest do
 
     {:ok, fail_events} =
       Run.decide(
-        %Commands.RecordFailure{code: :dietary_violation, user_message: nil,
-                                repair_action: {:edit_plan, ["mon_dinner"]}},
+        %Commands.RecordFailure{
+          code: :dietary_violation,
+          user_message: nil,
+          repair_action: {:edit_plan, ["mon_dinner"]}
+        },
         running
       )
 
@@ -202,8 +248,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
@@ -227,8 +277,12 @@ defmodule Tore.Harness.RunTest do
     {:ok, [opened]} =
       Run.decide(
         %Commands.Open{
-          household_id: 1, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )

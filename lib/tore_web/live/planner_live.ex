@@ -223,6 +223,7 @@ defmodule ToreWeb.PlannerLive do
     case Tore.WeekMode.set_mode(mode) do
       {:ok, _} ->
         {:noreply, assign(socket, current_week_mode: mode)}
+
       {:error, _} ->
         {:noreply, socket}
     end
@@ -442,12 +443,16 @@ defmodule ToreWeb.PlannerLive do
               class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               disabled={@quick_loading}
             >
-              <%= if @quick_loading, do: gettext("..."), else: gettext("Ask") %>
+              {if @quick_loading, do: gettext("..."), else: gettext("Ask")}
             </button>
           </form>
 
           <%= if @current_run do %>
-            <.live_component module={ToreWeb.Components.ReceiptLive} id="planner-receipt" run={@current_run} />
+            <.live_component
+              module={ToreWeb.Components.ReceiptLive}
+              id="planner-receipt"
+              run={@current_run}
+            />
           <% end %>
         </div>
 
@@ -462,12 +467,18 @@ defmodule ToreWeb.PlannerLive do
                 <p class="font-semibold text-[var(--text)] text-sm mb-0.5">{note.title}</p>
                 <p class="text-sm text-[color:var(--muted)] mb-3">{note.body}</p>
                 <div class="flex gap-2">
-                  <button phx-click="accept_note" phx-value-id={note.id}
-                    class="flex-1 py-2 rounded-xl bg-[color:var(--accent)] text-white text-xs font-semibold">
+                  <button
+                    phx-click="accept_note"
+                    phx-value-id={note.id}
+                    class="flex-1 py-2 rounded-xl bg-[color:var(--accent)] text-white text-xs font-semibold"
+                  >
                     {gettext("Accept")}
                   </button>
-                  <button phx-click="ignore_note" phx-value-id={note.id}
-                    class="px-4 py-2 rounded-xl border border-[color:var(--hairline)] text-[color:var(--muted)] text-xs font-medium">
+                  <button
+                    phx-click="ignore_note"
+                    phx-value-id={note.id}
+                    class="px-4 py-2 rounded-xl border border-[color:var(--hairline)] text-[color:var(--muted)] text-xs font-medium"
+                  >
                     {gettext("Ignore")}
                   </button>
                 </div>
@@ -479,12 +490,19 @@ defmodule ToreWeb.PlannerLive do
         <%!-- Plan health badge (placeholder until Task 3 wires real data) --%>
         <div class={[
           "inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full mb-4",
-          elem(@plan_health, 0) == :ready && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-          elem(@plan_health, 0) == :flexible && "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-          elem(@plan_health, 0) == :fragile && "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-          elem(@plan_health, 0) == :unplanned && "bg-[color:var(--surface-raised)] text-[color:var(--muted)]"
+          elem(@plan_health, 0) == :ready &&
+            "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+          elem(@plan_health, 0) == :flexible &&
+            "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+          elem(@plan_health, 0) == :fragile &&
+            "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+          elem(@plan_health, 0) == :unplanned &&
+            "bg-[color:var(--surface-raised)] text-[color:var(--muted)]"
         ]}>
-          <span class="size-1.5 rounded-full inline-block" style={health_dot_color(elem(@plan_health, 0))} />
+          <span
+            class="size-1.5 rounded-full inline-block"
+            style={health_dot_color(elem(@plan_health, 0))}
+          />
           {health_message(@plan_health)}
         </div>
 
@@ -1055,7 +1073,13 @@ defmodule ToreWeb.PlannerLive do
   defp load_week(socket, week_start) do
     plan_id = plan_id(week_start)
     {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
-    assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state, plan_health: PlanHealth.compute(plan_state))
+
+    assign(socket,
+      week_start: week_start,
+      plan_id: plan_id,
+      plan_state: plan_state,
+      plan_health: PlanHealth.compute(plan_state)
+    )
   end
 
   defp recipe_by_id(_recipes, nil), do: nil

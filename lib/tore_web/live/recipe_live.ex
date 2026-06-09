@@ -151,6 +151,7 @@ defmodule ToreWeb.RecipeLive do
 
   def handle_event("select_recipe", %{"id" => id}, socket) do
     recipe = Recipes.get!(String.to_integer(id))
+
     {:noreply,
      assign(socket,
        selected: recipe,
@@ -219,7 +220,8 @@ defmodule ToreWeb.RecipeLive do
   end
 
   def handle_event("toggle_substitution", _params, socket) do
-    {:noreply, assign(socket, show_substitution: !socket.assigns.show_substitution, substitution: nil)}
+    {:noreply,
+     assign(socket, show_substitution: !socket.assigns.show_substitution, substitution: nil)}
   end
 
   def handle_event("get_substitution", %{"missing" => missing}, socket) when missing != "" do
@@ -324,8 +326,14 @@ defmodule ToreWeb.RecipeLive do
   def handle_info({:run_substitution, missing, recipe_context}, socket) do
     result =
       case Recipes.suggest_substitution(missing, recipe_context) do
-        {:ok, r} -> r
-        {:error, _} -> %{suggestion: gettext("Couldn't find a substitution — try a web search."), updated_steps: nil}
+        {:ok, r} ->
+          r
+
+        {:error, _} ->
+          %{
+            suggestion: gettext("Couldn't find a substitution — try a web search."),
+            updated_steps: nil
+          }
       end
 
     {:noreply, assign(socket, substitution: result, substitution_loading: false)}
@@ -334,7 +342,9 @@ defmodule ToreWeb.RecipeLive do
   def handle_info({:load_cook_mode, recipe}, socket) do
     steps =
       case Recipes.cook_mode_steps(Map.from_struct(recipe)) do
-        {:ok, s} -> s
+        {:ok, s} ->
+          s
+
         {:error, _} ->
           %{
             do_first: [gettext("Follow the recipe steps")],
@@ -828,8 +838,10 @@ defmodule ToreWeb.RecipeLive do
         <%!-- Cook mode --%>
         <div class="mt-4">
           <%= if !@cook_mode do %>
-            <button phx-click="enter_cook_mode"
-              class="w-full py-3 rounded-2xl bg-[color:var(--accent)] text-white text-sm font-semibold flex items-center justify-center gap-2">
+            <button
+              phx-click="enter_cook_mode"
+              class="w-full py-3 rounded-2xl bg-[color:var(--accent)] text-white text-sm font-semibold flex items-center justify-center gap-2"
+            >
               <.icon name="hero-fire" class="size-4" />
               {gettext("Start cooking")}
             </button>
@@ -853,8 +865,10 @@ defmodule ToreWeb.RecipeLive do
                       {gettext("Do first")}
                     </p>
                     <ul class="space-y-1">
-                      <li :for={step <- @cook_mode_steps.do_first}
-                        class="text-sm text-[var(--text)] flex gap-2">
+                      <li
+                        :for={step <- @cook_mode_steps.do_first}
+                        class="text-sm text-[var(--text)] flex gap-2"
+                      >
                         <span class="text-[color:var(--accent)] mt-0.5">→</span>
                         <span>{step}</span>
                       </li>
@@ -867,8 +881,10 @@ defmodule ToreWeb.RecipeLive do
                         {gettext("While it cooks")}
                       </p>
                       <ul class="space-y-1">
-                        <li :for={step <- @cook_mode_steps.while_cooking}
-                          class="text-sm text-[var(--text)] flex gap-2">
+                        <li
+                          :for={step <- @cook_mode_steps.while_cooking}
+                          class="text-sm text-[var(--text)] flex gap-2"
+                        >
                           <span class="text-[color:var(--muted)] mt-0.5">→</span>
                           <span>{step}</span>
                         </li>
@@ -881,8 +897,10 @@ defmodule ToreWeb.RecipeLive do
                       {gettext("Finish")}
                     </p>
                     <ul class="space-y-1">
-                      <li :for={step <- @cook_mode_steps.finish}
-                        class="text-sm text-[var(--text)] flex gap-2">
+                      <li
+                        :for={step <- @cook_mode_steps.finish}
+                        class="text-sm text-[var(--text)] flex gap-2"
+                      >
                         <span class="text-[color:var(--muted)] mt-0.5">→</span>
                         <span>{step}</span>
                       </li>

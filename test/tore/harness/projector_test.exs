@@ -16,14 +16,20 @@ defmodule Tore.Harness.ProjectorTest do
 
   test "latest_on_surface/2 reflects a newly opened run after PubSub broadcast" do
     sid = Run.next_stream_id()
+
     {:ok, [ev]} =
       Run.decide(
         %Commands.Open{
-          household_id: 99, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{command: "x"}
+          household_id: 99,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{command: "x"}
         },
         %State.Draft{stream_id: sid}
       )
+
     :ok = Run.append(sid, [ev], %{household_id: 99})
 
     # Wait briefly for the projector to handle the broadcast.
@@ -38,14 +44,20 @@ defmodule Tore.Harness.ProjectorTest do
 
   test "projector boots by replaying open runs only" do
     sid = Run.next_stream_id()
+
     {:ok, [ev]} =
       Run.decide(
         %Commands.Open{
-          household_id: 100, kind: "planner_command_run", surface: :plan,
-          started_by: "user", user_id: 1, input: %{}
+          household_id: 100,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
         },
         %State.Draft{stream_id: sid}
       )
+
     :ok = Run.append(sid, [ev], %{household_id: 100})
 
     {:ok, _pid} = ProjectorSupervisor.start_or_lookup(100)

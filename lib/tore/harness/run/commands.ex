@@ -40,7 +40,14 @@ defmodule Tore.Harness.Run.Commands do
   end
 
   @type t ::
-          %Open{} | %EnterPhase{} | %RecordToolStep{} | %AddArtifact{}
-          | %ObserveModelUsage{} | %RaiseQuestion{} | %AnswerQuestion{}
-          | %Commit{} | %RecordFailure{} | %Revert{}
+          %Open{}
+          | %EnterPhase{}
+          | %RecordToolStep{}
+          | %AddArtifact{}
+          | %ObserveModelUsage{}
+          | %RaiseQuestion{}
+          | %AnswerQuestion{}
+          | %Commit{}
+          | %RecordFailure{}
+          | %Revert{}
 end

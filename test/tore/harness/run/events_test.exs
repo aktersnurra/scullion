@@ -4,6 +4,7 @@ defmodule Tore.Harness.Run.EventsTest do
 
   test "Opened carries stream_id, household_id, kind, surface, started_by, user_id, input, opened_at" do
     now = DateTime.utc_now()
+
     e = %Events.Opened{
       stream_id: "run-abc",
       household_id: 1,
@@ -14,6 +15,7 @@ defmodule Tore.Harness.Run.EventsTest do
       input: %{command: "skip mon dinner"},
       opened_at: now
     }
+
     assert e.stream_id == "run-abc"
     assert e.opened_at == now
   end
@@ -30,6 +32,7 @@ defmodule Tore.Harness.Run.EventsTest do
       payload: %{calls: []},
       ai_operation_id: 7
     }
+
     assert e.step_kind == :tool_calls
   end
 
@@ -45,6 +48,7 @@ defmodule Tore.Harness.Run.EventsTest do
       completion_tokens: 50,
       cost_usd: Decimal.new("0.0012")
     }
+
     assert e.prompt_tokens == 100
   end
 
@@ -66,6 +70,7 @@ defmodule Tore.Harness.Run.EventsTest do
       repair_action: nil,
       at: ~U[2026-06-02 12:00:00Z]
     }
+
     assert e.code == :slot_locked
   end
 

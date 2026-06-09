@@ -17,7 +17,8 @@ defmodule Tore.AiOperations.AiOperation do
     |> cast(attrs, [:run_stream_id, :kind, :payload, :result, :step_index, :undo_op_id])
     |> validate_required([:run_stream_id, :kind])
     |> unique_constraint([:run_stream_id, :step_index],
-         name: :ai_operations_run_stream_id_step_index_index)
+      name: :ai_operations_run_stream_id_step_index_index
+    )
     |> put_inserted_at()
   end
 

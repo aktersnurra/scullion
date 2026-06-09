@@ -242,8 +242,16 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
       state =
         %State{}
-        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: r1.id, servings: 2})
-        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{slot_key: "tue_dinner", recipe_id: r2.id, servings: 2})
+        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{
+          slot_key: "mon_dinner",
+          recipe_id: r1.id,
+          servings: 2
+        })
+        |> Decider.evolve(%Tore.Planning.Events.RecipeAssigned{
+          slot_key: "tue_dinner",
+          recipe_id: r2.id,
+          servings: 2
+        })
 
       assert {:ok, events, next} = PlanningHandler.swap_events(state, "mon_dinner", "tue_dinner")
       assert events != []
@@ -261,7 +269,10 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     test "appends events to the plan stream and returns :ok" do
       {:ok, r} = Tore.Recipes.create(%{title: "C", base_servings: 2, instructions: "x"})
       plan = "plan:apply-test"
-      events = [%Tore.Planning.Events.RecipeAssigned{slot_key: "wed_dinner", recipe_id: r.id, servings: 3}]
+
+      events = [
+        %Tore.Planning.Events.RecipeAssigned{slot_key: "wed_dinner", recipe_id: r.id, servings: 3}
+      ]
 
       assert :ok = PlanningHandler.apply_events(plan, events)
       {:ok, state} = PlanningHandler.load_plan(plan)
@@ -315,7 +326,9 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
     test "both slots empty returns {:error, :nothing_to_swap}" do
       plan = "plan:swap-3"
-      assert {:error, :nothing_to_swap} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+
+      assert {:error, :nothing_to_swap} =
+               PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
     end
   end
 end

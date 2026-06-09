@@ -19,7 +19,10 @@ defmodule Tore.Handlers.RecipeHandler do
     key = "recipes/#{recipe.id}/#{Ecto.UUID.generate()}.jpg"
 
     with {:ok, binary} <- fetch_or_generate(recipe, image_url),
-         {:ok, url} <- storage.put_object(Tore.Storage.Buckets.recipes(), key, binary, content_type: "image/jpeg") do
+         {:ok, url} <-
+           storage.put_object(Tore.Storage.Buckets.recipes(), key, binary,
+             content_type: "image/jpeg"
+           ) do
       Tore.Repo.update_all(
         from(r in Tore.Recipes.Recipe, where: r.id == ^recipe.id),
         set: [image_path: url]

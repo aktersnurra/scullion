@@ -40,6 +40,7 @@ defmodule Tore.WeekMode do
     |> changeset(attrs)
     |> Repo.insert_or_update()
   end
+
   def mode_prompt_fragment("normal"), do: nil
 
   def mode_prompt_fragment("low_effort") do

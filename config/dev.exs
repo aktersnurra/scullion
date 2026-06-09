@@ -82,7 +82,6 @@ config :tore,
        :openrouter_image_model,
        System.get_env("OPENROUTER_IMAGE_MODEL", "google/gemini-3.1-flash-image-preview")
 
-
 config :tore, :storage_client, Tore.Storage.S3
 config :tore, :env, :dev
 

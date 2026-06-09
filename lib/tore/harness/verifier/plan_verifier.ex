@@ -12,8 +12,11 @@ defmodule Tore.Harness.Verifier.PlanVerifier do
   @day_order ~w(mon tue wed thu fri sat sun)
 
   @type fail_code ::
-          :slot_pinned | :servings_missing | :skip_not_explicit
-          | :leftover_no_source | :dietary_violation
+          :slot_pinned
+          | :servings_missing
+          | :skip_not_explicit
+          | :leftover_no_source
+          | :dietary_violation
   @type repair_action :: {:edit_plan, [String.t()]}
   @type ctx :: %{plan_state: State.t(), preferences: Preferences.t()}
 

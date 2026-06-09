@@ -1,8 +1,13 @@
 defmodule Tore.Chat.WeekContext do
   @days ~w[mon tue wed thu fri sat sun]
   @day_labels %{
-    "mon" => "Mon", "tue" => "Tue", "wed" => "Wed",
-    "thu" => "Thu", "fri" => "Fri", "sat" => "Sat", "sun" => "Sun"
+    "mon" => "Mon",
+    "tue" => "Tue",
+    "wed" => "Wed",
+    "thu" => "Thu",
+    "fri" => "Fri",
+    "sat" => "Sat",
+    "sun" => "Sun"
   }
 
   @spec build(map() | nil) :: String.t()
@@ -34,9 +39,12 @@ defmodule Tore.Chat.WeekContext do
   def build(_state), do: "No meals planned this week."
 
   defp format_slot(label, %{skipped: true}), do: "#{label}: skipped"
+
   defp format_slot(label, %{leftover: true, recipe_id: id}) when not is_nil(id),
     do: "#{label}: leftover (recipe #{id})"
+
   defp format_slot(label, %{recipe_id: id}) when not is_nil(id),
     do: "#{label}: recipe #{id}"
+
   defp format_slot(label, _), do: "#{label}: unplanned"
 end

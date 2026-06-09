@@ -112,8 +112,8 @@ defmodule Tore.Recipes do
   end
 
   @spec cook_mode_steps(map()) ::
-          {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}} |
-          {:error, term()}
+          {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}}
+          | {:error, term()}
   def cook_mode_steps(recipe) do
     @llm.cook_mode_steps(recipe)
   end

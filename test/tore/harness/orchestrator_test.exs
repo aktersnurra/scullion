@@ -28,8 +28,7 @@ defmodule Tore.Harness.OrchestratorTest do
 
   test "dispatch persists a 'run' event stream that can be replayed" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "ok"},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok, {:message, "ok"}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     {:ok, state} = Orchestrator.dispatch(:planner_command_run, @ctx)
@@ -69,9 +68,13 @@ defmodule Tore.Harness.OrchestratorTest do
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
       {:ok,
        {:tool_calls,
-        [%{id: "c1", name: "skip_meal",
-           args: %{"slot_key" => "mon_dinner", "rationale" => "busy night"}}]},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+        [
+          %{
+            id: "c1",
+            name: "skip_meal",
+            args: %{"slot_key" => "mon_dinner", "rationale" => "busy night"}
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
@@ -79,14 +82,21 @@ defmodule Tore.Harness.OrchestratorTest do
        %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
-            plan_stream_id: plan, week_start: ~D[2026-06-01]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: plan,
+      week_start: ~D[2026-06-01]
+    }
 
     {:ok, state} = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
 
     plan_diff = Enum.find(state.artifacts, &match?(%Tore.Harness.Artifact.PlanDiff{}, &1))
+
     assert [%{slot_key: "mon_dinner", event_type: "MealSkipped", rationale: ["busy night"]}] =
              plan_diff.events
+
     refute Enum.any?(plan_diff.events, &(&1.slot_key == "run"))
   end
 
@@ -108,12 +118,19 @@ defmodule Tore.Harness.OrchestratorTest do
       {:error, :boom}
     end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
-            plan_stream_id: "plan:2026-06-01", week_start: ~D[2026-06-01]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: "plan:2026-06-01",
+      week_start: ~D[2026-06-01]
+    }
 
-    assert {:error, {:step_failed, :boom}} = Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+    assert {:error, {:step_failed, :boom}} =
+             Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
 
     sid = latest_run_stream_id()
+
     assert {:ok, %Tore.Harness.Run.State.Failed{failure_code: :internal_error}} =
              Tore.Harness.Run.load(sid)
   end
@@ -123,8 +140,13 @@ defmodule Tore.Harness.OrchestratorTest do
       raise "boom"
     end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday",
-            plan_stream_id: "plan:2026-06-01", week_start: ~D[2026-06-01]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: "plan:2026-06-01",
+      week_start: ~D[2026-06-01]
+    }
 
     assert {:error, {:run_crashed, %RuntimeError{message: "boom"}}} =
              Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
@@ -139,15 +161,30 @@ defmodule Tore.Harness.OrchestratorTest do
     Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "skip_meal",
+            args: %{"slot_key" => "mon_dinner", "rationale" => "out"}
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: plan,
+      week_start: ~D[2026-06-08]
+    }
+
     {:ok, %State.Applied{}} = Orchestrator.dispatch(:planner_command_run, ctx)
 
     {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
@@ -158,7 +195,14 @@ defmodule Tore.Harness.OrchestratorTest do
     plan = "plan:2026-06-08-empty"
     Mox.stub(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ -> {:error, :boom} end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: plan,
+      week_start: ~D[2026-06-08]
+    }
+
     assert {:error, {:step_failed, :boom}} = Orchestrator.dispatch(:planner_command_run, ctx)
 
     {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
@@ -166,24 +210,43 @@ defmodule Tore.Harness.OrchestratorTest do
   end
 
   test "a verifier failure records Failed, applies nothing, commits nothing" do
-    {:ok, recipe} = Tore.Recipes.create(%{title: "Pinned dish", recipe_type: :meal, base_servings: 4})
+    {:ok, recipe} =
+      Tore.Recipes.create(%{title: "Pinned dish", recipe_type: :meal, base_servings: 4})
+
     plan = "plan:2026-06-08-pinned"
     Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
     Tore.Handlers.PlanningHandler.pin_slot(plan, "mon_dinner", true)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:tool_calls, [%{id: "c1", name: "skip_meal", args: %{"slot_key" => "mon_dinner", "rationale" => "out"}}]},
-       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "skip_meal",
+            args: %{"slot_key" => "mon_dinner", "rationale" => "out"}
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
-      {:ok, {:message, "Done."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
     end)
 
-    ctx = %{household_id: 1, user_id: 1, command: "skip monday", plan_stream_id: plan, week_start: ~D[2026-06-08]}
+    ctx = %{
+      household_id: 1,
+      user_id: 1,
+      command: "skip monday",
+      plan_stream_id: plan,
+      week_start: ~D[2026-06-08]
+    }
 
-    assert {:ok, %State.Failed{failure_code: :slot_pinned,
-                               failure_repair_action: {:edit_plan, ["mon_dinner"]}}} =
+    assert {:ok,
+            %State.Failed{
+              failure_code: :slot_pinned,
+              failure_repair_action: {:edit_plan, ["mon_dinner"]}
+            }} =
              Orchestrator.dispatch(:planner_command_run, ctx)
 
     # nothing applied: the plan is byte-for-byte its pre-run state — mon_dinner
@@ -205,7 +268,9 @@ defmodule Tore.Harness.OrchestratorTest do
     Tore.Repo.one(
       from e in Tore.EventStore.Event,
         where: e.stream_type == "run",
-        order_by: [desc: e.id], limit: 1, select: e.stream_id
+        order_by: [desc: e.id],
+        limit: 1,
+        select: e.stream_id
     )
   end
 end

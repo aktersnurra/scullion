@@ -77,7 +77,15 @@ defmodule Tore.Groceries.Decider do
   end
 
   def evolve(state, %Events.ItemAdded{} = e) do
-    item = %{id: e.item_id, name: e.name, quantity: e.quantity, unit: e.unit, section: e.section, checked: false}
+    item = %{
+      id: e.item_id,
+      name: e.name,
+      quantity: e.quantity,
+      unit: e.unit,
+      section: e.section,
+      checked: false
+    }
+
     %{state | items: Map.put(state.items, e.item_id, item)}
   end
 

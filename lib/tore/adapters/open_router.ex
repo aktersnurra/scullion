@@ -293,10 +293,11 @@ defmodule Tore.Adapters.OpenRouter do
 
     case json_chat(system, user) do
       {:ok, %{"suggestion" => suggestion} = result, _usage} ->
-        {:ok, %{
-          suggestion: suggestion,
-          updated_steps: result["updated_steps"]
-        }}
+        {:ok,
+         %{
+           suggestion: suggestion,
+           updated_steps: result["updated_steps"]
+         }}
 
       {:ok, _, _} ->
         {:error, :invalid_response}
@@ -323,7 +324,8 @@ defmodule Tore.Adapters.OpenRouter do
     user = "Recipe: #{title}\nSteps: #{instructions}"
 
     case json_chat(system, user) do
-      {:ok, %{"do_first" => do_first, "while_cooking" => while_cooking, "finish" => finish}, _usage} ->
+      {:ok, %{"do_first" => do_first, "while_cooking" => while_cooking, "finish" => finish},
+       _usage} ->
         {:ok, %{do_first: do_first, while_cooking: while_cooking, finish: finish}}
 
       {:ok, _, _} ->
@@ -368,7 +370,6 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
-
   @impl Tore.LLM
   def chat_with_tools(system, messages, tools, opts) do
     model_name = Keyword.get(opts, :model, model())
@@ -406,14 +407,22 @@ defmodule Tore.Adapters.OpenRouter do
             {:error, {:unexpected_message, msg}}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
   defp maybe_put_tool_choice(body, [], _opts), do: body
+
   defp maybe_put_tool_choice(body, _tools, opts) do
     Map.put(body, :tool_choice, Keyword.get(opts, :tool_choice, "auto"))
   end
@@ -484,10 +493,17 @@ defmodule Tore.Adapters.OpenRouter do
           _ -> {:ok, %{class: :unknown, confidence: 0.0}}
         end
 
-      {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
-      {:ok, %{status: 429}} -> {:error, :rate_limited}
-      {:ok, %{status: status, body: resp}} -> {:error, {:openrouter_error, status, resp}}
-      {:error, reason} -> {:error, {:http_error, reason}}
+      {:ok, %{status: 402}} ->
+        {:error, :provider_budget_exceeded}
+
+      {:ok, %{status: 429}} ->
+        {:error, :rate_limited}
+
+      {:ok, %{status: status, body: resp}} ->
+        {:error, {:openrouter_error, status, resp}}
+
+      {:error, reason} ->
+        {:error, {:http_error, reason}}
     end
   end
 
@@ -728,7 +744,12 @@ defmodule Tore.Adapters.OpenRouter do
     end
   end
 
-  defp cheap_chat(system_prompt, user_prompt, model_name, response_format \\ %{type: "json_object"}) do
+  defp cheap_chat(
+         system_prompt,
+         user_prompt,
+         model_name,
+         response_format \\ %{type: "json_object"}
+       ) do
     body = %{
       model: model_name,
       response_format: response_format,
@@ -881,12 +902,13 @@ defmodule Tore.Adapters.OpenRouter do
       |> Enum.map(fn i -> Map.put(i, "name", i["name"] || i["item"] || i["ingredient"]) end)
       |> Enum.filter(&is_binary(&1["name"]))
       |> Enum.map(fn i ->
-        qty = case i["quantity"] do
-          nil -> nil
-          n when is_number(n) -> n
-          s when is_binary(s) -> s
-          _ -> nil
-        end
+        qty =
+          case i["quantity"] do
+            nil -> nil
+            n when is_number(n) -> n
+            s when is_binary(s) -> s
+            _ -> nil
+          end
 
         %{
           id: Ecto.UUID.generate(),

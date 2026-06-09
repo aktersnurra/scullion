@@ -69,17 +69,33 @@ defmodule ToreWeb.ChatLive do
     new_messages =
       Enum.map(results, fn
         %{class: :unknown, status: :ambiguous} ->
-          %{role: :assistant, text: "I wasn't sure what that photo showed. Could you tell me — is it a receipt, a recipe, or your fridge?"}
+          %{
+            role: :assistant,
+            text:
+              "I wasn't sure what that photo showed. Could you tell me — is it a receipt, a recipe, or your fridge?"
+          }
 
         %{class: :fridge, status: :ok, result: items} ->
-          names = items |> Enum.map(& (&1[:name] || &1["name"])) |> Enum.take(5) |> Enum.join(", ")
-          text = if names == "", do: "I can see your fridge but it looks empty.", else: "I can see #{names} in your fridge. Want me to suggest some recipes?"
+          names = items |> Enum.map(&(&1[:name] || &1["name"])) |> Enum.take(5) |> Enum.join(", ")
+
+          text =
+            if names == "",
+              do: "I can see your fridge but it looks empty.",
+              else: "I can see #{names} in your fridge. Want me to suggest some recipes?"
+
           %{role: :assistant, text: text}
 
         %{class: class, status: :ok, result: result} ->
           review_id = Ecto.UUID.generate()
           :ets.insert(:chat_reviews, {review_id, %{class: class, result: result}})
-          %{role: :assistant, review_card: true, class: class, review_id: review_id, text: "I found a #{class}."}
+
+          %{
+            role: :assistant,
+            review_card: true,
+            class: class,
+            review_id: review_id,
+            text: "I found a #{class}."
+          }
 
         %{class: class, status: :error} ->
           %{role: :assistant, text: "Something went wrong processing the #{class} photo."}
@@ -108,18 +124,35 @@ defmodule ToreWeb.ChatLive do
       </div>
 
       <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        <div :for={msg <- @messages} class={["flex", msg.role == :user && "justify-end", msg.role == :assistant && "justify-start"]}>
-          <div :if={Map.get(msg, :review_card)} class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]">
+        <div
+          :for={msg <- @messages}
+          class={[
+            "flex",
+            msg.role == :user && "justify-end",
+            msg.role == :assistant && "justify-start"
+          ]}
+        >
+          <div
+            :if={Map.get(msg, :review_card)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
+          >
             <p class="text-sm text-[color:var(--text)] mb-2">{gettext("I found a")} {msg.class}.</p>
-            <.link navigate={"/review/#{msg.class}/#{msg.review_id}"} class="text-sm text-[color:var(--accent)] font-semibold">
+            <.link
+              navigate={"/review/#{msg.class}/#{msg.review_id}"}
+              class="text-sm text-[color:var(--accent)] font-semibold"
+            >
               {gettext("Review")} →
             </.link>
           </div>
-          <div :if={!Map.get(msg, :review_card)} class={[
-            "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-            msg.role == :user && "bg-[color:var(--accent)] text-white",
-            msg.role == :assistant && "bg-[var(--surface)] border border-[color:var(--border)] text-[color:var(--text)]"
-          ]}>
+          <div
+            :if={!Map.get(msg, :review_card)}
+            class={[
+              "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+              msg.role == :user && "bg-[color:var(--accent)] text-white",
+              msg.role == :assistant &&
+                "bg-[var(--surface)] border border-[color:var(--border)] text-[color:var(--text)]"
+            ]}
+          >
             {msg.text}
           </div>
         </div>
@@ -155,7 +188,11 @@ defmodule ToreWeb.ChatLive do
             </button>
           </div>
           <.live_file_input upload={@uploads.chat_photos} class="hidden" id="chat-photos-input" />
-          <button type="button" onclick="document.getElementById('chat-photos-input').click()" class="text-xs text-[color:var(--muted)] flex items-center gap-1">
+          <button
+            type="button"
+            onclick="document.getElementById('chat-photos-input').click()"
+            class="text-xs text-[color:var(--muted)] flex items-center gap-1"
+          >
             <.icon name="hero-camera" class="size-3.5" /> {gettext("Attach photo")}
           </button>
         </form>

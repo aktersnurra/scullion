@@ -30,7 +30,9 @@ defmodule ToreWeb.ReviewLive do
     attrs = %{
       title: result[:title] || result["title"] || "Untitled",
       instructions: result[:instructions] || result["instructions"],
-      base_servings: result[:base_servings] || result["base_servings"] || result[:servings] || result["servings"] || 4,
+      base_servings:
+        result[:base_servings] || result["base_servings"] || result[:servings] ||
+          result["servings"] || 4,
       ingredients: result[:ingredients] || result["ingredients"] || []
     }
 
@@ -68,7 +70,10 @@ defmodule ToreWeb.ReviewLive do
     ~H"""
     <Layouts.app flash={@flash} current_path="/review">
       <div class="max-w-2xl mx-auto px-4 py-6">
-        <.link navigate={~p"/chat"} class="text-[color:var(--muted)] text-sm mb-4 inline-flex items-center gap-1">
+        <.link
+          navigate={~p"/chat"}
+          class="text-[color:var(--muted)] text-sm mb-4 inline-flex items-center gap-1"
+        >
           <.icon name="hero-arrow-left" class="size-4" /> {gettext("Back to chat")}
         </.link>
 
@@ -80,56 +85,105 @@ defmodule ToreWeb.ReviewLive do
 
   defp render_review(%{class: :recipe} = assigns) do
     ~H"""
-    <h2 class="text-xl font-semibold text-[color:var(--text)] mb-4">{@result[:title] || @result["title"] || "Untitled Recipe"}</h2>
-    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">{gettext("Nothing saved yet.")}</p>
+    <h2 class="text-xl font-semibold text-[color:var(--text)] mb-4">
+      {@result[:title] || @result["title"] || "Untitled Recipe"}
+    </h2>
+    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">
+      {gettext("Nothing saved yet.")}
+    </p>
     <section class="mb-4">
       <h3 class="font-medium text-[color:var(--text)] mb-2">{gettext("Ingredients")}</h3>
       <ul class="space-y-1">
-        <li :for={ing <- (@result[:ingredients] || @result["ingredients"] || [])} class="text-sm text-[color:var(--text)]">
+        <li
+          :for={ing <- @result[:ingredients] || @result["ingredients"] || []}
+          class="text-sm text-[color:var(--text)]"
+        >
           {ing[:name] || ing["name"] || ing}
         </li>
       </ul>
     </section>
     <section class="mb-6">
       <h3 class="font-medium text-[color:var(--text)] mb-2">{gettext("Instructions")}</h3>
-      <p class="text-sm text-[color:var(--text)]">{@result[:instructions] || @result["instructions"]}</p>
+      <p class="text-sm text-[color:var(--text)]">
+        {@result[:instructions] || @result["instructions"]}
+      </p>
     </section>
-    <button :if={!@saved} phx-click="confirm" class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold">{gettext("Confirm & Save")}</button>
-    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">{gettext("Saved to your recipe catalog.")}</p>
+    <button
+      :if={!@saved}
+      phx-click="confirm"
+      class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+    >
+      {gettext("Confirm & Save")}
+    </button>
+    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">
+      {gettext("Saved to your recipe catalog.")}
+    </p>
     """
   end
 
   defp render_review(%{class: :receipt} = assigns) do
     ~H"""
     <h2 class="text-xl font-semibold text-[color:var(--text)] mb-4">{gettext("Receipt")}</h2>
-    <p :if={@result[:store_name] || @result["store_name"]} class="text-sm text-[color:var(--muted)] mb-4">Store: {@result[:store_name] || @result["store_name"]}</p>
-    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">{gettext("Nothing saved yet.")}</p>
+    <p
+      :if={@result[:store_name] || @result["store_name"]}
+      class="text-sm text-[color:var(--muted)] mb-4"
+    >
+      Store: {@result[:store_name] || @result["store_name"]}
+    </p>
+    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">
+      {gettext("Nothing saved yet.")}
+    </p>
     <table class="w-full text-sm mb-6">
-      <thead><tr class="text-left text-[color:var(--muted)]"><th>Item</th><th>Qty</th><th>Price</th></tr></thead>
+      <thead>
+        <tr class="text-left text-[color:var(--muted)]">
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price</th>
+        </tr>
+      </thead>
       <tbody>
-        <tr :for={item <- (@result[:items] || @result["items"] || [])}>
+        <tr :for={item <- @result[:items] || @result["items"] || []}>
           <td>{item[:product_name] || item["product_name"]}</td>
           <td>{item[:quantity] || item["quantity"]}</td>
           <td>{item[:total_price] || item["total_price"]}</td>
         </tr>
       </tbody>
     </table>
-    <button :if={!@saved} phx-click="confirm" class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold">{gettext("Confirm & Save")}</button>
-    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">{gettext("Saved to costs.")}</p>
+    <button
+      :if={!@saved}
+      phx-click="confirm"
+      class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+    >
+      {gettext("Confirm & Save")}
+    </button>
+    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">
+      {gettext("Saved to costs.")}
+    </p>
     """
   end
 
   defp render_review(%{class: :pantry_items} = assigns) do
     ~H"""
     <h2 class="text-xl font-semibold text-[color:var(--text)] mb-4">{gettext("Pantry Items")}</h2>
-    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">{gettext("Nothing saved yet.")}</p>
+    <p :if={!@saved} class="text-sm text-[color:var(--muted)] mb-4">
+      {gettext("Nothing saved yet.")}
+    </p>
     <ul class="space-y-2 mb-6">
-      <li :for={item <- (@result || [])} class="text-sm text-[color:var(--text)]">
-        {item[:name] || item["name"]} — {item[:quantity] || item["quantity"]} {item[:unit] || item["unit"]}
+      <li :for={item <- @result || []} class="text-sm text-[color:var(--text)]">
+        {item[:name] || item["name"]} — {item[:quantity] || item["quantity"]} {item[:unit] ||
+          item["unit"]}
       </li>
     </ul>
-    <button :if={!@saved} phx-click="confirm" class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold">{gettext("Confirm & Add to Pantry")}</button>
-    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">{gettext("Added to pantry.")}</p>
+    <button
+      :if={!@saved}
+      phx-click="confirm"
+      class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+    >
+      {gettext("Confirm & Add to Pantry")}
+    </button>
+    <p :if={@saved} class="text-center text-[color:var(--accent)] font-semibold">
+      {gettext("Added to pantry.")}
+    </p>
     """
   end
 

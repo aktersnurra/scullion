@@ -8,7 +8,14 @@ defmodule ToreWeb.PrepLive do
     plan_id = "plan:#{Date.to_iso8601(week_start)}"
     guide = Prep.get_guide_for_week(week_start)
 
-    {:ok, assign(socket, week_start: week_start, plan_id: plan_id, guide: guide, generating: false, tab: "timeline")}
+    {:ok,
+     assign(socket,
+       week_start: week_start,
+       plan_id: plan_id,
+       guide: guide,
+       generating: false,
+       tab: "timeline"
+     )}
   end
 
   def handle_event("set_tab", %{"tab" => tab}, socket), do: {:noreply, assign(socket, tab: tab)}
@@ -145,7 +152,9 @@ defmodule ToreWeb.PrepLive do
                     <button
                       type="button"
                       phx-click="generate_guide"
-                      data-confirm={gettext("Regenerate the prep guide? The current guide will be replaced.")}
+                      data-confirm={
+                        gettext("Regenerate the prep guide? The current guide will be replaced.")
+                      }
                       class="size-7 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)] transition-colors"
                     >
                       <.icon name="hero-arrow-path" class="size-4" />

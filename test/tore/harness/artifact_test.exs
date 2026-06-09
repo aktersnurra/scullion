@@ -15,6 +15,7 @@ defmodule Tore.Harness.ArtifactTest do
     @impl true
     def summary(%__MODULE__{n: n}),
       do: %{counts: %{items: n}, text_fallback: "n=#{n}"}
+
     @impl true
     def is_rationale_complete(%__MODULE__{rationale: r}), do: r in [nil, []] == false
   end

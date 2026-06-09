@@ -2,7 +2,17 @@ defmodule Tore.Pantry.PantryItem do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @categories [:dairy, :meat, :produce, :frozen, :dry_goods, :canned, :herbs_spices, :condiments, :other]
+  @categories [
+    :dairy,
+    :meat,
+    :produce,
+    :frozen,
+    :dry_goods,
+    :canned,
+    :herbs_spices,
+    :condiments,
+    :other
+  ]
 
   def categories, do: @categories
 

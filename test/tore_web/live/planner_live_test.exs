@@ -152,8 +152,7 @@ defmodule ToreWeb.PlannerLiveTest do
       Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
         {:ok,
          {:tool_calls,
-          [%{id: "c1", name: "ask_user", args: %{"question" => "Which salmon recipe?"}}]},
-         %{}}
+          [%{id: "c1", name: "ask_user", args: %{"question" => "Which salmon recipe?"}}]}, %{}}
       end)
 
       {:ok, view, _} = live(conn, "/plan")
@@ -186,7 +185,10 @@ defmodule ToreWeb.PlannerLiveTest do
       plan = this_plan_id()
       {:ok, lv, _html} = live(conn, "/plan")
 
-      lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      lv
+      |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"]))
+      |> render_click()
+
       lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
 
       {:ok, state} = PlanningHandler.load_plan(plan)
@@ -199,7 +201,10 @@ defmodule ToreWeb.PlannerLiveTest do
       PlanningHandler.pin_slot(plan, "mon_dinner", true)
       {:ok, lv, _html} = live(conn, "/plan")
 
-      lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      lv
+      |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"]))
+      |> render_click()
+
       lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
 
       {:ok, state} = PlanningHandler.load_plan(plan)
@@ -225,17 +230,29 @@ defmodule ToreWeb.PlannerLiveTest do
     test "the pin toggle renders its Swedish label", %{conn: conn, user: user} do
       conn = authed(conn, user)
       {:ok, lv, _html} = live(conn, "/plan")
-      html = lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+
+      html =
+        lv
+        |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"]))
+        |> render_click()
+
       assert html =~ "Lås dagen"
     end
 
-    test "opening an already-pinned slot shows the toggle in its 'on' state", %{conn: conn, user: user} do
+    test "opening an already-pinned slot shows the toggle in its 'on' state", %{
+      conn: conn,
+      user: user
+    } do
       conn = authed(conn, user)
       plan = this_plan_id()
       PlanningHandler.pin_slot(plan, "mon_dinner", true)
       {:ok, lv, _html} = live(conn, "/plan")
 
-      html = lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      html =
+        lv
+        |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"]))
+        |> render_click()
+
       # the modal's pin toggle reflects the pinned state: label "Låst", not "Lås dagen"
       assert html =~ "Låst"
       refute html =~ "Lås dagen"
@@ -262,7 +279,9 @@ defmodule ToreWeb.PlannerLiveTest do
   defp eventually_renders(view, substr, attempts \\ 20)
 
   defp eventually_renders(view, substr, 0) do
-    flunk("Timed out waiting for #{inspect(substr)}.\nRendered:\n#{Phoenix.LiveViewTest.render(view)}")
+    flunk(
+      "Timed out waiting for #{inspect(substr)}.\nRendered:\n#{Phoenix.LiveViewTest.render(view)}"
+    )
   end
 
   defp eventually_renders(view, substr, attempts) do

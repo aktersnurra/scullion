@@ -228,7 +228,9 @@ defmodule ToreWeb.SettingsLive do
               {gettext("Things Tore has learned")}
             </h2>
             <%= if Enum.empty?(@memory_insights) do %>
-              <p class="text-sm text-zinc-500">{gettext("No memories yet. Tore learns as you cook.")}</p>
+              <p class="text-sm text-zinc-500">
+                {gettext("No memories yet. Tore learns as you cook.")}
+              </p>
             <% else %>
               <ul class="space-y-2">
                 <%= for insight <- @memory_insights do %>

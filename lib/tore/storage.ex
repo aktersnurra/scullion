@@ -1,5 +1,10 @@
 defmodule Tore.Storage do
-  @callback put_object(bucket :: String.t(), key :: String.t(), body :: binary(), opts :: keyword()) ::
+  @callback put_object(
+              bucket :: String.t(),
+              key :: String.t(),
+              body :: binary(),
+              opts :: keyword()
+            ) ::
               {:ok, String.t()} | {:error, term()}
 
   @callback get_object_url(bucket :: String.t(), key :: String.t()) :: String.t()

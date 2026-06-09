@@ -7,6 +7,7 @@ defmodule Tore.PlanHealthTest do
       assigned_days
       |> Enum.map(fn day -> {"#{day}_dinner", %{recipe_id: 1, skipped: false}} end)
       |> Map.new()
+
     %{slots: slots}
   end
 
@@ -32,6 +33,7 @@ defmodule Tore.PlanHealthTest do
       "thu_dinner" => %{recipe_id: 3, skipped: false},
       "fri_dinner" => %{recipe_id: 4, skipped: false}
     }
+
     assert {:fragile, 1} = PlanHealth.compute(%{slots: slots})
   end
 end

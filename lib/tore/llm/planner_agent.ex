@@ -71,8 +71,10 @@ defmodule Tore.LLM.PlannerAgent do
         finish(record_step(state, :message, %{text: text}, usage), {:capped, text})
 
       {:ok, _other, usage} ->
-        finish(record_step(state, :message, %{text: ""}, usage),
-               {:capped, "Stopped — too many steps."})
+        finish(
+          record_step(state, :message, %{text: ""}, usage),
+          {:capped, "Stopped — too many steps."}
+        )
 
       {:error, reason} ->
         {:error, reason}
@@ -122,7 +124,9 @@ defmodule Tore.LLM.PlannerAgent do
   defp handle_tool(%Tool{name: "ask_user"} = tool, call, _rest, state) do
     case Tool.validate_args(tool, call.args) do
       :ok ->
-        {:ok, %{ask_user: question}, [], _plan} = tool.run.(call.args, state.ctx, state.working_plan)
+        {:ok, %{ask_user: question}, [], _plan} =
+          tool.run.(call.args, state.ctx, state.working_plan)
+
         state = append_tool_result(state, call, %{ok: true, question: question})
         {:terminal_question, question, state}
 

@@ -33,20 +33,27 @@ defmodule Tore.Harness.Run.StateTest do
       artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     assert s.phase == :gathering_context
   end
 
   test "Failed enforces failure_user_message" do
     assert_raise ArgumentError, fn ->
       struct!(State.Failed, %{
-        stream_id: "x", household_id: 1, kind: "k", surface: :plan,
-        started_by: "user", user_id: 1, input: %{},
+        stream_id: "x",
+        household_id: 1,
+        kind: "k",
+        surface: :plan,
+        started_by: "user",
+        user_id: 1,
+        input: %{},
         opened_at: ~U[2026-06-02 12:00:00Z],
         failed_at: ~U[2026-06-02 12:00:00Z],
         failure_code: :x,
         # failure_user_message missing
         failure_repair_action: nil,
-        tool_trace: [], artifacts: [],
+        tool_trace: [],
+        artifacts: [],
         model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
       })
     end

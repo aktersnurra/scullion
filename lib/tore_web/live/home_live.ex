@@ -17,6 +17,7 @@ defmodule ToreWeb.HomeLive do
     recipes_by_id = Map.new(recipes, &{&1.id, &1})
 
     tonight_slot = Map.get(plan_state.slots, today_key)
+
     tonight_recipe =
       if tonight_slot && tonight_slot.recipe_id && !tonight_slot.skipped do
         Map.get(recipes_by_id, tonight_slot.recipe_id)
@@ -57,7 +58,10 @@ defmodule ToreWeb.HomeLive do
           {gettext("Tonight")}
         </h2>
 
-        <div :if={@tonight_recipe} class="rounded-2xl bg-[var(--surface)] border border-[color:var(--border)] overflow-hidden">
+        <div
+          :if={@tonight_recipe}
+          class="rounded-2xl bg-[var(--surface)] border border-[color:var(--border)] overflow-hidden"
+        >
           <div class="w-full h-48 bg-[var(--border)] flex items-center justify-center text-[color:var(--muted)] text-sm">
             {gettext("No photo")}
           </div>
@@ -80,7 +84,10 @@ defmodule ToreWeb.HomeLive do
           </div>
         </div>
 
-        <div :if={!@tonight_recipe} class="rounded-2xl bg-[var(--surface)] border border-[color:var(--border)] p-6 text-center text-[color:var(--muted)] text-sm">
+        <div
+          :if={!@tonight_recipe}
+          class="rounded-2xl bg-[var(--surface)] border border-[color:var(--border)] p-6 text-center text-[color:var(--muted)] text-sm"
+        >
           {gettext("Nothing planned for tonight")}
           <div class="mt-4">
             <.link navigate={~p"/plan"} class="text-[color:var(--accent)] font-semibold text-sm">
@@ -91,7 +98,12 @@ defmodule ToreWeb.HomeLive do
       </section>
 
       <%!-- Week strip --%>
-      <.week_strip plan_state={@plan_state} week_start={@week_start} today={@today} recipes_by_id={@recipes_by_id} />
+      <.week_strip
+        plan_state={@plan_state}
+        week_start={@week_start}
+        today={@today}
+        recipes_by_id={@recipes_by_id}
+      />
 
       <%!-- FAB --%>
       <button
@@ -111,10 +123,12 @@ defmodule ToreWeb.HomeLive do
     PlanningHandler.skip_meal(plan_id, today_key)
     {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
     tonight_slot = Map.get(plan_state.slots, today_key)
+
     tonight_recipe =
       if tonight_slot && tonight_slot.recipe_id && !tonight_slot.skipped do
         Map.get(recipes_by_id, tonight_slot.recipe_id)
       end
+
     {:noreply,
      socket
      |> assign(plan_state: plan_state, tonight_slot: tonight_slot, tonight_recipe: tonight_recipe)
@@ -169,9 +183,14 @@ defmodule ToreWeb.HomeLive do
 
   defp slot_title(plan_state, slot_key, recipes_by_id) do
     slot = Map.get(plan_state.slots, slot_key)
+
     cond do
-      is_nil(slot) || is_nil(slot.recipe_id) -> "—"
-      slot.skipped -> gettext("Skipped")
+      is_nil(slot) || is_nil(slot.recipe_id) ->
+        "—"
+
+      slot.skipped ->
+        gettext("Skipped")
+
       true ->
         recipe = Map.get(recipes_by_id, slot.recipe_id)
         if recipe, do: recipe.title, else: "—"

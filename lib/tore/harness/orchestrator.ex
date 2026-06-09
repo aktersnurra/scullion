@@ -38,7 +38,13 @@ defmodule Tore.Harness.Orchestrator do
              {:ok, state} <- enter(state, :gathering_context, metadata),
              {:ok, state} <- enter(state, :proposing, metadata),
              {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
-             {:ok, loop} <- PlannerAgent.run(system_prompt(ctx), ctx.command, agent_ctx(ctx, stream_id, working_plan), []),
+             {:ok, loop} <-
+               PlannerAgent.run(
+                 system_prompt(ctx),
+                 ctx.command,
+                 agent_ctx(ctx, stream_id, working_plan),
+                 []
+               ),
              {:ok, state} <- absorb_loop(state, loop, metadata),
              {:ok, state} <- enter(state, :verifying, metadata),
              {:ok, state} <- close(state, loop, ctx, metadata) do
@@ -142,8 +148,20 @@ defmodule Tore.Harness.Orchestrator do
         run_summary = RunSummary.from_artifacts([plan_diff], :applied)
 
         with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
-             {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: plan_diff}, state, metadata),
-             {:ok, state} <- apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
+             {:ok, state} <-
+               apply_command(
+                 state.stream_id,
+                 %Commands.AddArtifact{artifact: plan_diff},
+                 state,
+                 metadata
+               ),
+             {:ok, state} <-
+               apply_command(
+                 state.stream_id,
+                 %Commands.AddArtifact{artifact: run_summary},
+                 state,
+                 metadata
+               ) do
           apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
         end
 

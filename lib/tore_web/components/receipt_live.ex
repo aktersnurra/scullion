@@ -44,10 +44,18 @@ defmodule ToreWeb.Components.ReceiptLive do
 
   # Header per (kind, state-variant) ------------------------------------------
 
-  defp header_for(%State.Running{kind: "planner_command_run"}), do: gettext("Tore is working on it")
-  defp header_for(%State.NeedsUser{kind: "planner_command_run"}), do: gettext("Tore needs a moment")
-  defp header_for(%State.Applied{kind: "planner_command_run"}), do: gettext("Tore adjusted the plan")
-  defp header_for(%State.Failed{kind: "planner_command_run"}), do: gettext("Tore couldn't update the plan")
+  defp header_for(%State.Running{kind: "planner_command_run"}),
+    do: gettext("Tore is working on it")
+
+  defp header_for(%State.NeedsUser{kind: "planner_command_run"}),
+    do: gettext("Tore needs a moment")
+
+  defp header_for(%State.Applied{kind: "planner_command_run"}),
+    do: gettext("Tore adjusted the plan")
+
+  defp header_for(%State.Failed{kind: "planner_command_run"}),
+    do: gettext("Tore couldn't update the plan")
+
   defp header_for(%State.Reverted{kind: "planner_command_run"}), do: gettext("Reverted")
   defp header_for(_), do: gettext("Tore")
 
@@ -108,14 +116,16 @@ defmodule ToreWeb.Components.ReceiptLive do
     end
   end
 
-  defp line_for(%{change: :added, label: label, slot_key: sk}) when is_binary(label) and label != "",
-    do: gettext("Added %{recipe} on %{day}", recipe: label, day: day_of(sk))
+  defp line_for(%{change: :added, label: label, slot_key: sk})
+       when is_binary(label) and label != "",
+       do: gettext("Added %{recipe} on %{day}", recipe: label, day: day_of(sk))
 
   defp line_for(%{change: :added, slot_key: sk}),
     do: gettext("Added a meal on %{day}", day: day_of(sk))
 
-  defp line_for(%{change: :swapped, label: label, slot_key: sk}) when is_binary(label) and label != "",
-    do: gettext("Swapped in %{recipe} on %{day}", recipe: label, day: day_of(sk))
+  defp line_for(%{change: :swapped, label: label, slot_key: sk})
+       when is_binary(label) and label != "",
+       do: gettext("Swapped in %{recipe} on %{day}", recipe: label, day: day_of(sk))
 
   defp line_for(%{change: :swapped, slot_key: sk}),
     do: gettext("Swapped %{day}", day: day_of(sk))

@@ -16,12 +16,17 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   defp base_running do
     %State.Running{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1,
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
       input: %{command: "x"},
       opened_at: ~U[2026-06-02 12:00:00Z],
       phase: :proposing,
-      tool_trace: [], artifacts: [],
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
   end
@@ -33,30 +38,45 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "renders question for NeedsUser" do
     needs = %State.NeedsUser{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
       opened_at: ~U[2026-06-02 12:00:00Z],
       question: "Which Monday?",
-      tool_trace: [], artifacts: [],
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     html = render_component(ReceiptLive, id: "r", run: needs)
     assert html =~ "Which Monday?"
   end
 
   test "renders summary for Applied with header text" do
     diff = %PlanDiff{
-      plan_stream_id: "plan-1", week_start: ~D[2026-06-01],
+      plan_stream_id: "plan-1",
+      week_start: ~D[2026-06-01],
       events: [%{slot_key: "mon", event_type: "MealSkipped", payload: %{}, rationale: ["x"]}]
     }
+
     rs = RunSummary.from_artifacts([diff], :applied)
 
     applied = %State.Applied{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
       opened_at: ~U[2026-06-02 12:00:00Z],
       committed_at: ~U[2026-06-02 12:01:00Z],
-      tool_trace: [], artifacts: [diff, rs],
+      tool_trace: [],
+      artifacts: [diff, rs],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
 
@@ -68,16 +88,23 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "renders failure for Failed with header text and user message" do
     failed = %State.Failed{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
       opened_at: ~U[2026-06-02 12:00:00Z],
       failed_at: ~U[2026-06-02 12:00:01Z],
       failure_code: :slot_locked,
       failure_user_message: "That slot is pinned.",
       failure_repair_action: nil,
-      tool_trace: [], artifacts: [],
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     html = render_component(ReceiptLive, id: "r", run: failed)
     assert html =~ "kunde inte"
     refute html =~ "That slot is pinned."
@@ -85,26 +112,46 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "Failed renders the message for :internal_error from failure_code" do
     failed = %State.Failed{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
-      opened_at: ~U[2026-06-02 12:00:00Z], failed_at: ~U[2026-06-02 12:00:01Z],
-      failure_code: :internal_error, failure_user_message: nil, failure_repair_action: nil,
-      tool_trace: [], artifacts: [],
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z],
+      failed_at: ~U[2026-06-02 12:00:01Z],
+      failure_code: :internal_error,
+      failure_user_message: nil,
+      failure_repair_action: nil,
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     html = render_component(ReceiptLive, id: "r", run: failed)
     assert html =~ "Tore kunde inte slutföra det — inget ändrades"
   end
 
   test "Failed renders a fallback message for an unknown failure_code" do
     failed = %State.Failed{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
-      opened_at: ~U[2026-06-02 12:00:00Z], failed_at: ~U[2026-06-02 12:00:01Z],
-      failure_code: :some_unknown, failure_user_message: nil, failure_repair_action: nil,
-      tool_trace: [], artifacts: [],
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z],
+      failed_at: ~U[2026-06-02 12:00:01Z],
+      failure_code: :some_unknown,
+      failure_user_message: nil,
+      failure_repair_action: nil,
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     html = render_component(ReceiptLive, id: "r", run: failed)
     assert html =~ "Tore kunde inte slutföra det."
     refute html =~ "inget ändrades"
@@ -112,11 +159,20 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   defp base_failed(code, repair \\ nil) do
     %State.Failed{
-      stream_id: "run-f", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{command: "x"},
-      opened_at: ~U[2026-06-08 12:00:00Z], failed_at: ~U[2026-06-08 12:00:01Z],
-      failure_code: code, failure_user_message: nil, failure_repair_action: repair,
-      tool_trace: [], artifacts: [],
+      stream_id: "run-f",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{command: "x"},
+      opened_at: ~U[2026-06-08 12:00:00Z],
+      failed_at: ~U[2026-06-08 12:00:01Z],
+      failure_code: code,
+      failure_user_message: nil,
+      failure_repair_action: repair,
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
   end
@@ -137,7 +193,12 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
   end
 
   test "renders an Edit-the-plan link when repair_action is {:edit_plan, slots}" do
-    html = render_component(ReceiptLive, id: "r", run: base_failed(:slot_pinned, {:edit_plan, ["mon_dinner"]}))
+    html =
+      render_component(ReceiptLive,
+        id: "r",
+        run: base_failed(:slot_pinned, {:edit_plan, ["mon_dinner"]})
+      )
+
     assert html =~ ~s(href="/plan?focus=mon_dinner")
   end
 
@@ -148,13 +209,20 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "renders quiet line for Reverted" do
     reverted = %State.Reverted{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
       opened_at: ~U[2026-06-02 12:00:00Z],
       reverted_at: ~U[2026-06-02 12:01:00Z],
-      tool_trace: [], artifacts: [],
+      tool_trace: [],
+      artifacts: [],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
+
     html = render_component(ReceiptLive, id: "r", run: reverted)
     assert html =~ "Återställd"
   end
@@ -164,34 +232,56 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
     rs = RunSummary.from_artifacts([diff], :applied)
 
     %State.Applied{
-      stream_id: "run-x", household_id: 1, kind: "planner_command_run",
-      surface: :plan, started_by: "user", user_id: 1, input: %{},
-      opened_at: ~U[2026-06-02 12:00:00Z], committed_at: ~U[2026-06-02 12:01:00Z],
-      tool_trace: [], artifacts: [diff, rs],
+      stream_id: "run-x",
+      household_id: 1,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: 1,
+      input: %{},
+      opened_at: ~U[2026-06-02 12:00:00Z],
+      committed_at: ~U[2026-06-02 12:01:00Z],
+      tool_trace: [],
+      artifacts: [diff, rs],
       model_usage: %{prompt_tokens: 0, completion_tokens: 0, cost_usd: Decimal.new(0)}
     }
   end
 
   test "Applied renders a named line for a swapped recipe with the day" do
-    events = [%{slot_key: "sat_dinner", event_type: "RecipeSwapped",
-                payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"},
-                rationale: ["x"]}]
+    events = [
+      %{
+        slot_key: "sat_dinner",
+        event_type: "RecipeSwapped",
+        payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"},
+        rationale: ["x"]
+      }
+    ]
+
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "Ugnsraggmunk"
     assert html =~ "Lördag"
   end
 
   test "Applied renders a day-only line for a skip (no recipe name)" do
-    events = [%{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["x"]}]
+    events = [
+      %{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["x"]}
+    ]
+
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "Hoppade över"
     assert html =~ "Söndag"
   end
 
   test "Applied renders an added recipe line" do
-    events = [%{slot_key: "mon_dinner", event_type: "RecipeAssigned",
-                payload: %{"label" => "Roast chicken", "recipe_id" => 1, "servings" => 4},
-                rationale: ["x"]}]
+    events = [
+      %{
+        slot_key: "mon_dinner",
+        event_type: "RecipeAssigned",
+        payload: %{"label" => "Roast chicken", "recipe_id" => 1, "servings" => 4},
+        rationale: ["x"]
+      }
+    ]
+
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "La till"
     assert html =~ "Roast chicken"
@@ -200,10 +290,15 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
 
   test "Applied renders multiple lines, one per change" do
     events = [
-      %{slot_key: "sat_dinner", event_type: "RecipeSwapped",
-        payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"}, rationale: ["x"]},
+      %{
+        slot_key: "sat_dinner",
+        event_type: "RecipeSwapped",
+        payload: %{"label" => "Ugnsraggmunk", "to_slot_key" => "sat_dinner"},
+        rationale: ["x"]
+      },
       %{slot_key: "sun_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["y"]}
     ]
+
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "Ugnsraggmunk"
     assert html =~ "Söndag"
@@ -211,8 +306,15 @@ defmodule ToreWeb.Components.ReceiptLiveTest do
   end
 
   test "Applied with an added change but nil label falls back to day-only phrasing" do
-    events = [%{slot_key: "mon_dinner", event_type: "RecipeAssigned",
-                payload: %{"recipe_id" => 1, "servings" => 4}, rationale: ["x"]}]
+    events = [
+      %{
+        slot_key: "mon_dinner",
+        event_type: "RecipeAssigned",
+        payload: %{"recipe_id" => 1, "servings" => 4},
+        rationale: ["x"]
+      }
+    ]
+
     html = render_component(ReceiptLive, id: "r", run: applied_with_events(events))
     assert html =~ "La till en måltid"
     assert html =~ "Måndag"

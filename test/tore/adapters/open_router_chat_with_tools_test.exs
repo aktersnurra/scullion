@@ -18,7 +18,8 @@ defmodule Tore.Adapters.OpenRouterChatWithToolsTest do
          body: %{
            "choices" => [%{"message" => %{"content" => "Done.", "tool_calls" => nil}}],
            "usage" => %{"prompt_tokens" => 5, "completion_tokens" => 2, "total_tokens" => 7}
-         }}}
+         }
+       }}
     end)
 
     assert {:ok, {:message, "Done."}, %{prompt_tokens: 5}} =
@@ -49,13 +50,22 @@ defmodule Tore.Adapters.OpenRouterChatWithToolsTest do
              }
            ],
            "usage" => %{"prompt_tokens" => 10, "completion_tokens" => 5, "total_tokens" => 15}
-         }}}
+         }
+       }}
     end)
 
     assert {:ok, {:tool_calls, [call]}, _usage} =
-             OpenRouter.chat_with_tools("sys", [%{role: "user", content: "skip mon"}], [
-               %{type: "function", function: %{name: "skip_meal", description: "x", parameters: %{}}}
-             ], [])
+             OpenRouter.chat_with_tools(
+               "sys",
+               [%{role: "user", content: "skip mon"}],
+               [
+                 %{
+                   type: "function",
+                   function: %{name: "skip_meal", description: "x", parameters: %{}}
+                 }
+               ],
+               []
+             )
 
     assert call.id == "call_1"
     assert call.name == "skip_meal"

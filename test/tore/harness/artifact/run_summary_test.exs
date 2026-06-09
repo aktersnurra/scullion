@@ -12,12 +12,14 @@ defmodule Tore.Harness.Artifact.RunSummaryTest do
 
   test "from_artifacts/2: aggregates PlanDiff counts into RunSummary" do
     diff = %PlanDiff{
-      plan_stream_id: "p", week_start: ~D[2026-06-01],
+      plan_stream_id: "p",
+      week_start: ~D[2026-06-01],
       events: [
         %{slot_key: "mon", event_type: "MealSkipped", payload: %{}, rationale: ["x"]},
         %{slot_key: "tue", event_type: "RecipeAssigned", payload: %{}, rationale: ["x"]}
       ]
     }
+
     s = RunSummary.from_artifacts([diff], :applied)
     assert s.outcome == :applied
     assert s.counts == %{skipped: 1, added: 1}
@@ -49,12 +51,19 @@ defmodule Tore.Harness.Artifact.RunSummaryTest do
 
   test "from_artifacts text_fallback uses human wording per change type" do
     diff = %PlanDiff{
-      plan_stream_id: "p", week_start: ~D[2026-06-01],
+      plan_stream_id: "p",
+      week_start: ~D[2026-06-01],
       events: [
         %{slot_key: "mon_dinner", event_type: "RecipeAssigned", payload: %{}, rationale: ["a"]},
-        %{slot_key: "tue_dinner", event_type: "ServingsChanged", payload: %{"servings" => 6}, rationale: ["b"]}
+        %{
+          slot_key: "tue_dinner",
+          event_type: "ServingsChanged",
+          payload: %{"servings" => 6},
+          rationale: ["b"]
+        }
       ]
     }
+
     summary = RunSummary.from_artifacts([diff], :applied)
     text = RunSummary.summary(summary).text_fallback
     assert text =~ "1 added"

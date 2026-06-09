@@ -12,19 +12,31 @@ defmodule Tore.Chat.WeekContextTest do
   end
 
   test "describes a skipped slot" do
-    state = %{week_start: ~D[2026-05-25], slots: %{"mon_dinner" => %{skipped: true, recipe_id: nil, leftover: false}}}
+    state = %{
+      week_start: ~D[2026-05-25],
+      slots: %{"mon_dinner" => %{skipped: true, recipe_id: nil, leftover: false}}
+    }
+
     result = WeekContext.build(state)
     assert result =~ "Mon: skipped"
   end
 
   test "describes assigned slot" do
-    state = %{week_start: ~D[2026-05-25], slots: %{"tue_dinner" => %{recipe_id: 42, skipped: false, leftover: false}}}
+    state = %{
+      week_start: ~D[2026-05-25],
+      slots: %{"tue_dinner" => %{recipe_id: 42, skipped: false, leftover: false}}
+    }
+
     result = WeekContext.build(state)
     assert result =~ "Tue: recipe 42"
   end
 
   test "describes leftover slot" do
-    state = %{week_start: ~D[2026-05-25], slots: %{"wed_dinner" => %{recipe_id: 7, skipped: false, leftover: true}}}
+    state = %{
+      week_start: ~D[2026-05-25],
+      slots: %{"wed_dinner" => %{recipe_id: 7, skipped: false, leftover: true}}
+    }
+
     result = WeekContext.build(state)
     assert result =~ "Wed: leftover (recipe 7)"
   end

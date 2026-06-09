@@ -7,16 +7,17 @@ defmodule Tore.Harness.PlanDiffBuilderTest do
 
   defp calls_entry(idx, calls) do
     encoded =
-      Jason.encode!(
-        Enum.map(calls, fn {id, name, args} -> %{id: id, name: name, args: args} end)
-      )
+      Jason.encode!(Enum.map(calls, fn {id, name, args} -> %{id: id, name: name, args: args} end))
 
     %{step_index: idx, step_kind: :tool_calls, payload: %{calls: encoded}}
   end
 
   defp result_entry(idx, id, name, result) do
-    %{step_index: idx, step_kind: :tool_result,
-      payload: %{tool_call_id: id, name: name, result: result}}
+    %{
+      step_index: idx,
+      step_kind: :tool_result,
+      payload: %{tool_call_id: id, name: name, result: result}
+    }
   end
 
   test "skip_meal success becomes one MealSkipped event with rationale" do
@@ -27,14 +28,24 @@ defmodule Tore.Harness.PlanDiffBuilderTest do
 
     diff = PlanDiffBuilder.build(trace, @ctx)
     assert %PlanDiff{plan_stream_id: "plan:2026-06-01", week_start: ~D[2026-06-01]} = diff
-    assert [%{slot_key: "mon_dinner", event_type: "MealSkipped", payload: %{}, rationale: ["busy"]}] =
+
+    assert [
+             %{
+               slot_key: "mon_dinner",
+               event_type: "MealSkipped",
+               payload: %{},
+               rationale: ["busy"]
+             }
+           ] =
              diff.events
   end
 
   test "assign_recipe carries recipe_id, servings, label into payload" do
     trace = [
-      calls_entry(0, [{"c1", "assign_recipe",
-        %{"slot_key" => "mon_dinner", "recipe_id" => 7, "servings" => 4, "rationale" => "quick"}}]),
+      calls_entry(0, [
+        {"c1", "assign_recipe",
+         %{"slot_key" => "mon_dinner", "recipe_id" => 7, "servings" => 4, "rationale" => "quick"}}
+      ]),
       result_entry(1, "c1", "assign_recipe", %{ok: true, label: "Roast chicken"})
     ]
 
@@ -49,8 +60,14 @@ defmodule Tore.Harness.PlanDiffBuilderTest do
 
   test "swap_recipe uses to_slot_key and records both slots + label" do
     trace = [
-      calls_entry(0, [{"c1", "swap_recipe",
-        %{"from_slot_key" => "fri_dinner", "to_slot_key" => "sun_dinner", "rationale" => "prefer weekend"}}]),
+      calls_entry(0, [
+        {"c1", "swap_recipe",
+         %{
+           "from_slot_key" => "fri_dinner",
+           "to_slot_key" => "sun_dinner",
+           "rationale" => "prefer weekend"
+         }}
+      ]),
       result_entry(1, "c1", "swap_recipe", %{ok: true, label: "Lamb", recipe_id: 9})
     ]
 
@@ -65,7 +82,10 @@ defmodule Tore.Harness.PlanDiffBuilderTest do
 
   test "set_servings becomes ServingsChanged" do
     trace = [
-      calls_entry(0, [{"c1", "set_servings", %{"slot_key" => "mon_dinner", "servings" => 6, "rationale" => "guests"}}]),
+      calls_entry(0, [
+        {"c1", "set_servings",
+         %{"slot_key" => "mon_dinner", "servings" => 6, "rationale" => "guests"}}
+      ]),
       result_entry(1, "c1", "set_servings", %{ok: true})
     ]
 
@@ -76,7 +96,9 @@ defmodule Tore.Harness.PlanDiffBuilderTest do
 
   test "mark_leftover becomes LeftoverMarked" do
     trace = [
-      calls_entry(0, [{"c1", "mark_leftover", %{"slot_key" => "wed_dinner", "rationale" => "uses sunday roast"}}]),
+      calls_entry(0, [
+        {"c1", "mark_leftover", %{"slot_key" => "wed_dinner", "rationale" => "uses sunday roast"}}
+      ]),
       result_entry(1, "c1", "mark_leftover", %{ok: true})
     ]
 

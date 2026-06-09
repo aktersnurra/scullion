@@ -35,7 +35,12 @@ defmodule Tore.HouseholdTest do
     end
 
     test "update_preferences/1 persists and returns updated preferences" do
-      assert {:ok, prefs} = Household.update_preferences(%{default_portions: 6, dietary_restrictions: ["vegan"]})
+      assert {:ok, prefs} =
+               Household.update_preferences(%{
+                 default_portions: 6,
+                 dietary_restrictions: ["vegan"]
+               })
+
       assert prefs.default_portions == 6
       assert prefs.dietary_restrictions == ["vegan"]
     end
@@ -52,7 +57,9 @@ defmodule Tore.HouseholdTest do
     end
 
     test "prefs_to_dietary_guidance/1 formats dietary restrictions" do
-      {:ok, prefs} = Household.update_preferences(%{dietary_restrictions: ["vegetarian"], allergies: ["nuts"]})
+      {:ok, prefs} =
+        Household.update_preferences(%{dietary_restrictions: ["vegetarian"], allergies: ["nuts"]})
+
       guidance = Household.prefs_to_dietary_guidance(prefs)
       assert guidance =~ "Diet: vegetarian"
       assert guidance =~ "Allergies/hard avoids: nuts"

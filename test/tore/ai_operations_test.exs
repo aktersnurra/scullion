@@ -12,22 +12,58 @@ defmodule Tore.AiOperationsTest do
         payload: "{}",
         result: "ok"
       })
+
     assert op.run_stream_id == "run-abc"
     assert op.kind == "planner_agent.message"
   end
 
   test "list_for_run/1 returns rows ordered by step_index" do
-    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 1, payload: "{}", result: "a"})
-    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 0, payload: "{}", result: "b"})
-    AiOperations.log(%{run_stream_id: "run-x", kind: "k", step_index: 2, payload: "{}", result: "c"})
+    AiOperations.log(%{
+      run_stream_id: "run-x",
+      kind: "k",
+      step_index: 1,
+      payload: "{}",
+      result: "a"
+    })
+
+    AiOperations.log(%{
+      run_stream_id: "run-x",
+      kind: "k",
+      step_index: 0,
+      payload: "{}",
+      result: "b"
+    })
+
+    AiOperations.log(%{
+      run_stream_id: "run-x",
+      kind: "k",
+      step_index: 2,
+      payload: "{}",
+      result: "c"
+    })
+
     rows = AiOperations.list_for_run("run-x")
     assert Enum.map(rows, & &1.step_index) == [0, 1, 2]
   end
 
   test "unique constraint on (run_stream_id, step_index)" do
-    AiOperations.log(%{run_stream_id: "run-y", kind: "k", step_index: 0, payload: "{}", result: "a"})
+    AiOperations.log(%{
+      run_stream_id: "run-y",
+      kind: "k",
+      step_index: 0,
+      payload: "{}",
+      result: "a"
+    })
+
     assert {:error, changeset} =
-             AiOperations.log(%{run_stream_id: "run-y", kind: "k", step_index: 0, payload: "{}", result: "b"})
+             AiOperations.log(%{
+               run_stream_id: "run-y",
+               kind: "k",
+               step_index: 0,
+               payload: "{}",
+               result: "b"
+             })
+
     refute changeset.valid?
   end
 

@@ -99,6 +99,27 @@ the plan genuinely unchanged.
   "Edit the plan" link; the planner reads a `focus` query param and highlights
   the offending slot(s), completing the repair loop.
 
+### Context capsules (§A.4)
+
+The junk-drawer system prompt is replaced by typed, per-run-declared context
+capsules — the model's standing context is now auditable ("what did the model
+see?" = the run's capsule list), independently testable, and free of ambient
+string concatenation.
+
+- `Tore.Harness.Capsule` behaviour (`build/1` + `to_prompt/1`) and
+  `Tore.Harness.Capsules.compose/2` — the only assembler; a capsule a run did
+  not list is not in its prompt.
+- Four capsules with a real consumer today, each a typed struct that fetches and
+  summarises its own data (the compactness rule lives in the capsule):
+  `HouseholdPreferencesCapsule`, `ActiveInsightsCapsule` (≤5),
+  `WeekPlanCapsule` (typed per-day status), `PantryBeliefsCapsule`
+  (names capped at 20 + a count).
+- The planner run and the chat handler now declare their capsule list and
+  compose it; the date and active week-mode stay as small inline framing. The
+  planner's doubled role section (its own preamble plus the chat role text) is
+  removed.
+- `Tore.Chat.SystemPrompt.build/0` deleted — fully replaced by capsules.
+
 ### Fixed
 
 - Event-store JSON round-trip downgraded atom/Decimal event fields on replay;

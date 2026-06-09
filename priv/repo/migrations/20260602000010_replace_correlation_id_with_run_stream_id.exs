@@ -6,7 +6,8 @@ defmodule Tore.Repo.Migrations.ReplaceCorrelationIdWithRunStreamId do
     execute("DELETE FROM ai_operations")
 
     drop_if_exists unique_index(:ai_operations, [:correlation_id, :step_index],
-                     name: :ai_operations_correlation_id_step_index_index)
+                     name: :ai_operations_correlation_id_step_index_index
+                   )
 
     alter table(:ai_operations) do
       add :run_stream_id, :string, null: false
@@ -14,7 +15,8 @@ defmodule Tore.Repo.Migrations.ReplaceCorrelationIdWithRunStreamId do
     end
 
     create unique_index(:ai_operations, [:run_stream_id, :step_index],
-                     name: :ai_operations_run_stream_id_step_index_index)
+             name: :ai_operations_run_stream_id_step_index_index
+           )
   end
 
   def down do

@@ -115,7 +115,10 @@ defmodule ToreWeb.KioskLive do
       date = Date.add(week_start, i)
       slot_key = "#{day}_dinner"
       slot = Map.get(plan_state.slots, slot_key)
-      recipe = if slot && slot.recipe_id && !slot.skipped, do: Map.get(recipes_by_id, slot.recipe_id)
+
+      recipe =
+        if slot && slot.recipe_id && !slot.skipped, do: Map.get(recipes_by_id, slot.recipe_id)
+
       %{day: day, date: date, slot_key: slot_key, recipe: recipe}
     end)
     |> Enum.reject(fn %{date: d} -> d == today end)
@@ -125,18 +128,30 @@ defmodule ToreWeb.KioskLive do
     ~H"""
     <div class="min-h-screen bg-stone-950 text-white flex flex-col p-6 gap-6">
       <section class="flex flex-col gap-3">
-        <p class="text-stone-400 text-lg uppercase tracking-widest font-medium">{gettext("Tonight")}</p>
-        <h1 :if={@tonight_recipe} class="text-5xl font-bold leading-tight">{@tonight_recipe.title}</h1>
-        <h1 :if={!@tonight_recipe} class="text-5xl font-bold leading-tight text-stone-500">{gettext("No meal planned")}</h1>
-        <div class="rounded-2xl bg-stone-800 h-48 w-full flex items-center justify-center text-stone-600 text-sm">Photo</div>
+        <p class="text-stone-400 text-lg uppercase tracking-widest font-medium">
+          {gettext("Tonight")}
+        </p>
+        <h1 :if={@tonight_recipe} class="text-5xl font-bold leading-tight">
+          {@tonight_recipe.title}
+        </h1>
+        <h1 :if={!@tonight_recipe} class="text-5xl font-bold leading-tight text-stone-500">
+          {gettext("No meal planned")}
+        </h1>
+        <div class="rounded-2xl bg-stone-800 h-48 w-full flex items-center justify-center text-stone-600 text-sm">
+          Photo
+        </div>
       </section>
 
       <section class="flex flex-col gap-2">
-        <p class="text-stone-400 text-sm uppercase tracking-widest font-medium">{gettext("Coming up")}</p>
+        <p class="text-stone-400 text-sm uppercase tracking-widest font-medium">
+          {gettext("Coming up")}
+        </p>
         <div class="flex gap-3 overflow-x-auto pb-1">
           <div :for={day <- @upcoming} class="flex-shrink-0 rounded-xl bg-stone-800 px-4 py-3 w-32">
             <p class="text-stone-400 text-xs uppercase">{String.capitalize(day.day)}</p>
-            <p class="text-sm font-medium mt-1 line-clamp-2">{if day.recipe, do: day.recipe.title, else: "—"}</p>
+            <p class="text-sm font-medium mt-1 line-clamp-2">
+              {if day.recipe, do: day.recipe.title, else: "—"}
+            </p>
           </div>
         </div>
       </section>

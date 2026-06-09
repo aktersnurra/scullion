@@ -27,19 +27,24 @@ defmodule Tore.LLM do
               {:ok, %{suggestion: String.t(), updated_steps: String.t() | nil}} | {:error, term()}
 
   @callback cook_mode_steps(recipe :: map()) ::
-              {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}} |
-              {:error, term()}
+              {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}}
+              | {:error, term()}
 
   @callback chat(system :: String.t(), messages :: [map()]) ::
               {:ok, String.t(), map()} | {:error, term()}
 
   @callback classify_image(image :: binary()) ::
-              {:ok, %{class: :receipt | :recipe | :pantry_items | :fridge | :unknown, confidence: float()}}
+              {:ok,
+               %{
+                 class: :receipt | :recipe | :pantry_items | :fridge | :unknown,
+                 confidence: float()
+               }}
               | {:error, term()}
 
   @callback synthesise_insights(events_summary :: String.t()) ::
-    {:ok, [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]} |
-    {:error, term()}
+              {:ok,
+               [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]}
+              | {:error, term()}
 
   @type tool_call :: %{id: String.t(), name: String.t(), args: %{String.t() => term()}}
   @type tool_response ::

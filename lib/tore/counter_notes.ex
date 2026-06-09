@@ -10,8 +10,8 @@ defmodule Tore.CounterNotes do
       from n in CounterNote,
         where:
           n.surface == ^surface and
-          n.status == "pending" and
-          (is_nil(n.expires_at) or n.expires_at > ^now),
+            n.status == "pending" and
+            (is_nil(n.expires_at) or n.expires_at > ^now),
         order_by: [asc: n.inserted_at],
         limit: 3
     )
@@ -43,9 +43,11 @@ defmodule Tore.CounterNotes do
   @spec expire_stale() :: {integer(), nil}
   def expire_stale do
     now = DateTime.utc_now()
+
     Repo.update_all(
       from(n in CounterNote,
-        where: n.status == "pending" and not is_nil(n.expires_at) and n.expires_at <= ^now),
+        where: n.status == "pending" and not is_nil(n.expires_at) and n.expires_at <= ^now
+      ),
       set: [status: "expired"]
     )
   end

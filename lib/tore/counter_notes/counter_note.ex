@@ -21,8 +21,7 @@ defmodule Tore.CounterNotes.CounterNote do
 
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:surface, :kind, :title, :body, :commands,
-                    :confidence, :status, :expires_at])
+    |> cast(attrs, [:surface, :kind, :title, :body, :commands, :confidence, :status, :expires_at])
     |> validate_required([:surface, :kind, :title, :body])
     |> validate_inclusion(:surface, @valid_surfaces)
     |> validate_inclusion(:kind, @valid_kinds)

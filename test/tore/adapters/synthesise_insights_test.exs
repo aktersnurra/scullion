@@ -8,10 +8,22 @@ defmodule Tore.Adapters.SynthesiseInsightsTest do
     Tore.MockLLM
     |> expect(:synthesise_insights, fn summary ->
       assert is_binary(summary)
-      {:ok, [
-        %{kind: "skip_pattern", body: "Family skips Mondays often.", confidence: 0.8, evidence: [1, 2]},
-        %{kind: "time_preference", body: "Quick meals preferred mid-week.", confidence: 0.6, evidence: [3]}
-      ]}
+
+      {:ok,
+       [
+         %{
+           kind: "skip_pattern",
+           body: "Family skips Mondays often.",
+           confidence: 0.8,
+           evidence: [1, 2]
+         },
+         %{
+           kind: "time_preference",
+           body: "Quick meals preferred mid-week.",
+           confidence: 0.6,
+           evidence: [3]
+         }
+       ]}
     end)
 
     {:ok, insights} = Tore.MockLLM.synthesise_insights("Week 1: skipped mon_dinner (id:1)...")

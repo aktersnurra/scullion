@@ -10,7 +10,12 @@ defmodule Tore.LLM.PlannerToolsTest do
   end
 
   defp make_recipe(attrs \\ %{}) do
-    base = %{title: "Recipe #{System.unique_integer([:positive])}", base_servings: 2, instructions: "x"}
+    base = %{
+      title: "Recipe #{System.unique_integer([:positive])}",
+      base_servings: 2,
+      instructions: "x"
+    }
+
     {:ok, r} = Tore.Recipes.create(Map.merge(base, attrs))
     r
   end
@@ -23,7 +28,13 @@ defmodule Tore.LLM.PlannerToolsTest do
   test "assign_recipe proposes a RecipeAssigned event and evolves the plan", %{ctx: ctx} do
     %{id: rid} = make_recipe(%{title: "Test Salmon"})
     tool = find("assign_recipe")
-    args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 2, "rationale" => "good protein"}
+
+    args = %{
+      "slot_key" => "mon_dinner",
+      "recipe_id" => rid,
+      "servings" => 2,
+      "rationale" => "good protein"
+    }
 
     assert {:ok, %{ok: true}, events, next} = tool.run.(args, ctx, %State{})
     assert [%Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: ^rid, servings: 2}] = events
@@ -33,9 +44,16 @@ defmodule Tore.LLM.PlannerToolsTest do
   test "assign_recipe returns the recipe title as label", %{ctx: ctx} do
     %{id: rid} = make_recipe(%{title: "Roast chicken"})
     tool = find("assign_recipe")
-    args = %{"slot_key" => "mon_dinner", "recipe_id" => rid, "servings" => 4, "rationale" => "easy"}
 
-    assert {:ok, %{ok: true, label: "Roast chicken"}, _events, _next} = tool.run.(args, ctx, %State{})
+    args = %{
+      "slot_key" => "mon_dinner",
+      "recipe_id" => rid,
+      "servings" => 4,
+      "rationale" => "easy"
+    }
+
+    assert {:ok, %{ok: true, label: "Roast chicken"}, _events, _next} =
+             tool.run.(args, ctx, %State{})
   end
 
   test "skip_meal on an occupied slot proposes MealSkipped", %{ctx: ctx} do
@@ -45,11 +63,13 @@ defmodule Tore.LLM.PlannerToolsTest do
 
     assert {:ok, %{ok: true}, [%Events.MealSkipped{slot_key: "tue_dinner"}], next} =
              tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "out"}, ctx, state)
+
     assert next.slots["tue_dinner"].skipped == true
   end
 
   test "skip_meal on an empty slot returns the Decider error and does not evolve", %{ctx: ctx} do
     tool = find("skip_meal")
+
     assert {:error, :slot_empty} =
              tool.run.(%{"slot_key" => "fri_dinner", "rationale" => "out"}, ctx, %State{})
   end
@@ -61,6 +81,7 @@ defmodule Tore.LLM.PlannerToolsTest do
 
     assert {:ok, %{ok: true}, [%Events.RecipeRemoved{slot_key: "mon_dinner"}], next} =
              tool.run.(%{"slot_key" => "mon_dinner", "rationale" => "changed mind"}, ctx, state)
+
     refute Map.has_key?(next.slots, "mon_dinner")
   end
 
@@ -69,8 +90,14 @@ defmodule Tore.LLM.PlannerToolsTest do
     state = with_slot(%State{}, "mon_dinner", rid)
     tool = find("set_servings")
 
-    assert {:ok, %{ok: true}, [%Events.ServingsChanged{slot_key: "mon_dinner", servings: 6}], next} =
-             tool.run.(%{"slot_key" => "mon_dinner", "servings" => 6, "rationale" => "guests"}, ctx, state)
+    assert {:ok, %{ok: true}, [%Events.ServingsChanged{slot_key: "mon_dinner", servings: 6}],
+            next} =
+             tool.run.(
+               %{"slot_key" => "mon_dinner", "servings" => 6, "rationale" => "guests"},
+               ctx,
+               state
+             )
+
     assert next.slots["mon_dinner"].servings == 6
   end
 
@@ -81,6 +108,7 @@ defmodule Tore.LLM.PlannerToolsTest do
 
     assert {:ok, %{ok: true}, [%Events.LeftoverMarked{slot_key: "tue_dinner"}], next} =
              tool.run.(%{"slot_key" => "tue_dinner", "rationale" => "leftovers"}, ctx, state)
+
     assert next.slots["tue_dinner"].leftover == true
   end
 
@@ -91,7 +119,16 @@ defmodule Tore.LLM.PlannerToolsTest do
     tool = find("swap_recipe")
 
     assert {:ok, %{ok: true, recipe_id: rid, label: "One"}, events, next} =
-             tool.run.(%{"from_slot_key" => "mon_dinner", "to_slot_key" => "tue_dinner", "rationale" => "balance"}, ctx, state)
+             tool.run.(
+               %{
+                 "from_slot_key" => "mon_dinner",
+                 "to_slot_key" => "tue_dinner",
+                 "rationale" => "balance"
+               },
+               ctx,
+               state
+             )
+
     assert rid == r1.id
     assert next.slots["tue_dinner"].recipe_id == r1.id
     assert next.slots["mon_dinner"].recipe_id == r2.id
@@ -105,6 +142,7 @@ defmodule Tore.LLM.PlannerToolsTest do
 
   test "ask_user returns the question with the plan unchanged", %{ctx: ctx} do
     tool = find("ask_user")
+
     assert {:ok, %{ask_user: "which day?"}, [], %State{}} =
              tool.run.(%{"question" => "which day?"}, ctx, %State{})
   end

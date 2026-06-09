@@ -13,8 +13,10 @@ defmodule Tore.LLM.PlannerTools do
   alias Tore.Planning.{Decider, Commands}
 
   @slot_key %{type: "string", description: "Slot identifier like \"mon_dinner\""}
-  @rationale %{type: "string",
-    description: "One short clause explaining why you are making this change."}
+  @rationale %{
+    type: "string",
+    description: "One short clause explaining why you are making this change."
+  }
 
   @spec all() :: [Tool.t()]
   def all do
@@ -51,7 +53,12 @@ defmodule Tore.LLM.PlannerTools do
         required: ["slot_key", "recipe_id", "servings", "rationale"]
       },
       run: fn args, _ctx, plan ->
-        cmd = %Commands.AssignRecipe{slot_key: args["slot_key"], recipe_id: args["recipe_id"], servings: args["servings"]}
+        cmd = %Commands.AssignRecipe{
+          slot_key: args["slot_key"],
+          recipe_id: args["recipe_id"],
+          servings: args["servings"]
+        }
+
         propose(cmd, plan, %{ok: true, label: recipe_title(args["recipe_id"])})
       end
     }
@@ -75,7 +82,9 @@ defmodule Tore.LLM.PlannerTools do
         case PlanningHandler.swap_events(plan, args["from_slot_key"], args["to_slot_key"]) do
           {:ok, events, next} ->
             to_recipe_id = get_in(next.slots, [args["to_slot_key"], :recipe_id])
-            {:ok, %{ok: true, label: recipe_title(to_recipe_id), recipe_id: to_recipe_id}, events, next}
+
+            {:ok, %{ok: true, label: recipe_title(to_recipe_id), recipe_id: to_recipe_id}, events,
+             next}
 
           {:error, reason} ->
             {:error, reason}
@@ -123,11 +132,19 @@ defmodule Tore.LLM.PlannerTools do
       kind: :action,
       parameters: %{
         type: "object",
-        properties: %{slot_key: @slot_key, servings: %{type: "integer", minimum: 1}, rationale: @rationale},
+        properties: %{
+          slot_key: @slot_key,
+          servings: %{type: "integer", minimum: 1},
+          rationale: @rationale
+        },
         required: ["slot_key", "servings", "rationale"]
       },
       run: fn args, _ctx, plan ->
-        propose(%Commands.SetServings{slot_key: args["slot_key"], servings: args["servings"]}, plan, %{ok: true})
+        propose(
+          %Commands.SetServings{slot_key: args["slot_key"], servings: args["servings"]},
+          plan,
+          %{ok: true}
+        )
       end
     }
   end

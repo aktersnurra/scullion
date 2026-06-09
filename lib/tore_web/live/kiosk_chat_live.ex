@@ -46,10 +46,8 @@ defmodule ToreWeb.KioskChatLive do
           :for={msg <- @messages}
           class={
             if msg.role == "user",
-              do:
-                "self-end bg-amber-600 rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%]",
-              else:
-                "self-start bg-stone-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]"
+              do: "self-end bg-amber-600 rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%]",
+              else: "self-start bg-stone-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]"
           }
         >
           <p class="text-base leading-relaxed">{msg.content}</p>

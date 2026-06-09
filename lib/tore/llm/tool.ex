@@ -33,13 +33,17 @@ defmodule Tore.LLM.Tool do
   end
 
   @spec validate_args(t(), map()) :: :ok | {:error, {:missing_arg, String.t()}}
-  def validate_args(%__MODULE__{parameters: %{"required" => req}}, args), do: check_keys(req, args)
+  def validate_args(%__MODULE__{parameters: %{"required" => req}}, args),
+    do: check_keys(req, args)
+
   def validate_args(%__MODULE__{parameters: %{required: req}}, args), do: check_keys(req, args)
   def validate_args(_, _), do: :ok
 
   defp check_keys([], _), do: :ok
+
   defp check_keys([k | rest], args) when is_binary(k) do
     if Map.has_key?(args, k), do: check_keys(rest, args), else: {:error, {:missing_arg, k}}
   end
+
   defp check_keys([k | rest], args), do: check_keys([to_string(k) | rest], args)
 end

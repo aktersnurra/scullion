@@ -13,15 +13,17 @@ defmodule Tore.PlanHealth do
     slots = plan_state.slots || %{}
     week_keys = Enum.map(@weekdays, &"#{&1}_dinner")
 
-    assigned = Enum.filter(week_keys, fn k ->
-      slot = Map.get(slots, k)
-      slot && slot.recipe_id && !slot.skipped
-    end)
+    assigned =
+      Enum.filter(week_keys, fn k ->
+        slot = Map.get(slots, k)
+        slot && slot.recipe_id && !slot.skipped
+      end)
 
-    skipped = Enum.filter(week_keys, fn k ->
-      slot = Map.get(slots, k)
-      slot && slot.skipped
-    end)
+    skipped =
+      Enum.filter(week_keys, fn k ->
+        slot = Map.get(slots, k)
+        slot && slot.skipped
+      end)
 
     unplanned_count = length(week_keys) - length(assigned) - length(skipped)
 

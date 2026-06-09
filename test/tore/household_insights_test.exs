@@ -4,15 +4,20 @@ defmodule Tore.HouseholdInsightsTest do
   alias Tore.Household
 
   defp insight_attrs(overrides \\ %{}) do
-    Map.merge(%{kind: "skip_pattern", body: "Household skips Mondays", confidence: 0.8}, overrides)
+    Map.merge(
+      %{kind: "skip_pattern", body: "Household skips Mondays", confidence: 0.8},
+      overrides
+    )
   end
 
   test "list_active_insights returns only active insights sorted by confidence desc" do
     {:ok, _} = Household.replace_insights([insight_attrs(%{confidence: 0.6})])
-    {:ok, _} = Household.replace_insights([
-      insight_attrs(%{confidence: 0.9, body: "High confidence"}),
-      insight_attrs(%{confidence: 0.4, body: "Low confidence"})
-    ])
+
+    {:ok, _} =
+      Household.replace_insights([
+        insight_attrs(%{confidence: 0.9, body: "High confidence"}),
+        insight_attrs(%{confidence: 0.4, body: "Low confidence"})
+      ])
 
     active = Household.list_active_insights()
     assert length(active) == 2

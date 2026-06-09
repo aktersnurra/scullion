@@ -11,10 +11,22 @@ defmodule Tore.Handlers.InsightsHandlerTest do
     Tore.MockLLM
     |> expect(:synthesise_insights, fn summary ->
       assert is_binary(summary)
-      {:ok, [
-        %{kind: "skip_pattern", body: "Mondays are often skipped.", confidence: 0.75, evidence: []},
-        %{kind: "time_preference", body: "Quick meals preferred mid-week.", confidence: 0.6, evidence: []}
-      ]}
+
+      {:ok,
+       [
+         %{
+           kind: "skip_pattern",
+           body: "Mondays are often skipped.",
+           confidence: 0.75,
+           evidence: []
+         },
+         %{
+           kind: "time_preference",
+           body: "Quick meals preferred mid-week.",
+           confidence: 0.6,
+           evidence: []
+         }
+       ]}
     end)
 
     assert {:ok, saved} = InsightsHandler.synthesise_weekly()
