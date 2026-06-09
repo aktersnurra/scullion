@@ -221,6 +221,25 @@ defmodule ToreWeb.PlannerLiveTest do
       {:ok, _lv, html} = live(conn, "/plan")
       refute html =~ ~s(data-pinned="true")
     end
+
+    test "the pin toggle renders its Swedish label", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      {:ok, lv, _html} = live(conn, "/plan")
+      html = lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      assert html =~ "Lås dagen"
+    end
+
+    test "opening an already-pinned slot shows the toggle in its 'on' state", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      plan = this_plan_id()
+      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      {:ok, lv, _html} = live(conn, "/plan")
+
+      html = lv |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"])) |> render_click()
+      # the modal's pin toggle reflects the pinned state: label "Låst", not "Lås dagen"
+      assert html =~ "Låst"
+      refute html =~ "Lås dagen"
+    end
   end
 
   describe "focus param" do
