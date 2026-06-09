@@ -64,6 +64,11 @@ defmodule Tore.Harness.Verifier.PlanVerifier do
     fail_if(bad, :leftover_no_source)
   end
 
+  # Unlike the other checks (which key off the authoritative plan_state), this one
+  # reads recipe_id from the PlanDiff payload. It therefore depends on
+  # PlanDiffBuilder emitting recipe_id for both RecipeAssigned AND RecipeSwapped —
+  # if that fidelity ever lapses, the dietary check goes blind on swapped recipes
+  # while the plan still gets written. Keep the two in sync.
   defp check_dietary(events, prefs) do
     banned = MapSet.new(downcase(prefs.dietary_restrictions ++ prefs.allergies ++ prefs.dislikes))
 
