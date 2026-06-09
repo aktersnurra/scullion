@@ -563,7 +563,8 @@ defmodule ToreWeb.PlannerLive do
     slot = Map.get(assigns.plan_state.slots, assigns.slot_key)
     recipe = recipe_by_id(assigns.recipes, slot[:recipe_id])
     is_today = assigns.date == assigns.today
-    assigns = assign(assigns, slot: slot, recipe: recipe, is_today: is_today)
+    pinned = Map.has_key?(assigns.plan_state.pins, assigns.slot_key)
+    assigns = assign(assigns, slot: slot, recipe: recipe, is_today: is_today, pinned: pinned)
 
     ~H"""
     <li
@@ -610,6 +611,14 @@ defmodule ToreWeb.PlannerLive do
           >
             {gettext("Today")}
           </div>
+          <span
+            :if={@pinned}
+            data-pinned="true"
+            title={gettext("Pinned")}
+            class="mt-1 text-[color:var(--subtle)]"
+          >
+            <.icon name="hero-lock-closed" class="size-3.5" />
+          </span>
         </div>
 
         <div class={[

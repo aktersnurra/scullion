@@ -205,6 +205,22 @@ defmodule ToreWeb.PlannerLiveTest do
       {:ok, state} = PlanningHandler.load_plan(plan)
       refute Map.has_key?(state.pins, "mon_dinner")
     end
+
+    test "the day row shows a lock indicator when the slot is pinned", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      plan = this_plan_id()
+      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      {:ok, lv, _html} = live(conn, "/plan")
+
+      # structural: the indicator lives inside the pinned slot's row, not just somewhere
+      assert has_element?(lv, ~s(#slot-mon_dinner [data-pinned="true"]))
+    end
+
+    test "the day row shows no lock indicator when not pinned", %{conn: conn, user: user} do
+      conn = authed(conn, user)
+      {:ok, _lv, html} = live(conn, "/plan")
+      refute html =~ ~s(data-pinned="true")
+    end
   end
 
   describe "focus param" do
