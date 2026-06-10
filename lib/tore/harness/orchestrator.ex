@@ -32,31 +32,44 @@ defmodule Tore.Harness.Orchestrator do
     stream_id = Run.next_stream_id()
     metadata = %{household_id: ctx.household_id}
 
+    open_cmd = %Commands.Open{
+      household_id: ctx.household_id,
+      kind: "planner_command_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: ctx.user_id,
+      input: %{
+        command: ctx.command,
+        plan_stream_id: ctx.plan_stream_id,
+        week_start: ctx.week_start
+      }
+    }
+
+    run_dispatch(stream_id, metadata, "planner_command_run", fn ->
+      with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
+           {:ok, state} <- enter(state, :gathering_context, metadata),
+           {:ok, state} <- enter(state, :proposing, metadata),
+           {:ok, state} <-
+             run_planner_loop(state, ctx, stream_id, ctx.command, [], metadata) do
+        {:ok, state}
+      else
+        {:error, reason} -> {:error, {:step_failed, reason}}
+      end
+    end)
+  end
+
+  defp open_run(sid, %Commands.Open{} = cmd, metadata) do
+    apply_command(sid, cmd, %State.Draft{stream_id: sid}, metadata)
+  end
+
+  defp run_dispatch(stream_id, metadata, kind, fun) do
     result =
       try do
-        with {:ok, state} <- open_run(stream_id, ctx, metadata),
-             {:ok, state} <- enter(state, :gathering_context, metadata),
-             {:ok, state} <- enter(state, :proposing, metadata),
-             {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
-             {:ok, loop} <-
-               PlannerAgent.run(
-                 system_prompt(ctx),
-                 ctx.command,
-                 agent_ctx(ctx, stream_id, working_plan),
-                 []
-               ),
-             {:ok, state} <- absorb_loop(state, loop, metadata),
-             {:ok, state} <- enter(state, :verifying, metadata),
-             {:ok, state} <- close(state, loop, ctx, metadata) do
-          {:ok, state}
-        else
-          {:error, reason} -> {:error, {:step_failed, reason}}
-        end
+        fun.()
       rescue
         e ->
           Logger.error(
-            "planner_command_run crashed: " <>
-              Exception.format(:error, e, __STACKTRACE__)
+            "#{kind} crashed: " <> Exception.format(:error, e, __STACKTRACE__)
           )
 
           {:error, {:run_crashed, e}}
@@ -72,21 +85,20 @@ defmodule Tore.Harness.Orchestrator do
     end
   end
 
-  defp open_run(sid, ctx, metadata) do
-    cmd = %Commands.Open{
-      household_id: ctx.household_id,
-      kind: "planner_command_run",
-      surface: :plan,
-      started_by: "user",
-      user_id: ctx.user_id,
-      input: %{
-        command: ctx.command,
-        plan_stream_id: ctx.plan_stream_id,
-        week_start: ctx.week_start
-      }
-    }
-
-    apply_command(sid, cmd, %State.Draft{stream_id: sid}, metadata)
+  defp run_planner_loop(state, ctx, stream_id, user_text, opts, metadata) do
+    with {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
+         {:ok, loop} <-
+           PlannerAgent.run(
+             system_prompt(ctx),
+             user_text,
+             agent_ctx(ctx, stream_id, working_plan),
+             opts
+           ),
+         {:ok, state} <- absorb_loop(state, loop, metadata),
+         {:ok, state} <- enter(state, :verifying, metadata),
+         {:ok, state} <- close(state, loop, ctx, metadata) do
+      {:ok, state}
+    end
   end
 
   defp enter(state, phase, metadata),
