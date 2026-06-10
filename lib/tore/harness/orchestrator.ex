@@ -58,6 +58,40 @@ defmodule Tore.Harness.Orchestrator do
     end)
   end
 
+  @weekly_max_round_trips 10
+  @weekly_max_action_calls 25
+
+  def dispatch(:weekly_planning_run, ctx) do
+    stream_id = Run.next_stream_id()
+    metadata = %{household_id: ctx.household_id}
+
+    open_cmd = %Commands.Open{
+      household_id: ctx.household_id,
+      kind: "weekly_planning_run",
+      surface: :plan,
+      started_by: "system",
+      user_id: ctx.user_id,
+      input: %{
+        plan_stream_id: ctx.plan_stream_id,
+        week_start: ctx.week_start
+      }
+    }
+
+    opts = [max_round_trips: @weekly_max_round_trips, max_action_calls: @weekly_max_action_calls]
+
+    run_dispatch(stream_id, metadata, "weekly_planning_run", fn ->
+      with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
+           {:ok, state} <- enter(state, :gathering_context, metadata),
+           {:ok, state} <- enter(state, :proposing, metadata),
+           {:ok, state} <-
+             run_planner_loop(state, ctx, stream_id, weekly_fill_instruction(), opts, metadata) do
+        {:ok, state}
+      else
+        {:error, reason} -> {:error, {:step_failed, reason}}
+      end
+    end)
+  end
+
   defp open_run(sid, %Commands.Open{} = cmd, metadata) do
     apply_command(sid, cmd, %State.Draft{stream_id: sid}, metadata)
   end
@@ -274,6 +308,15 @@ defmodule Tore.Harness.Orchestrator do
       run_stream_id: stream_id,
       working_plan: working_plan
     }
+  end
+
+  defp weekly_fill_instruction do
+    """
+    Fill every empty, unplanned dinner this week with a suitable recipe. Leave
+    days that already have a meal, and days the household has pinned, exactly as
+    they are. Use leftovers across days where it makes sense. When you are done,
+    stop.
+    """
   end
 
   defp agent_preamble do
