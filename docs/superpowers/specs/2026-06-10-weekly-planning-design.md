@@ -192,15 +192,28 @@ filled," which equals the starting state — acceptable for a background job.
 Delete (the new run fully replaces them, and the `PlanGenerated` evolve is a
 latent pin-clobbering footgun):
 
-- `Tore.Handlers.PlanningHandler.generate_plan/1` and its private helpers used
-  only by it (`build_plan_context/4`, `parse_llm_slots/1` — verify they have no
-  other callers before removing).
+- The Prep page's **"generate plan" button** and its `handle_event("generate_plan", …)`
+  in `lib/tore_web/live/prep_live.ex` (lines ~23–35) plus its template button
+  (~line 109). This is the in-app consumer of the old one-shot path. The Prep
+  page keeps its separate **"generate guide"** button — `PrepHandler.generate_guide`
+  is fully independent (it only *reads* the plan via `load_plan/1` and calls
+  `@llm.generate_prep_guide`; it does not call `generate_plan`) and is untouched.
+- `Tore.Handlers.PlanningHandler.generate_plan/3` and its private helpers used
+  only by it (`build_plan_context/4`, `parse_llm_slots/1` — verify no other
+  callers before removing).
 - `Tore.Planning.Commands.GeneratePlan`.
 - `Tore.Planning.Events.PlanGenerated` and its `Decider.decide`/`Decider.evolve`
   clauses.
-- The `@llm.generate_plan` LLM callback **iff** it has no remaining caller after
-  the above (check `Tore.LLM` behaviour + Mock + any other handler).
-- Their tests.
+- The `@llm.generate_plan/1` callback in `Tore.LLM`, its `Tore.Adapters.OpenRouter`
+  implementation, and the Mock expectations — confirmed to have no remaining
+  caller once the cron + Prep button are re-pointed/removed.
+- The `:generate_plan` SpendGuard budget entry (`lib/tore/spend_guard.ex`) and the
+  `feature_label("generate_plan")` clause in `settings_live.ex`, IFF nothing else
+  references the `:generate_plan` feature key after removal (the prep guide uses
+  its own feature key — verify).
+- Their tests (`planning_handler_test.exs` generate_plan cases; the
+  `open_router_test.exs` generate_plan case; SpendGuard test cases that use the
+  `:generate_plan` key only if that key is fully removed — otherwise leave them).
 
 ## File structure
 
@@ -210,19 +223,31 @@ Modify: lib/tore/harness/orchestrator.ex       # add :weekly_planning_run clause
                                                 #   refactor :planner_command_run to use it;
                                                 #   add weekly_fill_instruction/0
         lib/tore/handlers/planning_handler.ex   # add plan_upcoming_week/0;
-                                                #   remove generate_plan/1 (+ its private-only helpers)
+                                                #   remove generate_plan/3 + build_plan_context/4 + parse_llm_slots/1
         lib/tore/planning/commands.ex           # remove GeneratePlan
         lib/tore/planning/events.ex             # remove PlanGenerated
         lib/tore/planning/decider.ex            # remove GeneratePlan/PlanGenerated clauses
-        lib/tore/llm.ex (or wherever the @callback lives)  # remove generate_plan/1 callback IFF unused
-        config/runtime.exs (or scheduler config) # re-point the Sat 18:00 Quantum job
-Modify/Delete: test files for generate_plan / GeneratePlan / PlanGenerated
+        lib/tore/llm.ex                          # remove @callback generate_plan/1
+        lib/tore/adapters/open_router.ex         # remove generate_plan/1 implementation
+        lib/tore/spend_guard.ex                  # remove :generate_plan @feature_defaults entry
+        lib/tore_web/live/prep_live.ex           # remove "generate_plan" handle_event + template button
+        lib/tore_web/live/settings_live.ex       # remove feature_label("generate_plan") clause
+        config/config.exs                        # re-point the Sat 18:00 Quantum job (line ~63)
+Delete tests: planning_handler_test.exs generate_plan cases;
+              open_router_test.exs generate_plan case
+Modify tests: spend_guard_test.exs (switch the :generate_plan test key to the
+              default fallback or :generate_prep_guide — it tests the guard, not the feature)
 New: test/tore/harness/weekly_planning_run_test.exs
 ```
 
-Confirm the exact home of the Quantum job and the `generate_plan` LLM callback
-during planning (the schedule in SPEC.md §Quantum Schedule is *target state*; the
-live schedule may differ).
+**Confirmed against live code (2026-06-10):** the live Quantum schedule is in
+`config/config.exs` (not `runtime.exs`); the Sat 18:00 entry currently calls
+`generate_plan("plan:current", Date.utc_today())`. The `@llm.generate_plan/1`
+callback's only callers are `PlanningHandler.generate_plan/3` (being removed) and
+the Prep "generate plan" button (being removed) — so the callback + adapter impl
+are safely removable. The prep guide (`PrepHandler.generate_guide` →
+`@llm.generate_prep_guide`, SpendGuard key `:generate_prep_guide`) is independent
+and untouched.
 
 ## Testing
 
