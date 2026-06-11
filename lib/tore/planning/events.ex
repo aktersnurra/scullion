@@ -1,5 +1,4 @@
 defmodule Tore.Planning.Events do
-  defmodule PlanGenerated, do: defstruct([:week_start, :slots])
   defmodule RecipeAssigned, do: defstruct([:slot_key, :recipe_id, :servings])
   defmodule RecipeRemoved, do: defstruct([:slot_key])
   defmodule ServingsChanged, do: defstruct([:slot_key, :servings])
@@ -9,8 +8,7 @@ defmodule Tore.Planning.Events do
   defmodule LeftoverMarked, do: defstruct([:slot_key])
 
   @type t ::
-          %PlanGenerated{}
-          | %RecipeAssigned{}
+          %RecipeAssigned{}
           | %RecipeRemoved{}
           | %ServingsChanged{}
           | %SlotPinned{}

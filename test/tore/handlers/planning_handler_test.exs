@@ -14,7 +14,6 @@ defmodule Tore.Handlers.PlanningHandlerTest do
   end
 
   defp plan_id, do: "plan:2026-04-27"
-  defp week_start, do: ~D[2026-04-27]
 
   defp mock_usage, do: %{prompt_tokens: 100, completion_tokens: 50, cost_usd: 0.001}
 
@@ -47,57 +46,6 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     {:ok, state} = PlanningHandler.load_plan(plan_id())
     assert state.slots["mon_dinner"].skipped == true
     assert state.slots["tue_dinner"].recipe_id == 11
-  end
-
-  test "generate_plan calls LLM, logs usage, persists PlanGenerated" do
-    Tore.MockLLM
-    |> expect(:generate_plan, fn _ctx ->
-      {:ok,
-       %{
-         "days" => [
-           %{
-             "slot_key" => "mon_dinner",
-             "recipe_id" => 999,
-             "servings" => 4,
-             "cascade_from" => nil,
-             "notes" => ""
-           }
-         ],
-         "prep_session" => %{}
-       }, mock_usage()}
-    end)
-
-    assert {:ok, _events} = PlanningHandler.generate_plan(plan_id(), week_start())
-    {:ok, state} = PlanningHandler.load_plan(plan_id())
-    assert state.slots["mon_dinner"].recipe_id == 999
-
-    assert Tore.Costs.llm_spend_this_month() > 0.0
-  end
-
-  test "generate_plan broadcasts PlanGenerated" do
-    Tore.MockLLM
-    |> expect(:generate_plan, fn _ ->
-      {:ok, %{"days" => [], "prep_session" => %{}}, mock_usage()}
-    end)
-
-    PlanningHandler.generate_plan(plan_id(), week_start())
-    assert_receive {:events, [%Tore.Planning.Events.PlanGenerated{}]}
-  end
-
-  test "generate_plan returns error when LLM fails" do
-    Tore.MockLLM |> expect(:generate_plan, fn _ -> {:error, :timeout} end)
-    assert {:error, :timeout} = PlanningHandler.generate_plan(plan_id(), week_start())
-  end
-
-  test "generate_plan returns budget_exceeded when over monthly limit" do
-    Tore.Costs.log_llm_usage(%{
-      feature: "seed",
-      prompt_tokens: 0,
-      completion_tokens: 0,
-      cost_usd: 20.0
-    })
-
-    assert {:error, :budget_exceeded} = PlanningHandler.generate_plan(plan_id(), week_start())
   end
 
   describe "suggest_recipes_for_slot/3" do

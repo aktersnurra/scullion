@@ -1,7 +1,7 @@
 defmodule ToreWeb.PrepLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Handlers.PrepHandler, Handlers.PlanningHandler, Prep}
+  alias Tore.{Handlers.PrepHandler, Prep}
 
   def mount(_params, _session, socket) do
     week_start = week_start(Date.utc_today())
@@ -19,20 +19,6 @@ defmodule ToreWeb.PrepLive do
   end
 
   def handle_event("set_tab", %{"tab" => tab}, socket), do: {:noreply, assign(socket, tab: tab)}
-
-  def handle_event("generate_plan", _params, socket) do
-    guidance = Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
-    week_start = socket.assigns.week_start
-
-    Task.start(fn ->
-      PlanningHandler.generate_plan(socket.assigns.plan_id, week_start,
-        mode: :from_catalog,
-        dietary_guidance: guidance
-      )
-    end)
-
-    {:noreply, put_flash(socket, :info, gettext("Generating plan…"))}
-  end
 
   def handle_event("generate_guide", _params, socket) do
     %{plan_id: plan_id, week_start: week_start} = socket.assigns
@@ -104,14 +90,6 @@ defmodule ToreWeb.PrepLive do
               {gettext("Prep Guide")}
             </h1>
             <div class="flex items-center gap-2">
-              <button
-                type="button"
-                phx-click="generate_plan"
-                title={gettext("Generate week plan")}
-                class="size-8 inline-flex items-center justify-center rounded-[var(--r-md)] text-[color:var(--muted)] hover:text-[var(--text)] hover:bg-[color:var(--hairline)] transition-colors"
-              >
-                <.icon name="hero-sparkles" class="size-5" />
-              </button>
               <button
                 type="button"
                 class="h-9 px-3 inline-flex items-center gap-1.5 rounded-[var(--r-lg)] border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--subtle)]"

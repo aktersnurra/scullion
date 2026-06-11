@@ -5,12 +5,6 @@ defmodule Tore.Adapters.OpenRouter do
   @api_url "https://openrouter.ai/api/v1/chat/completions"
 
   @impl Tore.LLM
-  def generate_plan(constraints) do
-    {system, user} = Tore.LLM.Prompts.plan_weekly(constraints)
-    json_chat(system, user)
-  end
-
-  @impl Tore.LLM
   def generate_prep_guide(plan, locale \\ nil) do
     {system, user} = Tore.LLM.Prompts.prep_guide(plan, locale)
     json_chat(system, user)

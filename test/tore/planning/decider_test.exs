@@ -17,16 +17,6 @@ defmodule Tore.Planning.DeciderTest do
     assert %State{week_start: nil, slots: %{}, pins: %{}} = Decider.initial()
   end
 
-  describe "decide/2 — GeneratePlan" do
-    test "emits PlanGenerated" do
-      slots = %{"mon_dinner" => %{recipe_id: 1, servings: 4}}
-      cmd = %Commands.GeneratePlan{week_start: ~D[2026-04-27], slots: slots}
-
-      assert {:ok, [%Events.PlanGenerated{week_start: ~D[2026-04-27], slots: ^slots}]} =
-               Decider.decide(cmd, Decider.initial())
-    end
-  end
-
   describe "decide/2 — AssignRecipe" do
     test "emits RecipeAssigned" do
       cmd = %Commands.AssignRecipe{slot_key: "mon_dinner", recipe_id: 42, servings: 4}
@@ -117,17 +107,6 @@ defmodule Tore.Planning.DeciderTest do
   end
 
   describe "evolve/2" do
-    test "PlanGenerated sets week_start and slots" do
-      slots = %{"mon_dinner" => %{recipe_id: 1, servings: 4}}
-      event = %Events.PlanGenerated{week_start: ~D[2026-04-27], slots: slots}
-      state = Decider.evolve(Decider.initial(), event)
-      assert state.week_start == ~D[2026-04-27]
-      assert state.slots["mon_dinner"].recipe_id == 1
-      assert state.slots["mon_dinner"].servings == 4
-      assert state.slots["mon_dinner"].skipped == false
-      assert state.slots["mon_dinner"].leftover == false
-    end
-
     test "RecipeAssigned adds slot with skipped: false, leftover: false" do
       event = %Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: 7, servings: 3}
       state = Decider.evolve(Decider.initial(), event)

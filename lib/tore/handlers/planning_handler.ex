@@ -32,26 +32,6 @@ defmodule Tore.Handlers.PlanningHandler do
     Tore.Harness.Orchestrator.dispatch(:weekly_planning_run, ctx)
   end
 
-  def generate_plan(plan_id, week_start, opts \\ []) do
-    mode = Keyword.get(opts, :mode, :from_catalog)
-    dietary_guidance = Keyword.get(opts, :dietary_guidance)
-
-    with :ok <- SpendGuard.allow?(:generate_plan),
-         {:ok, state} <- EventStore.load(plan_id, Decider) do
-      context = build_plan_context(state, week_start, mode, dietary_guidance)
-
-      with {:ok, llm_result, usage} <- @llm.generate_plan(context),
-           :ok <- SpendGuard.log_usage(:generate_plan, usage),
-           {:ok, slots} <- parse_llm_slots(llm_result),
-           {:ok, events} <-
-             Decider.decide(%Commands.GeneratePlan{week_start: week_start, slots: slots}, state),
-           :ok <- EventStore.append(plan_id, events) do
-        PubSub.broadcast(@pubsub, @topic, {:events, events})
-        {:ok, events}
-      end
-    end
-  end
-
   def assign_recipe(plan_id, slot_key, recipe_id, servings) do
     run(plan_id, %Commands.AssignRecipe{
       slot_key: slot_key,
@@ -480,57 +460,4 @@ defmodule Tore.Handlers.PlanningHandler do
     end
   end
 
-  defp build_plan_context(state, week_start, mode, dietary_guidance) do
-    recipes =
-      Recipes.list(sort: :alphabetical)
-      |> Tore.Repo.preload(recipe_ingredients: :ingredient)
-      |> Enum.map(fn r ->
-        %{
-          id: r.id,
-          title: r.title,
-          key_ingredients: Enum.map(Enum.take(r.recipe_ingredients, 3), & &1.ingredient.name),
-          total_time_minutes: (r.prep_time_minutes || 0) + (r.cook_time_minutes || 0),
-          tags: Enum.map(r.tags, & &1.name)
-        }
-      end)
-
-    slot_keys =
-      state.slots
-      |> Map.keys()
-      |> Kernel.++(default_slot_keys())
-      |> Enum.uniq()
-
-    %{
-      recipes: recipes,
-      slot_keys: slot_keys,
-      pins: state.pins,
-      pantry: [],
-      deals:
-        Enum.map(Deals.list_current(), fn d ->
-          "#{d.product_name}#{if d.price, do: " #{d.price}kr", else: ""}"
-        end),
-      recent_recipes: [],
-      week_start: week_start,
-      mode: mode,
-      dietary_guidance: dietary_guidance,
-      week_mode_fragment: Tore.WeekMode.mode_prompt_fragment(Tore.WeekMode.get_current_mode())
-    }
-  end
-
-  defp parse_llm_slots(%{"days" => days}) when is_list(days) do
-    slots =
-      days
-      |> Enum.filter(fn d -> is_binary(d["slot_key"]) && is_integer(d["recipe_id"]) end)
-      |> Map.new(fn d ->
-        {d["slot_key"], %{recipe_id: d["recipe_id"], servings: d["servings"] || 2}}
-      end)
-
-    {:ok, slots}
-  end
-
-  defp parse_llm_slots(_), do: {:ok, %{}}
-
-  defp default_slot_keys do
-    for day <- ~w[mon tue wed thu fri sat sun], meal <- ~w[dinner], do: "#{day}_#{meal}"
-  end
 end

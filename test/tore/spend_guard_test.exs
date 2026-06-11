@@ -8,7 +8,7 @@ defmodule Tore.SpendGuardTest do
   end
 
   test "allow? returns :ok when under budget" do
-    assert :ok = SpendGuard.allow?(:generate_plan)
+    assert :ok = SpendGuard.allow?(:generate_prep_guide)
   end
 
   test "allow? returns budget_exceeded when over monthly limit" do
@@ -19,21 +19,10 @@ defmodule Tore.SpendGuardTest do
       cost_usd: 20.0
     })
 
-    assert {:error, :budget_exceeded} = SpendGuard.allow?(:generate_plan)
+    assert {:error, :budget_exceeded} = SpendGuard.allow?(:generate_prep_guide)
   end
 
   test "allow? returns cooldown when same feature called within 60s" do
-    Tore.Costs.log_llm_usage(%{
-      feature: "generate_plan",
-      prompt_tokens: 100,
-      completion_tokens: 50,
-      cost_usd: 0.001
-    })
-
-    assert {:error, :cooldown} = SpendGuard.allow?(:generate_plan)
-  end
-
-  test "allow? does not apply cooldown across different features" do
     Tore.Costs.log_llm_usage(%{
       feature: "generate_prep_guide",
       prompt_tokens: 100,
@@ -41,12 +30,23 @@ defmodule Tore.SpendGuardTest do
       cost_usd: 0.001
     })
 
-    assert :ok = SpendGuard.allow?(:generate_plan)
+    assert {:error, :cooldown} = SpendGuard.allow?(:generate_prep_guide)
+  end
+
+  test "allow? does not apply cooldown across different features" do
+    Tore.Costs.log_llm_usage(%{
+      feature: "suggest_recipe",
+      prompt_tokens: 100,
+      completion_tokens: 50,
+      cost_usd: 0.001
+    })
+
+    assert :ok = SpendGuard.allow?(:generate_prep_guide)
   end
 
   test "log_usage inserts a usage record" do
     usage = %{prompt_tokens: 1000, completion_tokens: 200, cost_usd: 0.005}
-    assert :ok = SpendGuard.log_usage(:generate_plan, usage)
+    assert :ok = SpendGuard.log_usage(:generate_prep_guide, usage)
     assert Tore.Costs.llm_spend_this_month() >= 0.005
   end
 end

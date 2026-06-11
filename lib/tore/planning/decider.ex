@@ -5,10 +5,6 @@ defmodule Tore.Planning.Decider do
   def initial, do: %State{}
 
   @spec decide(Commands.t(), State.t()) :: {:ok, [Events.t()]} | {:error, term()}
-  def decide(%Commands.GeneratePlan{week_start: ws, slots: slots}, _state) do
-    {:ok, [%Events.PlanGenerated{week_start: ws, slots: slots}]}
-  end
-
   def decide(%Commands.AssignRecipe{slot_key: sk, recipe_id: rid, servings: sv}, _state) do
     {:ok, [%Events.RecipeAssigned{slot_key: sk, recipe_id: rid, servings: sv}]}
   end
@@ -58,22 +54,6 @@ defmodule Tore.Planning.Decider do
   end
 
   @spec evolve(State.t(), Events.t()) :: State.t()
-  def evolve(state, %Events.PlanGenerated{week_start: ws, slots: slots}) do
-    normalized =
-      Map.new(slots, fn {k, v} ->
-        slot = %{
-          recipe_id: v[:recipe_id] || v["recipe_id"],
-          servings: v[:servings] || v["servings"],
-          skipped: v[:skipped] || v["skipped"] || false,
-          leftover: v[:leftover] || v["leftover"] || false
-        }
-
-        {to_string(k), slot}
-      end)
-
-    %{state | week_start: ws, slots: normalized}
-  end
-
   def evolve(state, %Events.RecipeAssigned{slot_key: sk, recipe_id: rid, servings: sv}) do
     slot = %{recipe_id: rid, servings: sv, skipped: false, leftover: false}
     %{state | slots: Map.put(state.slots, sk, slot)}

@@ -5,7 +5,6 @@ defmodule Tore.SpendGuard do
 
   # Per-feature defaults. Anything not listed falls back to {50_000, 60}.
   @feature_defaults %{
-    generate_plan: {50_000, 60},
     suggest_recipe: {6_000, 3}
   }
 
