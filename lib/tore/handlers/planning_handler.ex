@@ -459,5 +459,4 @@ defmodule Tore.Handlers.PlanningHandler do
       {:error, reason} -> {:error, reason}
     end
   end
-
 end

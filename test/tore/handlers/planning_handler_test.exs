@@ -184,7 +184,8 @@ defmodule Tore.Handlers.PlanningHandlerTest do
   test "plan_upcoming_week dispatches a weekly run for the upcoming Monday-start week" do
     Tore.MockLLM
     |> Mox.expect(:chat_with_tools, fn _sys, _msgs, _tools, _opts ->
-      {:ok, {:message, "Nothing to do."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: 0.0}}
+      {:ok, {:message, "Nothing to do."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: 0.0}}
     end)
 
     today = Date.utc_today()

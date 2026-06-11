@@ -102,9 +102,7 @@ defmodule Tore.Harness.Orchestrator do
         fun.()
       rescue
         e ->
-          Logger.error(
-            "#{kind} crashed: " <> Exception.format(:error, e, __STACKTRACE__)
-          )
+          Logger.error("#{kind} crashed: " <> Exception.format(:error, e, __STACKTRACE__))
 
           {:error, {:run_crashed, e}}
       end

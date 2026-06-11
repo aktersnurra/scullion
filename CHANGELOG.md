@@ -120,6 +120,30 @@ string concatenation.
   removed.
 - `Tore.Chat.SystemPrompt.build/0` deleted — fully replaced by capsules.
 
+### Weekly auto-planning (`:weekly_planning_run`, PlanMyWeek)
+
+A headless harness run that fills the upcoming week's empty, unpinned dinner
+slots, triggered by the Saturday cron.
+
+- `:weekly_planning_run` reuses the planner's pure tool loop, the four context
+  capsules, and `PlanVerifier`, via an extracted `run_planner_loop` helper shared
+  with `:planner_command_run` (the planner clause is a behaviour-preserving
+  refactor over the new `run_dispatch` + `run_planner_loop` helpers). Higher loop
+  caps (10 round-trips / 25 action calls). Fills empty + unpinned slots only;
+  pinned and assigned days are left untouched; the apply is atomic
+  (verifier-gated).
+- `PlanningHandler.plan_upcoming_week/0` is the cron entry; the Saturday 18:00
+  Quantum job now targets the upcoming (next Mon–Sun) week via the harness. With
+  no LiveView session the filled week surfaces through the Projector when the
+  user next opens `/plan`; they edit individual slots with the existing modal.
+- Removed the old one-shot `generate_plan` path — `PlanningHandler.generate_plan/3`,
+  `Planning.Commands.GeneratePlan`, `Planning.Events.PlanGenerated` (whose evolve
+  clobbered pins), the `@llm.generate_plan/1` callback + adapter impl, the
+  `:generate_plan` SpendGuard entry, and the Prep page's "generate plan" button.
+  The prep *guide* (`PrepHandler.generate_guide`) is independent and unchanged.
+  The `feature_label("generate_plan")` Settings clause is kept — it labels
+  historical `ai_operations` cost rows, not a live caller.
+
 ### Fixed
 
 - Event-store JSON round-trip downgraded atom/Decimal event fields on replay;
