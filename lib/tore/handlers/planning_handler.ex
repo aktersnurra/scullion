@@ -1,6 +1,7 @@
 defmodule Tore.Handlers.PlanningHandler do
   alias Tore.{Deals, EventStore, Planning.Decider, Planning.Commands, Recipes, SpendGuard}
   alias Phoenix.PubSub
+  alias Tore.Household
 
   @pubsub Tore.PubSub
   @topic "plan"
@@ -8,6 +9,27 @@ defmodule Tore.Handlers.PlanningHandler do
 
   def load_plan(plan_id) do
     EventStore.load(plan_id, Decider)
+  end
+
+  @doc """
+  Cron entry: plan the upcoming week (next Monday-Sunday) for the household by
+  dispatching a headless `:weekly_planning_run`.
+  """
+  def plan_upcoming_week do
+    household = Household.get_household!()
+    today = Date.utc_today()
+    days_ahead = rem(8 - Date.day_of_week(today), 7)
+    days_ahead = if days_ahead == 0, do: 7, else: days_ahead
+    week_start = Date.add(today, days_ahead)
+
+    ctx = %{
+      household_id: household.id,
+      user_id: nil,
+      plan_stream_id: "plan:#{Date.to_iso8601(week_start)}",
+      week_start: week_start
+    }
+
+    Tore.Harness.Orchestrator.dispatch(:weekly_planning_run, ctx)
   end
 
   def generate_plan(plan_id, week_start, opts \\ []) do

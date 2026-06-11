@@ -233,6 +233,23 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     end
   end
 
+  test "plan_upcoming_week dispatches a weekly run for the upcoming Monday-start week" do
+    Tore.MockLLM
+    |> Mox.expect(:chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok, {:message, "Nothing to do."}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: 0.0}}
+    end)
+
+    today = Date.utc_today()
+    days_ahead = rem(8 - Date.day_of_week(today), 7)
+    days_ahead = if days_ahead == 0, do: 7, else: days_ahead
+    expected_week_start = Date.add(today, days_ahead)
+    expected_stream = "plan:#{Date.to_iso8601(expected_week_start)}"
+
+    assert {:ok, state} = PlanningHandler.plan_upcoming_week()
+    assert state.__struct__ == Tore.Harness.Run.State.Applied
+    assert {:ok, _plan} = PlanningHandler.load_plan(expected_stream)
+  end
+
   describe "swap_events/3 (pure)" do
     alias Tore.Planning.{Decider, State}
 
