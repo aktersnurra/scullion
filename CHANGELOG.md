@@ -144,6 +144,27 @@ slots, triggered by the Saturday cron.
   The `feature_label("generate_plan")` Settings clause is kept — it labels
   historical `ai_operations` cost rows, not a live caller.
 
+### Capture / Shop vocabulary rename
+
+Aligned code with the SPEC's adopted UI vocabulary.
+
+- `Tore.Chat.ChatHandler` → `Tore.Capture.Conversation` (`handle_text/2` →
+  `reply/2`); `ChatLive`/`KioskChatLive` → `CaptureLive`/`KioskCaptureLive`;
+  routes `/chat` → `/capture`, `/kiosk/chat` → `/kiosk/capture`. The dead
+  `Tore.Chat.WeekContext` (superseded by `WeekPlanCapsule`) is deleted, retiring
+  the `Tore.Chat` namespace.
+- `Tore.Groceries` aggregate → `Tore.Shop`; `GroceryLive` → `ShopLive`; route
+  `/groceries` → `/shop`; event-store stream key `grocery_list:` → `shop_list:`
+  and the PubSub topic `grocery_list` → `shop_list`; nav label → "Shop"/"Inköp".
+  The grocery-list aggregate and its surface now share one name.
+- Kept: `Tore.Handlers.GroceriesHandler` (a Tiger-Style rename of the whole
+  handler family is a separate spec) and the cross-feature grocery vocabulary
+  (`GroceryDiff`, `GroceryVerifier`, `resolve_grocery_item`,
+  `:grocery_reconciliation_run`, `:grocery_checkoff`) — those name the grocery
+  domain concept used by other features, not the Shop surface.
+- SPEC.md line 69 + module map updated to match (overriding the earlier "stream
+  stays named groceries" note; safe pre-production with no persisted events).
+
 ### Fixed
 
 - Event-store JSON round-trip downgraded atom/Decimal event fields on replay;

@@ -66,7 +66,7 @@ behind a context boundary. LiveViews call context APIs only; Handlers orchestrat
 | Aggregate     | Why                                                                |
 |---------------|--------------------------------------------------------------------|
 | **Planning**  | LLM-orchestrated workflow with frequent user tweaks. Events are the substrate from which insights are synthesised. |
-| **Shop** | Multi-user real-time grocery checklist (decider stream stays named `groceries`). Granular events enable PubSub sync and natural undo. |
+| **Shop** | Multi-user real-time grocery checklist (decider stream `shop`, formerly `groceries`). Granular events enable PubSub sync and natural undo. |
 
 ### CRUD
 
@@ -748,7 +748,7 @@ lib/tore/
   pantry.ex                  # inference-shaped: list, add_item, remove_item, last_seen_at
   costs.ex
   prep.ex
-  groceries/                 # Decider aggregate
+  shop/                      # Decider aggregate
   planning/                  # Decider aggregate
     commands.ex              # AssignRecipe, SwapRecipe, SkipMeal, ...
     events.ex                # MealSkipped, RecipeRemoved, RecipeSwapped, ...
@@ -811,11 +811,11 @@ lib/tore/
 lib/tore_web/live/
   home_live.ex
   planner_live.ex            # adds command bar that drives PlannerAgent
-  chat_live.ex               # completes fridge → suggestions flow
+  capture_live.ex            # completes fridge → suggestions flow
   kiosk_live.ex
-  kiosk_chat_live.ex
+  kiosk_capture_live.ex
   cooking_live.ex
-  grocery_live.ex            # close loop: check → Pantry.add_item
+  shop_live.ex               # close loop: check → Pantry.add_item
   recipe_live.ex
   deals_live.ex
   prep_live.ex
