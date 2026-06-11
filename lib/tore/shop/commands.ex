@@ -1,4 +1,4 @@
-defmodule Tore.Groceries.Commands do
+defmodule Tore.Shop.Commands do
   defmodule BuildList, do: defstruct([:week_start, :items])
   defmodule AddItem, do: defstruct([:item_id, :name, :quantity, :unit, :section, :added_by])
   defmodule RemoveItem, do: defstruct([:item_id, :removed_by])

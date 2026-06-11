@@ -52,7 +52,7 @@ defmodule ToreWeb.Router do
       live "/", HomeLive
       live "/plan", PlannerLive
       live "/recipes", RecipeLive
-      live "/groceries", GroceryLive
+      live "/shop", ShopLive
       live "/prep", PrepLive
       live "/deals", DealsLive
       live "/cooking", CookingLive

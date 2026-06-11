@@ -1,4 +1,4 @@
-defmodule ToreWeb.GroceryLive do
+defmodule ToreWeb.ShopLive do
   use ToreWeb, :live_view
 
   alias Tore.Handlers.GroceriesHandler
@@ -6,10 +6,10 @@ defmodule ToreWeb.GroceryLive do
 
   def mount(_params, session, socket) do
     week_start = week_start(Date.utc_today())
-    list_id = grocery_id(week_start)
+    list_id = shop_id(week_start)
 
     if connected?(socket) do
-      PubSub.subscribe(Tore.PubSub, "grocery_list")
+      PubSub.subscribe(Tore.PubSub, "shop_list")
     end
 
     {:ok, grocery_state} = GroceriesHandler.load_list(list_id)
@@ -94,13 +94,13 @@ defmodule ToreWeb.GroceryLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/groceries"}>
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/shop"}>
       <.page max_width={:md}>
         <.card padded={false}>
           <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">
             <div>
               <h1 class="font-semibold text-[var(--text)]" style="font-size: var(--t-h1);">
-                {gettext("Groceries")}
+                {gettext("Shop")}
               </h1>
               <p class="mt-0.5 text-[color:var(--muted)]" style="font-size: var(--t-meta);">
                 {gettext("%{n} unchecked · Week %{week}", n: @unchecked_count, week: @week_number)}
@@ -151,7 +151,7 @@ defmodule ToreWeb.GroceryLive do
                   {section_label(section)}
                 </h2>
                 <ul class="divide-y divide-[color:var(--hairline)]">
-                  <.grocery_row :for={item <- section_items} item={item} />
+                  <.item_row :for={item <- section_items} item={item} />
                 </ul>
               <% end %>
 
@@ -163,7 +163,7 @@ defmodule ToreWeb.GroceryLive do
                   {gettext("Done · %{n}", n: length(@checked))}
                 </h2>
                 <ul class="divide-y divide-[color:var(--hairline)]">
-                  <.grocery_row :for={item <- @checked} item={item} />
+                  <.item_row :for={item <- @checked} item={item} />
                 </ul>
               <% end %>
             <% end %>
@@ -206,7 +206,7 @@ defmodule ToreWeb.GroceryLive do
 
   attr :item, :map, required: true
 
-  defp grocery_row(assigns) do
+  defp item_row(assigns) do
     ~H"""
     <li class={[
       "flex items-center gap-4 py-3 transition-opacity",
@@ -312,5 +312,5 @@ defmodule ToreWeb.GroceryLive do
     w
   end
 
-  defp grocery_id(week_start), do: "grocery_list:#{Date.to_iso8601(week_start)}"
+  defp shop_id(week_start), do: "shop_list:#{Date.to_iso8601(week_start)}"
 end

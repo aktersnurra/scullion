@@ -1,5 +1,5 @@
-defmodule Tore.Groceries.Decider do
-  alias Tore.Groceries.{Commands, Events, State}
+defmodule Tore.Shop.Decider do
+  alias Tore.Shop.{Commands, Events, State}
 
   @spec initial() :: State.t()
   def initial, do: %State{}

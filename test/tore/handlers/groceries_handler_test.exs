@@ -7,7 +7,7 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tore.Repo)
-    Phoenix.PubSub.subscribe(Tore.PubSub, "grocery_list")
+    Phoenix.PubSub.subscribe(Tore.PubSub, "shop_list")
 
     # GroceriesHandler.add_item/build_list call the LLM to classify items and
     # filter the pantry; stub them so these tests don't depend on a real model.
@@ -17,7 +17,7 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
     :ok
   end
 
-  defp list_id, do: "grocery_list:2026-04-27"
+  defp list_id, do: "shop_list:2026-04-27"
   defp week_start, do: ~D[2026-04-27]
 
   test "load_list returns initial state for new list" do
@@ -34,9 +34,9 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
     assert item.checked == false
   end
 
-  test "add_item broadcasts to grocery_list topic" do
+  test "add_item broadcasts to shop_list topic" do
     GroceriesHandler.add_item(list_id(), "Eggs", nil, nil, 1)
-    assert_receive {:events, [%Tore.Groceries.Events.ItemAdded{}]}
+    assert_receive {:events, [%Tore.Shop.Events.ItemAdded{}]}
   end
 
   test "check_item persists ItemChecked and broadcasts" do
@@ -48,7 +48,7 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
     {:ok, updated} = GroceriesHandler.load_list(list_id())
     assert updated.items[item_id].checked == true
 
-    assert_receive {:events, [%Tore.Groceries.Events.ItemChecked{}]}
+    assert_receive {:events, [%Tore.Shop.Events.ItemChecked{}]}
   end
 
   test "check_item returns error for unknown item_id" do
@@ -76,6 +76,6 @@ defmodule Tore.Handlers.GroceriesHandlerTest do
     {:ok, state} = GroceriesHandler.load_list(list_id())
     item = state.items |> Map.values() |> Enum.find(&(&1.name == "onion"))
     assert item
-    assert_receive {:events, [%Tore.Groceries.Events.ListBuilt{}]}
+    assert_receive {:events, [%Tore.Shop.Events.ListBuilt{}]}
   end
 end

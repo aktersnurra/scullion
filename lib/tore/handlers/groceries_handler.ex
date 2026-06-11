@@ -1,10 +1,10 @@
 defmodule Tore.Handlers.GroceriesHandler do
-  alias Tore.{EventStore, Groceries.Decider, Groceries.Commands, Groceries.Aggregator, Pantry}
+  alias Tore.{EventStore, Shop.Decider, Shop.Commands, Shop.Aggregator, Pantry}
   alias Phoenix.PubSub
 
   @llm Application.compile_env(:tore, :llm_client)
   @pubsub Tore.PubSub
-  @topic "grocery_list"
+  @topic "shop_list"
 
   def load_list(list_id) do
     EventStore.load(list_id, Decider)

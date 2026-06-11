@@ -314,7 +314,7 @@ defmodule ToreWeb.PlannerLive do
 
     if recipe_ids != [] do
       Task.start(fn ->
-        GroceriesHandler.build_list(grocery_id(week_start), week_start, recipe_ids)
+        GroceriesHandler.build_list(shop_id(week_start), week_start, recipe_ids)
       end)
     end
   end
@@ -1180,7 +1180,7 @@ defmodule ToreWeb.PlannerLive do
   end
 
   defp plan_id(week_start), do: "plan:#{Date.to_iso8601(week_start)}"
-  defp grocery_id(week_start), do: "grocery_list:#{Date.to_iso8601(week_start)}"
+  defp shop_id(week_start), do: "shop_list:#{Date.to_iso8601(week_start)}"
 
   defp health_dot_color(:ready), do: "background:#16a34a"
   defp health_dot_color(:flexible), do: "background:#ca8a04"

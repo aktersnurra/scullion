@@ -1,7 +1,7 @@
-defmodule Tore.Groceries.AggregatorTest do
+defmodule Tore.Shop.AggregatorTest do
   use ExUnit.Case, async: false
 
-  alias Tore.{Groceries.Aggregator, Recipes}
+  alias Tore.{Shop.Aggregator, Recipes}
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tore.Repo)

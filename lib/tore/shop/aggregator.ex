@@ -1,4 +1,4 @@
-defmodule Tore.Groceries.Aggregator do
+defmodule Tore.Shop.Aggregator do
   alias Tore.Recipes
 
   @spec aggregate_by_ids([integer()]) :: [map()]

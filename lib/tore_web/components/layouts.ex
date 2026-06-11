@@ -11,7 +11,7 @@ defmodule ToreWeb.Layouts do
       {"/", gettext("Home"), "nav-home"},
       {"/plan", gettext("Week"), "nav-week"},
       {"/recipes", gettext("Recipes"), "nav-recipes"},
-      {"/groceries", gettext("Groceries"), "nav-groceries"},
+      {"/shop", gettext("Shop"), "nav-shop"},
       {"/prep", gettext("Prep"), "nav-prep"},
       {"/deals", gettext("Deals"), "nav-deals"},
       {"/cooking", gettext("Cooking"), "nav-cooking"},

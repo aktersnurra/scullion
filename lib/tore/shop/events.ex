@@ -1,4 +1,4 @@
-defmodule Tore.Groceries.Events do
+defmodule Tore.Shop.Events do
   defmodule ListBuilt, do: defstruct([:week_start, :items])
   defmodule ItemAdded, do: defstruct([:item_id, :name, :quantity, :unit, :section, :added_by])
   defmodule ItemRemoved, do: defstruct([:item_id, :removed_by])

@@ -1,4 +1,4 @@
-defmodule Tore.Groceries.State do
+defmodule Tore.Shop.State do
   defstruct week_start: nil, items: %{}
 
   @type t :: %__MODULE__{

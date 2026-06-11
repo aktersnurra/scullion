@@ -1,7 +1,7 @@
-defmodule Tore.Groceries.DeciderTest do
+defmodule Tore.Shop.DeciderTest do
   use ExUnit.Case, async: true
 
-  alias Tore.Groceries.{Decider, State, Commands, Events}
+  alias Tore.Shop.{Decider, State, Commands, Events}
 
   defp item(id \\ "item-1"), do: %{id: id, name: "Milk", quantity: nil, unit: "l", checked: false}
 
