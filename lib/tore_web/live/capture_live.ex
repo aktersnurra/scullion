@@ -1,7 +1,7 @@
-defmodule ToreWeb.ChatLive do
+defmodule ToreWeb.CaptureLive do
   use ToreWeb, :live_view
 
-  alias Tore.Chat.ChatHandler
+  alias Tore.Capture.Conversation
 
   @impl true
   def mount(_params, _session, socket) do
@@ -50,7 +50,7 @@ defmodule ToreWeb.ChatLive do
 
   @impl true
   def handle_info({:chat, text}, socket) do
-    case ChatHandler.handle_text(text) do
+    case Conversation.reply(text) do
       {:ok, reply, _action} ->
         messages = socket.assigns.messages ++ [%{role: :assistant, text: reply}]
         {:noreply, assign(socket, messages: messages, loading: false)}

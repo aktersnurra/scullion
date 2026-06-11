@@ -39,7 +39,7 @@ defmodule ToreWeb.Router do
     live_session :kiosk,
       on_mount: [{ToreWeb.Live.Auth, :require_device_token}] do
       live "/", KioskLive
-      live "/chat", KioskChatLive
+      live "/capture", KioskCaptureLive
     end
   end
 
@@ -59,7 +59,7 @@ defmodule ToreWeb.Router do
       live "/settings", SettingsLive
       live "/settings/pantry", PantryLive
       live "/settings/costs", CostLive
-      live "/chat", ChatLive
+      live "/capture", CaptureLive
       live "/review/:class/:id", ReviewLive
     end
   end

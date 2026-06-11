@@ -1,4 +1,4 @@
-defmodule Tore.Chat.ChatHandler do
+defmodule Tore.Capture.Conversation do
   alias Tore.AiOperations
   alias Tore.Harness.Capsules
 
@@ -20,8 +20,8 @@ defmodule Tore.Chat.ChatHandler do
 
   @role_preamble "You are Tore, a friendly and practical AI cooking and meal planning assistant.\nHelp the household plan meals, manage groceries, and make the most of what they have.\nRespond conversationally in the user's language. Be concise and warm."
 
-  @spec handle_text(String.t(), keyword()) :: {:ok, String.t(), nil} | {:error, term()}
-  def handle_text(text, _opts \\ []) do
+  @spec reply(String.t(), keyword()) :: {:ok, String.t(), nil} | {:error, term()}
+  def reply(text, _opts \\ []) do
     system =
       [@role_preamble, date_line(), Capsules.compose(@chat_capsules, chat_ctx())]
       |> Enum.reject(&(&1 == ""))

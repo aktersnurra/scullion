@@ -71,7 +71,7 @@ defmodule ToreWeb.ReviewLive do
     <Layouts.app flash={@flash} current_path="/review">
       <div class="max-w-2xl mx-auto px-4 py-6">
         <.link
-          navigate={~p"/chat"}
+          navigate={~p"/capture"}
           class="text-[color:var(--muted)] text-sm mb-4 inline-flex items-center gap-1"
         >
           <.icon name="hero-arrow-left" class="size-4" /> {gettext("Back to chat")}

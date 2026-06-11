@@ -1,4 +1,4 @@
-defmodule ToreWeb.KioskChatLive do
+defmodule ToreWeb.KioskCaptureLive do
   use ToreWeb, :live_view
 
   @llm Application.compile_env(:tore, :llm_client)

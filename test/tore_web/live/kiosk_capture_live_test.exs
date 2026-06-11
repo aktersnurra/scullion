@@ -1,4 +1,4 @@
-defmodule ToreWeb.KioskChatLiveTest do
+defmodule ToreWeb.KioskCaptureLiveTest do
   use ToreWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   import Mox
@@ -16,7 +16,7 @@ defmodule ToreWeb.KioskChatLiveTest do
   end
 
   test "mounts and renders input", %{conn: conn} do
-    {:ok, _lv, html} = live(conn, "/kiosk/chat")
+    {:ok, _lv, html} = live(conn, "/kiosk/capture")
     assert html =~ "Ask Tore"
   end
 
@@ -26,7 +26,7 @@ defmodule ToreWeb.KioskChatLiveTest do
       {:ok, "Cook at 180°C for 25 minutes.", %{}}
     end)
 
-    {:ok, lv, _html} = live(conn, "/kiosk/chat")
+    {:ok, lv, _html} = live(conn, "/kiosk/capture")
 
     html = lv |> form("form", %{message: "How long to roast chicken?"}) |> render_submit()
     assert html =~ "How long to roast chicken?"

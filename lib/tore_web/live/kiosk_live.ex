@@ -214,7 +214,7 @@ defmodule ToreWeb.KioskLive do
       </div>
 
       <.link
-        navigate="/kiosk/chat"
+        navigate="/kiosk/capture"
         class="fixed bottom-6 right-6 bg-amber-500 text-stone-950 rounded-full w-20 h-20 flex items-center justify-center shadow-xl text-sm font-bold text-center leading-tight active:bg-amber-400"
       >
         Ask Tore

@@ -1,4 +1,4 @@
-defmodule ToreWeb.ChatLiveTest do
+defmodule ToreWeb.CaptureLiveTest do
   use ToreWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   import Mox
@@ -12,7 +12,7 @@ defmodule ToreWeb.ChatLiveTest do
   end
 
   test "mount renders empty chat", %{conn: conn} do
-    {:ok, _lv, html} = live(conn, "/chat")
+    {:ok, _lv, html} = live(conn, "/capture")
     assert html =~ "Ask Tore"
   end
 
@@ -23,7 +23,7 @@ defmodule ToreWeb.ChatLiveTest do
        %{prompt_tokens: 10, completion_tokens: 8, cost_usd: 0.0001}}
     end)
 
-    {:ok, lv, _html} = live(conn, "/chat")
+    {:ok, lv, _html} = live(conn, "/capture")
 
     html =
       lv
