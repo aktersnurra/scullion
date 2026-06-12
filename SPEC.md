@@ -59,7 +59,7 @@ restricted UI (see §Kiosk). The phone/laptop gets the full planner.
 ## Pattern Strategy
 
 Two aggregates are event-sourced via the Decider pattern. Everything else is Ecto CRUD
-behind a context boundary. LiveViews call context APIs only; Handlers orchestrate IO.
+behind a context boundary. LiveViews call context APIs only; the context modules orchestrate IO.
 
 ### Event-sourced
 
@@ -214,7 +214,7 @@ the surrounding code, never assembled by string concatenation.
 |---|---|---|
 | `HouseholdPreferencesCapsule` | Diet, allergies, dislikes, cuisines, kid constraints, default servings, planning days | `Tore.Household.get_preferences/0` |
 | `ActiveInsightsCapsule` | Active `HouseholdInsight` rows, prose + structured fields | `Tore.Household.list_active_insights/0` |
-| `WeekPlanCapsule` | The current or referenced week's plan state, per slot | `Tore.Handlers.PlanningHandler.load_plan/1` |
+| `WeekPlanCapsule` | The current or referenced week's plan state, per slot | `Tore.Planning.load_plan/1` |
 | `PantryBeliefsCapsule` | Approximate inventory with `last_seen_at` and provenance; framed as belief, not fact | `Tore.Pantry.list_inventory/0` |
 | `DealsDigestCapsule` | Active deals grouped by store, ranked by household affinity | `Tore.Deals.list_current/0` + `RecipeAffinityCapsule` |
 | `RecipeAffinityCapsule` | Recipes the household chose recently or repeatedly, plus those swapped or removed | derived from planning event stream |
@@ -791,15 +791,14 @@ lib/tore/
     planner_tools.ex         # tool definitions take handles, not raw IDs
   adapters/
     open_router.ex           # implements chat_with_tools via OpenRouter tool API
-  handlers/
-    planning_handler.ex
-    groceries_handler.ex
-    recipe_handler.ex
-    pantry_handler.ex
-    deals_handler.ex
-    prep_handler.ex
-    costs_handler.ex         # closes the loop to pantry inside :receipt_ingestion_run
-    insights_handler.ex      # weekly synthesis run dispatcher
+  planning.ex                # bare context: imperative shell over the pure Planning aggregate
+  shop.ex                    # bare context: imperative shell over the pure Shop aggregate
+  recipes.ex                 # context; owns scrape_and_create/generate_image (folded)
+  pantry.ex                  # context; owns parse_image/confirm_items (folded)
+  deals.ex                   # context; owns scrape_all/scrape_url/parse_pdf (folded)
+  prep.ex                    # context; owns generate_guide (folded)
+  costs.ex                   # context; owns receipt parse/log (folded), closes loop to pantry
+  insights.ex                # weekly synthesis run dispatcher
   jobs/
     ambient_scan.ex          # daily rule scan; dispatches :ambient_scan_run
   photo_pipeline.ex
@@ -906,10 +905,10 @@ config :tore, Tore.Scheduler,
   jobs: [
     {"0 7 * * *",   {Tore.Jobs.AmbientScan,             :run,                []}},
     {"0 3 * * *",   {Tore.Deals,                        :clear_expired,      []}},
-    {"0 6 * * 6",   {Tore.Handlers.InsightsHandler,     :synthesise_weekly,  []}},
-    {"0 8 * * 6",   {Tore.Handlers.DealsHandler,        :scrape_all,         []}},
-    {"0 18 * * 6",  fn -> Tore.Handlers.PlanningHandler.generate_plan("plan:current", Date.utc_today()) end},
-    {"30 18 * * 6", fn -> Tore.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today()) end},
+    {"0 6 * * 6",   {Tore.Insights,                     :synthesise_weekly,  []}},
+    {"0 8 * * 6",   {Tore.Deals,                        :scrape_all,         []}},
+    {"0 18 * * 6",  {Tore.Planning,                     :plan_upcoming_week, []}},
+    {"30 18 * * 6", fn -> Tore.Prep.generate_guide("plan:current", Date.utc_today()) end},
   ]
 ```
 
@@ -945,7 +944,7 @@ The rewrite is done when:
 2. `pantry_live.ex` no longer offers add/edit; the route is gone from main nav.
 3. `cost_live.ex` is reachable only through Settings.
 4. `Tore.Family.*` is deleted; `Tore.Household` is canonical.
-5. `PlannerAgent` runs a bounded tool-calling loop driven from the planner command bar, with all action tools wired through `PlanningHandler` and at least two read tools (`search_recipes`, `pantry_snapshot`) wired to real context state.
+5. `PlannerAgent` runs a bounded tool-calling loop driven from the planner command bar, with all action tools wired through `Tore.Planning` and at least two read tools (`search_recipes`, `pantry_snapshot`) wired to real context state.
 6. `AmbientScan` runs daily and writes at least one counter-note type when the
    corresponding rule fires.
 7. Receipts uploaded via chat write to both `costs` and `pantry` without a confirm

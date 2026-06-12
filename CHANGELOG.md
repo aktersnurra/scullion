@@ -7,6 +7,32 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### All-handlers Tiger-Style rename
+
+The `Tore.Handlers.*Handler` family is retired — "handler" is filler; each
+module now names what it does. Pure rename — suite unchanged at 483/0.
+
+- Folded the context-backed handlers into their existing context modules:
+  `RecipeHandler` → `Tore.Recipes`, `CostsHandler` → `Tore.Costs`,
+  `PantryHandler` → `Tore.Pantry`, `DealsHandler` → `Tore.Deals`,
+  `PrepHandler` → `Tore.Prep`. Their LLM/scraping/orchestration functions now
+  sit beside the persistence and query functions they already called (the
+  `Tore.Recipes` ↔ `RecipeHandler` cyclic dependency dissolves into local calls).
+- `PlanningHandler` → `Tore.Planning` and `GroceriesHandler` → `Tore.Shop`:
+  the bare context module is the imperative shell over the pure aggregate
+  submodules (`*.Decider/.Events/.State/.Commands`), matching the `Tore.Recipes`
+  pattern. The aggregate and its operations now share one name.
+- `InsightsHandler` → `Tore.Insights` (no sibling context existed).
+- `Tore.Costs.log_dining_out/1` is kept (live callers) with the folded `/2`
+  beside it; the handler's `to_decimal` was folded as a distinct
+  `receipt_to_decimal` because the pre-existing `Tore.Costs.to_decimal` coerces
+  `nil → 0` while the receipt path must pass `nil` through — reusing it would
+  have silently changed behavior. `lib/tore/handlers/` is removed.
+- Follow-ups deferred to keep this pass a pure rename (not done here):
+  consider making `Tore.Recipes.scrape_and_create/2` private now that its only
+  caller is internal; add `@spec`s to the folded functions; add a comment on
+  `Tore.Costs.receipt_to_decimal` documenting its nil-pass-through contract.
+
 ### Harness foundation
 
 The event-sourced run harness — the load-bearing primitives for AI-driven
