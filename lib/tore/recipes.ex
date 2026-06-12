@@ -3,6 +3,9 @@ defmodule Tore.Recipes do
   alias Tore.Repo
   alias Tore.Recipes.{Recipe, Ingredient, RecipeIngredient, Tag}
 
+  @http Application.compile_env(:tore, :http_client)
+  @image_gen Application.compile_env(:tore, :image_gen_client)
+
   @spec create(map()) :: {:ok, Recipe.t()} | {:error, Ecto.Changeset.t()}
   def create(attrs) do
     {tag_names, attrs} = Map.pop(attrs, :tags, [])
@@ -95,7 +98,7 @@ defmodule Tore.Recipes do
 
   @spec scrape_from_url(String.t(), String.t() | nil) :: {:ok, Recipe.t()} | {:error, term()}
   def scrape_from_url(url, locale \\ nil) do
-    Tore.Handlers.RecipeHandler.scrape_and_create(url, locale)
+    scrape_and_create(url, locale)
   end
 
   @llm Application.compile_env(:tore, :llm_client)
@@ -206,8 +209,50 @@ defmodule Tore.Recipes do
     loaded = Repo.preload(recipe, recipe_ingredients: :ingredient)
 
     Task.start(fn ->
-      Tore.Handlers.RecipeHandler.generate_image(loaded, image_url)
+      generate_image(loaded, image_url)
     end)
+  end
+
+  @spec scrape_and_create(String.t(), String.t() | nil) ::
+          {:ok, Recipe.t()} | {:error, term()}
+  def scrape_and_create(url, locale \\ nil) do
+    with {:ok, html} <- @http.fetch(url),
+         {:ok, attrs} <- parse_or_extract(html, locale) do
+      create(Map.put(attrs, :source_url, url))
+    end
+  end
+
+  @spec generate_image(Recipe.t(), String.t() | nil) :: :ok | {:error, term()}
+  def generate_image(recipe, image_url) do
+    storage = Tore.Storage.client()
+    key = "recipes/#{recipe.id}/#{Ecto.UUID.generate()}.jpg"
+
+    with {:ok, binary} <- fetch_or_generate(recipe, image_url),
+         {:ok, url} <-
+           storage.put_object(Tore.Storage.Buckets.recipes(), key, binary,
+             content_type: "image/jpeg"
+           ) do
+      Repo.update_all(
+        from(r in Recipe, where: r.id == ^recipe.id),
+        set: [image_path: url]
+      )
+
+      :ok
+    end
+  end
+
+  defp parse_or_extract(html, locale) do
+    with {:error, :not_found} <- Tore.Recipes.Parser.parse_html(html) do
+      @llm.extract_recipe_from_html(html, locale)
+    end
+  end
+
+  defp fetch_or_generate(_recipe, image_url) when is_binary(image_url) and image_url != "" do
+    @http.fetch(image_url)
+  end
+
+  defp fetch_or_generate(recipe, _image_url) do
+    @image_gen.generate_food_image(recipe.title, recipe.instructions)
   end
 
   # ── Query filters ──────────────────────────────────────────────────────────

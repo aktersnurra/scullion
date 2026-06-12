@@ -1,7 +1,7 @@
-defmodule Tore.Handlers.RecipeHandlerTest do
+defmodule Tore.RecipesScrapeTest do
   use Tore.DataCase, async: false
   import Mox
-  alias Tore.Handlers.RecipeHandler
+  alias Tore.Recipes
 
   setup :verify_on_exit!
 
@@ -20,7 +20,7 @@ defmodule Tore.Handlers.RecipeHandlerTest do
       Tore.MockHTTP
       |> expect(:fetch, fn "https://example.com/recipe" -> {:ok, @ld_json_html} end)
 
-      assert {:ok, recipe} = RecipeHandler.scrape_and_create("https://example.com/recipe")
+      assert {:ok, recipe} = Recipes.scrape_and_create("https://example.com/recipe")
       assert recipe.title == "Scraped Pasta"
       assert recipe.source_url == "https://example.com/recipe"
     end
@@ -34,7 +34,7 @@ defmodule Tore.Handlers.RecipeHandlerTest do
         {:ok, %{title: "LLM Recipe", ingredients: []}}
       end)
 
-      assert {:ok, recipe} = RecipeHandler.scrape_and_create("https://example.com/plain")
+      assert {:ok, recipe} = Recipes.scrape_and_create("https://example.com/plain")
       assert recipe.title == "LLM Recipe"
     end
 
@@ -42,7 +42,7 @@ defmodule Tore.Handlers.RecipeHandlerTest do
       Tore.MockHTTP
       |> expect(:fetch, fn _ -> {:error, :timeout} end)
 
-      assert {:error, :timeout} = RecipeHandler.scrape_and_create("https://example.com/bad")
+      assert {:error, :timeout} = Recipes.scrape_and_create("https://example.com/bad")
     end
   end
 end
