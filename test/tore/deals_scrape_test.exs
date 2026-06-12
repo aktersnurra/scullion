@@ -1,4 +1,4 @@
-defmodule Tore.Handlers.DealsHandlerTest do
+defmodule Tore.DealsScrapeTest do
   use ExUnit.Case, async: false
 
   import Mox
@@ -15,7 +15,7 @@ defmodule Tore.Handlers.DealsHandlerTest do
     |> expect(:fetch, fn _url -> {:ok, @ica_html} end)
 
     assert {:ok, 1} =
-             Tore.Handlers.DealsHandler.scrape_url("https://ica.se/erbjudanden/test-123/", :ica)
+             Tore.Deals.scrape_url("https://ica.se/erbjudanden/test-123/", :ica)
 
     deals = Tore.Deals.list_current()
     assert Enum.any?(deals, &(&1.product_name == "Kycklingfilé"))
@@ -25,10 +25,10 @@ defmodule Tore.Handlers.DealsHandlerTest do
     Tore.MockHTTP
     |> expect(:fetch, fn _url -> {:error, :timeout} end)
 
-    assert {:error, :timeout} = Tore.Handlers.DealsHandler.scrape_url("https://ica.se/", :ica)
+    assert {:error, :timeout} = Tore.Deals.scrape_url("https://ica.se/", :ica)
   end
 
   test "scrape_all returns :ok with no enabled store configs" do
-    assert :ok = Tore.Handlers.DealsHandler.scrape_all()
+    assert :ok = Tore.Deals.scrape_all()
   end
 end

@@ -1,7 +1,7 @@
 defmodule ToreWeb.DealsLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Deals, Handlers.DealsHandler}
+  alias Tore.Deals
 
   @impl true
   def mount(_params, _session, socket) do
@@ -172,7 +172,7 @@ defmodule ToreWeb.DealsLive do
     pid = self()
 
     Task.start(fn ->
-      result = DealsHandler.scrape_url(url, chain_atom, store_name)
+      result = Deals.scrape_url(url, chain_atom, store_name)
       send(pid, {:scrape_result, result})
     end)
 
@@ -184,7 +184,7 @@ defmodule ToreWeb.DealsLive do
     pid = self()
 
     Task.start(fn ->
-      DealsHandler.scrape_all()
+      Deals.scrape_all()
       send(pid, {:scrape_all_done})
     end)
 
@@ -243,7 +243,7 @@ defmodule ToreWeb.DealsLive do
       pid = self()
 
       Task.start(fn ->
-        result = DealsHandler.parse_pdf(binary)
+        result = Deals.parse_pdf(binary)
         send(pid, {:pdf_result, result})
       end)
 
