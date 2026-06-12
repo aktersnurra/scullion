@@ -1,8 +1,8 @@
-defmodule Tore.Handlers.InsightsHandlerTest do
+defmodule Tore.InsightsTest do
   use Tore.DataCase, async: false
   import Mox
 
-  alias Tore.Handlers.InsightsHandler
+  alias Tore.Insights
   alias Tore.Household
 
   setup :verify_on_exit!
@@ -29,7 +29,7 @@ defmodule Tore.Handlers.InsightsHandlerTest do
        ]}
     end)
 
-    assert {:ok, saved} = InsightsHandler.synthesise_weekly()
+    assert {:ok, saved} = Insights.synthesise_weekly()
     assert length(saved) == 2
     assert hd(saved).status == "active"
     assert length(Household.list_active_insights()) == 2
@@ -41,8 +41,8 @@ defmodule Tore.Handlers.InsightsHandlerTest do
       {:ok, [%{kind: "skip_pattern", body: "Pattern detected.", confidence: 0.7, evidence: []}]}
     end)
 
-    InsightsHandler.synthesise_weekly()
-    InsightsHandler.synthesise_weekly()
+    Insights.synthesise_weekly()
+    Insights.synthesise_weekly()
 
     assert length(Household.list_active_insights()) == 1
   end
@@ -51,7 +51,7 @@ defmodule Tore.Handlers.InsightsHandlerTest do
     Tore.MockLLM
     |> expect(:synthesise_insights, fn _summary -> {:error, :rate_limited} end)
 
-    assert {:error, :rate_limited} = InsightsHandler.synthesise_weekly()
+    assert {:error, :rate_limited} = Insights.synthesise_weekly()
     assert Household.list_active_insights() == []
   end
 end

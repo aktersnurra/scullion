@@ -1,4 +1,4 @@
-defmodule Tore.Handlers.InsightsHandler do
+defmodule Tore.Insights do
   import Ecto.Query
   alias Tore.Household
 
