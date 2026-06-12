@@ -1,7 +1,7 @@
 defmodule ToreWeb.PrepLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Handlers.PrepHandler, Prep}
+  alias Tore.Prep
 
   def mount(_params, _session, socket) do
     week_start = week_start(Date.utc_today())
@@ -28,7 +28,7 @@ defmodule ToreWeb.PrepLive do
     Task.start(fn ->
       result =
         try do
-          PrepHandler.generate_guide(plan_id, week_start, locale)
+          Prep.generate_guide(plan_id, week_start, locale)
         rescue
           e -> {:error, e}
         catch

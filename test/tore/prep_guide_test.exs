@@ -1,9 +1,9 @@
-defmodule Tore.Handlers.PrepHandlerTest do
+defmodule Tore.PrepGuideTest do
   use ExUnit.Case, async: false
 
   import Mox
 
-  alias Tore.Handlers.PrepHandler
+  alias Tore.Prep
 
   setup :verify_on_exit!
 
@@ -37,7 +37,7 @@ defmodule Tore.Handlers.PrepHandlerTest do
        }, mock_usage()}
     end)
 
-    assert {:ok, guide} = PrepHandler.generate_guide(plan_id(), week_start())
+    assert {:ok, guide} = Prep.generate_guide(plan_id(), week_start())
     assert guide.week_start == week_start()
     assert length(guide.timeline) == 1
     assert guide.storage_notes == "Chicken: 3 days"
@@ -45,7 +45,7 @@ defmodule Tore.Handlers.PrepHandlerTest do
 
   test "generate_guide returns error when LLM fails" do
     Tore.MockLLM |> expect(:generate_prep_guide, fn _, _ -> {:error, :timeout} end)
-    assert {:error, :timeout} = PrepHandler.generate_guide(plan_id(), week_start())
+    assert {:error, :timeout} = Prep.generate_guide(plan_id(), week_start())
   end
 
   test "generate_guide returns budget_exceeded when over limit" do
@@ -56,6 +56,6 @@ defmodule Tore.Handlers.PrepHandlerTest do
       cost_usd: 20.0
     })
 
-    assert {:error, :budget_exceeded} = PrepHandler.generate_guide(plan_id(), week_start())
+    assert {:error, :budget_exceeded} = Prep.generate_guide(plan_id(), week_start())
   end
 end

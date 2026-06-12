@@ -63,7 +63,7 @@ config :tore, Tore.Scheduler,
     {"0 18 * * 6", {Tore.Planning, :plan_upcoming_week, []}},
     {"30 18 * * 6",
      fn ->
-       Tore.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today())
+       Tore.Prep.generate_guide("plan:current", Date.utc_today())
      end}
   ]
 
