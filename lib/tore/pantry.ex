@@ -3,6 +3,25 @@ defmodule Tore.Pantry do
   alias Tore.Repo
   alias Tore.Pantry.PantryItem
 
+  @llm Application.compile_env(:tore, :llm_client)
+
+  def parse_image(image_binary) do
+    @llm.parse_pantry_image(image_binary)
+  end
+
+  def confirm_items(items) do
+    Enum.reduce_while(items, {:ok, []}, fn item, {:ok, acc} ->
+      case add_item(item) do
+        {:ok, pantry_item} -> {:cont, {:ok, [pantry_item | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, inserted} -> {:ok, Enum.reverse(inserted)}
+      error -> error
+    end
+  end
+
   @spec add_item(map()) :: {:ok, PantryItem.t()} | {:error, Ecto.Changeset.t()}
   def add_item(attrs) do
     attrs = Map.put_new(attrs, :added_at, Date.utc_today())

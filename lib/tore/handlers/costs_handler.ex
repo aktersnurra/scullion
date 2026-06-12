@@ -35,7 +35,7 @@ defmodule Tore.Handlers.CostsHandler do
              user_id: user_id,
              line_items: []
            }) do
-      Tore.Handlers.PantryHandler.confirm_items(items)
+      Tore.Pantry.confirm_items(items)
     end
   end
 

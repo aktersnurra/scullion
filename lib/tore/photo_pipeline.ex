@@ -53,7 +53,7 @@ defmodule Tore.PhotoPipeline do
   end
 
   defp route_group(:pantry_items, [image | _]) do
-    case Tore.Handlers.PantryHandler.parse_image(image) do
+    case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :pantry_items, status: :ok, result: items}
       {:ok, items, _usage} -> %{class: :pantry_items, status: :ok, result: items}
       {:error, reason} -> %{class: :pantry_items, status: :error, result: reason}
@@ -61,7 +61,7 @@ defmodule Tore.PhotoPipeline do
   end
 
   defp route_group(:fridge, [image | _]) do
-    case Tore.Handlers.PantryHandler.parse_image(image) do
+    case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :fridge, status: :ok, result: items}
       {:ok, items, _usage} -> %{class: :fridge, status: :ok, result: items}
       {:error, reason} -> %{class: :fridge, status: :error, result: reason}

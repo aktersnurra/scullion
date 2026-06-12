@@ -59,7 +59,7 @@ defmodule ToreWeb.ReviewLive do
   end
 
   def handle_event("confirm", _params, %{assigns: %{class: :pantry_items}} = socket) do
-    case Tore.Handlers.PantryHandler.confirm_items(socket.assigns.result) do
+    case Tore.Pantry.confirm_items(socket.assigns.result) do
       {:ok, _} -> {:noreply, assign(socket, :saved, true)}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to add pantry items.")}
     end
