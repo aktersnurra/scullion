@@ -1,4 +1,4 @@
-defmodule Tore.Handlers.GroceriesHandler do
+defmodule Tore.Shop do
   alias Tore.{EventStore, Shop.Decider, Shop.Commands, Shop.Aggregator, Pantry}
   alias Phoenix.PubSub
 

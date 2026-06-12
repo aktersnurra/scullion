@@ -1,7 +1,7 @@
 defmodule ToreWeb.ShopLive do
   use ToreWeb, :live_view
 
-  alias Tore.Handlers.GroceriesHandler
+  alias Tore.Shop
   alias Phoenix.PubSub
 
   def mount(_params, session, socket) do
@@ -12,7 +12,7 @@ defmodule ToreWeb.ShopLive do
       PubSub.subscribe(Tore.PubSub, "shop_list")
     end
 
-    {:ok, grocery_state} = GroceriesHandler.load_list(list_id)
+    {:ok, grocery_state} = Shop.load_list(list_id)
     user_id = Map.get(session, "user_id")
 
     {:ok,
@@ -30,21 +30,21 @@ defmodule ToreWeb.ShopLive do
     item = Map.get(socket.assigns.grocery_state.items, id)
 
     if item && item.checked do
-      GroceriesHandler.uncheck_item(socket.assigns.list_id, id, socket.assigns.user_id)
+      Shop.uncheck_item(socket.assigns.list_id, id, socket.assigns.user_id)
     else
-      GroceriesHandler.check_item(socket.assigns.list_id, id, socket.assigns.user_id)
+      Shop.check_item(socket.assigns.list_id, id, socket.assigns.user_id)
     end
 
     {:noreply, socket}
   end
 
   def handle_event("remove_item", %{"item_id" => id}, socket) do
-    GroceriesHandler.remove_item(socket.assigns.list_id, id, socket.assigns.user_id)
+    Shop.remove_item(socket.assigns.list_id, id, socket.assigns.user_id)
     {:noreply, socket}
   end
 
   def handle_event("export_list", _params, socket) do
-    case GroceriesHandler.export_list(socket.assigns.list_id) do
+    case Shop.export_list(socket.assigns.list_id) do
       {:ok, text} -> {:noreply, assign(socket, export_text: text)}
       _ -> {:noreply, socket}
     end
@@ -63,7 +63,7 @@ defmodule ToreWeb.ShopLive do
       quantity = if qty == "", do: nil, else: parse_qty(qty)
       unit = if unit == "", do: nil, else: unit
 
-      GroceriesHandler.add_item(
+      Shop.add_item(
         socket.assigns.list_id,
         name,
         quantity,
@@ -76,7 +76,7 @@ defmodule ToreWeb.ShopLive do
   end
 
   def handle_info({:events, _events}, socket) do
-    {:ok, grocery_state} = GroceriesHandler.load_list(socket.assigns.list_id)
+    {:ok, grocery_state} = Shop.load_list(socket.assigns.list_id)
     {:noreply, assign(socket, grocery_state: grocery_state)}
   end
 

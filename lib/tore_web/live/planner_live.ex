@@ -1,7 +1,7 @@
 defmodule ToreWeb.PlannerLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Recipes, Planning, Handlers.GroceriesHandler, PlanHealth}
+  alias Tore.{Recipes, Planning, Shop, PlanHealth}
   alias Phoenix.PubSub
 
   @days ~w[mon tue wed thu fri sat sun]
@@ -314,7 +314,7 @@ defmodule ToreWeb.PlannerLive do
 
     if recipe_ids != [] do
       Task.start(fn ->
-        GroceriesHandler.build_list(shop_id(week_start), week_start, recipe_ids)
+        Shop.build_list(shop_id(week_start), week_start, recipe_ids)
       end)
     end
   end
