@@ -2,6 +2,8 @@ defmodule Tore.Costs do
   alias Tore.{Repo, Costs.LLMUsage, Costs.Receipt, Costs.LineItem, Costs.DiningOut}
   import Ecto.Query
 
+  @llm Application.compile_env(:tore, :llm_client)
+
   def log_llm_usage(attrs) do
     %LLMUsage{} |> LLMUsage.changeset(attrs) |> Repo.insert()
   end
@@ -140,6 +142,48 @@ defmodule Tore.Costs do
     %DiningOut{} |> DiningOut.changeset(attrs) |> Repo.insert()
   end
 
+  def log_dining_out(attrs, user_id) do
+    log_dining_out(Map.put(attrs, :user_id, user_id))
+  end
+
+  def parse_receipt_image(image_binary) do
+    @llm.parse_receipt_for_pantry(image_binary)
+  end
+
+  def parse_and_log_receipt(image_binary, user_id) do
+    image_path = store_receipt_image(image_binary)
+
+    with {:ok, line_items, _usage} <- @llm.parse_receipt_image(image_binary) do
+      total =
+        line_items
+        |> Enum.map(fn item -> item.total_price || Decimal.new(0) end)
+        |> Enum.reduce(Decimal.new(0), &Decimal.add/2)
+
+      log_receipt(%{
+        date: Date.utc_today(),
+        image_path: image_path,
+        total_amount: total,
+        user_id: user_id,
+        line_items: line_items
+      })
+    end
+  end
+
+  def confirm_receipt(%{total: total, store_name: store_name, items: items, date: date}, user_id) do
+    total_decimal = receipt_to_decimal(total)
+
+    with {:ok, _receipt} <-
+           log_receipt(%{
+             date: date,
+             store_name: store_name,
+             total_amount: total_decimal,
+             user_id: user_id,
+             line_items: []
+           }) do
+      Tore.Pantry.confirm_items(items)
+    end
+  end
+
   @spec list_dining_out() :: [DiningOut.t()]
   def list_dining_out do
     Repo.all(from d in DiningOut, order_by: [desc: d.date], limit: 50)
@@ -249,6 +293,20 @@ defmodule Tore.Costs do
        receipt_count: receipt_count,
        dining_count: dining_count
      }}
+  end
+
+  defp receipt_to_decimal(nil), do: nil
+  defp receipt_to_decimal(%Decimal{} = d), do: d
+  defp receipt_to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+  defp receipt_to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp receipt_to_decimal(s) when is_binary(s), do: Decimal.new(s)
+
+  defp store_receipt_image(binary) do
+    filename = "#{System.unique_integer([:positive])}.jpg"
+    dir = Path.join([:code.priv_dir(:tore), "static", "uploads", "receipts"])
+    File.mkdir_p!(dir)
+    File.write!(Path.join(dir, filename), binary)
+    "/uploads/receipts/#{filename}"
   end
 
   defp to_decimal(nil), do: Decimal.new(0)

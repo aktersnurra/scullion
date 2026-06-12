@@ -52,7 +52,7 @@ defmodule ToreWeb.ReviewLive do
       date: Date.utc_today()
     }
 
-    case Tore.Handlers.CostsHandler.confirm_receipt(attrs, socket.assigns.current_user.id) do
+    case Tore.Costs.confirm_receipt(attrs, socket.assigns.current_user.id) do
       {:ok, _} -> {:noreply, assign(socket, :saved, true)}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to save receipt.")}
     end

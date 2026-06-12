@@ -2,7 +2,6 @@ defmodule ToreWeb.CostLive do
   use ToreWeb, :live_view
 
   alias Tore.Costs
-  alias Tore.Handlers.CostsHandler
 
   @impl true
   def mount(_params, _session, socket) do
@@ -120,7 +119,7 @@ defmodule ToreWeb.CostLive do
     preview = socket.assigns.receipt_preview
     user_id = socket.assigns.current_user.id
 
-    case CostsHandler.confirm_receipt(preview, user_id) do
+    case Costs.confirm_receipt(preview, user_id) do
       {:ok, _} ->
         today = Date.utc_today()
         {:ok, summary} = Costs.monthly_summary(today.year, today.month)
@@ -201,7 +200,7 @@ defmodule ToreWeb.CostLive do
       pid = self()
 
       Task.start(fn ->
-        send(pid, {:receipt_scan_result, CostsHandler.parse_receipt_image(binary)})
+        send(pid, {:receipt_scan_result, Costs.parse_receipt_image(binary)})
       end)
 
       {:noreply, assign(socket, scanning: true, scan_error: nil)}

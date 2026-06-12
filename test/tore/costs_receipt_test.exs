@@ -1,4 +1,4 @@
-defmodule Tore.Handlers.CostsHandlerTest do
+defmodule Tore.CostsReceiptTest do
   use ExUnit.Case, async: false
 
   import Mox
@@ -23,7 +23,7 @@ defmodule Tore.Handlers.CostsHandlerTest do
     Tore.MockLLM
     |> expect(:parse_receipt_image, fn _binary -> {:ok, line_items, %{}} end)
 
-    assert {:ok, receipt} = Tore.Handlers.CostsHandler.parse_and_log_receipt(<<1, 2, 3>>, user_id)
+    assert {:ok, receipt} = Tore.Costs.parse_and_log_receipt(<<1, 2, 3>>, user_id)
     assert receipt.user_id == user_id
     assert Decimal.equal?(receipt.total_amount, Decimal.new("25.00"))
   end
@@ -33,7 +33,7 @@ defmodule Tore.Handlers.CostsHandlerTest do
     |> expect(:parse_receipt_image, fn _binary -> {:error, :rate_limited} end)
 
     assert {:error, :rate_limited} =
-             Tore.Handlers.CostsHandler.parse_and_log_receipt(<<1>>, user_id)
+             Tore.Costs.parse_and_log_receipt(<<1>>, user_id)
   end
 
   test "log_dining_out/2 delegates to Costs context", %{user_id: user_id} do
@@ -44,7 +44,7 @@ defmodule Tore.Handlers.CostsHandlerTest do
       num_people: 2
     }
 
-    assert {:ok, entry} = Tore.Handlers.CostsHandler.log_dining_out(attrs, user_id)
+    assert {:ok, entry} = Tore.Costs.log_dining_out(attrs, user_id)
     assert entry.description == "Sushi"
   end
 end

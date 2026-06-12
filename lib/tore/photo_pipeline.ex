@@ -45,7 +45,7 @@ defmodule Tore.PhotoPipeline do
   end
 
   defp route_group(:receipt, [image | _]) do
-    case Tore.Handlers.CostsHandler.parse_receipt_image(image) do
+    case Tore.Costs.parse_receipt_image(image) do
       {:ok, parsed} -> %{class: :receipt, status: :ok, result: parsed}
       {:ok, parsed, _usage} -> %{class: :receipt, status: :ok, result: parsed}
       {:error, reason} -> %{class: :receipt, status: :error, result: reason}
