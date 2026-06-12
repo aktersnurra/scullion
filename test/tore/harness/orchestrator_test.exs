@@ -63,7 +63,7 @@ defmodule Tore.Harness.OrchestratorTest do
   test "dispatch builds a real PlanDiff from the planner's skip_meal call" do
     {:ok, recipe} = Tore.Recipes.create(%{title: "Chili", recipe_type: :meal, base_servings: 4})
     plan = "plan:2026-06-01"
-    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+    Tore.Planning.assign_recipe(plan, "mon_dinner", recipe.id, 4)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
       {:ok,
@@ -158,7 +158,7 @@ defmodule Tore.Harness.OrchestratorTest do
   test "dispatch applies accumulated plan events to the plan stream exactly once" do
     {:ok, recipe} = Tore.Recipes.create(%{title: "Stew", recipe_type: :meal, base_servings: 4})
     plan = "plan:2026-06-08-apply"
-    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+    Tore.Planning.assign_recipe(plan, "mon_dinner", recipe.id, 4)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok,
@@ -187,7 +187,7 @@ defmodule Tore.Harness.OrchestratorTest do
 
     {:ok, %State.Applied{}} = Orchestrator.dispatch(:planner_command_run, ctx)
 
-    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    {:ok, plan_state} = Tore.Planning.load_plan(plan)
     assert plan_state.slots["mon_dinner"].skipped == true
   end
 
@@ -205,7 +205,7 @@ defmodule Tore.Harness.OrchestratorTest do
 
     assert {:error, {:step_failed, :boom}} = Orchestrator.dispatch(:planner_command_run, ctx)
 
-    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    {:ok, plan_state} = Tore.Planning.load_plan(plan)
     assert plan_state.slots == %{}
   end
 
@@ -214,8 +214,8 @@ defmodule Tore.Harness.OrchestratorTest do
       Tore.Recipes.create(%{title: "Pinned dish", recipe_type: :meal, base_servings: 4})
 
     plan = "plan:2026-06-08-pinned"
-    Tore.Handlers.PlanningHandler.assign_recipe(plan, "mon_dinner", recipe.id, 4)
-    Tore.Handlers.PlanningHandler.pin_slot(plan, "mon_dinner", true)
+    Tore.Planning.assign_recipe(plan, "mon_dinner", recipe.id, 4)
+    Tore.Planning.pin_slot(plan, "mon_dinner", true)
 
     Mox.expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok,
@@ -253,7 +253,7 @@ defmodule Tore.Harness.OrchestratorTest do
     # still holds the original recipe, is not skipped, and no slot was added.
     # (Proves "not applied", not "applied then undone": the fail branch never
     # calls apply_events, so the skip event was never written.)
-    {:ok, plan_state} = Tore.Handlers.PlanningHandler.load_plan(plan)
+    {:ok, plan_state} = Tore.Planning.load_plan(plan)
     assert Map.keys(plan_state.slots) == ["mon_dinner"]
     assert plan_state.slots["mon_dinner"].recipe_id == recipe.id
     refute plan_state.slots["mon_dinner"].skipped

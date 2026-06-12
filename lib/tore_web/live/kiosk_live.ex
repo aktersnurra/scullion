@@ -1,7 +1,7 @@
 defmodule ToreWeb.KioskLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Recipes, Handlers.PlanningHandler}
+  alias Tore.{Recipes, Planning}
 
   @days ~w[mon tue wed thu fri sat sun]
 
@@ -14,7 +14,7 @@ defmodule ToreWeb.KioskLive do
       Phoenix.PubSub.subscribe(Tore.PubSub, "plan")
     end
 
-    {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
     recipes = Recipes.list()
     recipes_by_id = Map.new(recipes, &{&1.id, &1})
 
@@ -48,7 +48,7 @@ defmodule ToreWeb.KioskLive do
   end
 
   def handle_info({:events, _events}, socket) do
-    {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
+    {:ok, plan_state} = Planning.load_plan(socket.assigns.plan_id)
     tonight_slot = Map.get(plan_state.slots, socket.assigns.tonight_slot_key)
 
     tonight_recipe =
@@ -73,7 +73,7 @@ defmodule ToreWeb.KioskLive do
   end
 
   def handle_event("swap_tonight", _params, socket) do
-    case PlanningHandler.skip_meal(socket.assigns.plan_id, socket.assigns.tonight_slot_key) do
+    case Planning.skip_meal(socket.assigns.plan_id, socket.assigns.tonight_slot_key) do
       {:ok, _events} ->
         {:noreply, flash(socket, "Tonight's meal swapped.")}
 

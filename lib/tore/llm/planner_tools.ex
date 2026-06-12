@@ -9,7 +9,7 @@ defmodule Tore.LLM.PlannerTools do
   """
 
   alias Tore.LLM.Tool
-  alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning
   alias Tore.Planning.{Decider, Commands}
 
   @slot_key %{type: "string", description: "Slot identifier like \"mon_dinner\""}
@@ -79,7 +79,7 @@ defmodule Tore.LLM.PlannerTools do
         required: ["from_slot_key", "to_slot_key", "rationale"]
       },
       run: fn args, _ctx, plan ->
-        case PlanningHandler.swap_events(plan, args["from_slot_key"], args["to_slot_key"]) do
+        case Planning.swap_events(plan, args["from_slot_key"], args["to_slot_key"]) do
           {:ok, events, next} ->
             to_recipe_id = get_in(next.slots, [args["to_slot_key"], :recipe_id])
 

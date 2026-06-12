@@ -1,11 +1,11 @@
 defmodule Tore.Handlers.PrepHandler do
-  alias Tore.{Handlers.PlanningHandler, Prep, Recipes, SpendGuard}
+  alias Tore.{Planning, Prep, Recipes, SpendGuard}
 
   @llm Application.compile_env(:tore, :llm_client)
 
   def generate_guide(plan_id, week_start, locale \\ nil) do
     with :ok <- SpendGuard.allow?(:generate_prep_guide),
-         {:ok, plan_state} <- PlanningHandler.load_plan(plan_id) do
+         {:ok, plan_state} <- Planning.load_plan(plan_id) do
       plan_for_prompt = build_plan_for_prompt(plan_state, week_start)
 
       with {:ok, guide_data, usage} <- @llm.generate_prep_guide(plan_for_prompt, locale),

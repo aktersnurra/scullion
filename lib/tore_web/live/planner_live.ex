@@ -1,7 +1,7 @@
 defmodule ToreWeb.PlannerLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Recipes, Handlers.PlanningHandler, Handlers.GroceriesHandler, PlanHealth}
+  alias Tore.{Recipes, Planning, Handlers.GroceriesHandler, PlanHealth}
   alias Phoenix.PubSub
 
   @days ~w[mon tue wed thu fri sat sun]
@@ -19,7 +19,7 @@ defmodule ToreWeb.PlannerLive do
       Phoenix.PubSub.subscribe(Tore.PubSub, "harness:household:#{household_id}")
     end
 
-    {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
     recipes = Recipes.list(sort: :alphabetical)
     current_run = Tore.Harness.Projector.latest_on_surface(household_id, :plan)
 
@@ -94,7 +94,7 @@ defmodule ToreWeb.PlannerLive do
       Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
 
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
+      case Planning.suggest_recipes_for_slot(plan_id, sk,
              limit: 5,
              dietary_guidance: dietary_guidance
            ) do
@@ -171,8 +171,8 @@ defmodule ToreWeb.PlannerLive do
     plan_id = socket.assigns.plan_id
 
     if was_pinned,
-      do: PlanningHandler.unpin_slot(plan_id, sk),
-      else: PlanningHandler.pin_slot(plan_id, sk, true)
+      do: Planning.unpin_slot(plan_id, sk),
+      else: Planning.pin_slot(plan_id, sk, true)
 
     {:noreply, update_slot(socket, fn s -> %{s | pinned: !was_pinned} end)}
   end
@@ -191,7 +191,7 @@ defmodule ToreWeb.PlannerLive do
       Tore.Household.get_preferences() |> Tore.Household.prefs_to_dietary_guidance()
 
     Task.start(fn ->
-      case PlanningHandler.suggest_recipes_for_slot(plan_id, sk,
+      case Planning.suggest_recipes_for_slot(plan_id, sk,
              limit: 5,
              include_llm: true,
              dietary_guidance: dietary_guidance
@@ -205,7 +205,7 @@ defmodule ToreWeb.PlannerLive do
   end
 
   def handle_event("remove_meal", %{"slot_key" => sk}, socket) do
-    PlanningHandler.remove_recipe(socket.assigns.plan_id, sk)
+    Planning.remove_recipe(socket.assigns.plan_id, sk)
     {:noreply, socket}
   end
 
@@ -280,10 +280,10 @@ defmodule ToreWeb.PlannerLive do
         cond do
           s.skipped ->
             slot = Map.get(socket.assigns.plan_state.slots, s.slot_key)
-            if slot, do: PlanningHandler.skip_meal(plan_id, s.slot_key)
+            if slot, do: Planning.skip_meal(plan_id, s.slot_key)
 
           s.selected_recipe_id ->
-            PlanningHandler.assign_with_leftovers(
+            Planning.assign_with_leftovers(
               plan_id,
               s.slot_key,
               s.selected_recipe_id,
@@ -343,7 +343,7 @@ defmodule ToreWeb.PlannerLive do
   def handle_info({:run_event, _stream_id, _event}, socket), do: {:noreply, socket}
 
   def handle_info({:events, _events}, socket) do
-    {:ok, plan_state} = PlanningHandler.load_plan(socket.assigns.plan_id)
+    {:ok, plan_state} = Planning.load_plan(socket.assigns.plan_id)
     old_ids = assigned_recipe_ids(socket.assigns.plan_state)
     new_ids = assigned_recipe_ids(plan_state)
 
@@ -1072,7 +1072,7 @@ defmodule ToreWeb.PlannerLive do
 
   defp load_week(socket, week_start) do
     plan_id = plan_id(week_start)
-    {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
 
     assign(socket,
       week_start: week_start,

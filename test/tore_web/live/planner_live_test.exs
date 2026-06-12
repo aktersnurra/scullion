@@ -3,7 +3,7 @@ defmodule ToreWeb.PlannerLiveTest do
   import Phoenix.LiveViewTest
   import Mox
 
-  alias Tore.{Accounts, Recipes, Handlers.PlanningHandler}
+  alias Tore.{Accounts, Recipes, Planning}
 
   setup :verify_on_exit!
 
@@ -58,7 +58,7 @@ defmodule ToreWeb.PlannerLiveTest do
       render_click(lv, "pick_recipe", %{"id" => to_string(recipe.id)})
       render_click(lv, "save_slot", %{})
 
-      {:ok, state} = PlanningHandler.load_plan(this_plan_id())
+      {:ok, state} = Planning.load_plan(this_plan_id())
       assert state.slots["tue_dinner"].recipe_id == recipe.id
     end
 
@@ -75,7 +75,7 @@ defmodule ToreWeb.PlannerLiveTest do
       render_click(lv, "toggle_leftover_day", %{"day" => "tue_dinner"})
       render_click(lv, "save_slot", %{})
 
-      {:ok, state} = PlanningHandler.load_plan(this_plan_id())
+      {:ok, state} = Planning.load_plan(this_plan_id())
       assert state.slots["mon_dinner"].recipe_id == recipe.id
       assert state.slots["tue_dinner"].leftover == true
     end
@@ -86,7 +86,7 @@ defmodule ToreWeb.PlannerLiveTest do
       recipe: recipe
     } do
       # Pre-assign a meal so skip has something to act on
-      PlanningHandler.assign_recipe(this_plan_id(), "wed_dinner", recipe.id, 4)
+      Planning.assign_recipe(this_plan_id(), "wed_dinner", recipe.id, 4)
 
       conn = authed(conn, user)
       {:ok, lv, _html} = live(conn, "/plan")
@@ -95,7 +95,7 @@ defmodule ToreWeb.PlannerLiveTest do
       render_click(lv, "toggle_skipped", %{})
       render_click(lv, "save_slot", %{})
 
-      {:ok, state} = PlanningHandler.load_plan(this_plan_id())
+      {:ok, state} = Planning.load_plan(this_plan_id())
       assert state.slots["wed_dinner"].skipped == true
     end
 
@@ -191,14 +191,14 @@ defmodule ToreWeb.PlannerLiveTest do
 
       lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
 
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      {:ok, state} = Planning.load_plan(plan)
       assert Map.has_key?(state.pins, "mon_dinner")
     end
 
     test "toggling pin off persists a SlotUnpinned event", %{conn: conn, user: user} do
       conn = authed(conn, user)
       plan = this_plan_id()
-      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      Planning.pin_slot(plan, "mon_dinner", true)
       {:ok, lv, _html} = live(conn, "/plan")
 
       lv
@@ -207,14 +207,14 @@ defmodule ToreWeb.PlannerLiveTest do
 
       lv |> element(~s(button[phx-click="toggle_pinned"])) |> render_click()
 
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      {:ok, state} = Planning.load_plan(plan)
       refute Map.has_key?(state.pins, "mon_dinner")
     end
 
     test "the day row shows a lock indicator when the slot is pinned", %{conn: conn, user: user} do
       conn = authed(conn, user)
       plan = this_plan_id()
-      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      Planning.pin_slot(plan, "mon_dinner", true)
       {:ok, lv, _html} = live(conn, "/plan")
 
       # structural: the indicator lives inside the pinned slot's row, not just somewhere
@@ -245,7 +245,7 @@ defmodule ToreWeb.PlannerLiveTest do
     } do
       conn = authed(conn, user)
       plan = this_plan_id()
-      PlanningHandler.pin_slot(plan, "mon_dinner", true)
+      Planning.pin_slot(plan, "mon_dinner", true)
       {:ok, lv, _html} = live(conn, "/plan")
 
       html =

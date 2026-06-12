@@ -1,4 +1,4 @@
-defmodule Tore.Handlers.PlanningHandler do
+defmodule Tore.Planning do
   alias Tore.{Deals, EventStore, Planning.Decider, Planning.Commands, Recipes, SpendGuard}
   alias Phoenix.PubSub
   alias Tore.Household

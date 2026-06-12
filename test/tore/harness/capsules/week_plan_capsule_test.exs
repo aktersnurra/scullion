@@ -2,7 +2,7 @@ defmodule Tore.Harness.Capsules.WeekPlanCapsuleTest do
   use Tore.DataCase, async: false
 
   alias Tore.Harness.Capsules.WeekPlanCapsule, as: Capsule
-  alias Tore.{Handlers.PlanningHandler, Recipes}
+  alias Tore.{Planning, Recipes}
 
   defp ctx_for(week_start) do
     %{
@@ -25,7 +25,7 @@ defmodule Tore.Harness.Capsules.WeekPlanCapsuleTest do
         cook_time_minutes: 30
       })
 
-    PlanningHandler.assign_recipe(ctx.plan_stream_id, "tue_dinner", recipe.id, 4)
+    Planning.assign_recipe(ctx.plan_stream_id, "tue_dinner", recipe.id, 4)
 
     capsule = Capsule.build(ctx)
     assert length(capsule.slots) == 7

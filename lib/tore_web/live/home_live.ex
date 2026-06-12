@@ -1,7 +1,7 @@
 defmodule ToreWeb.HomeLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Recipes, Handlers.PlanningHandler, CounterNotes}
+  alias Tore.{Recipes, Planning, CounterNotes}
 
   @days ~w[mon tue wed thu fri sat sun]
 
@@ -11,7 +11,7 @@ defmodule ToreWeb.HomeLive do
     plan_id = plan_id(week_start)
     today_key = today_slot_key(today)
 
-    {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
 
     recipes = Recipes.list()
     recipes_by_id = Map.new(recipes, &{&1.id, &1})
@@ -120,8 +120,8 @@ defmodule ToreWeb.HomeLive do
 
   def handle_event("something_else", _params, socket) do
     %{plan_id: plan_id, today_key: today_key, recipes_by_id: recipes_by_id} = socket.assigns
-    PlanningHandler.skip_meal(plan_id, today_key)
-    {:ok, plan_state} = PlanningHandler.load_plan(plan_id)
+    Planning.skip_meal(plan_id, today_key)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
     tonight_slot = Map.get(plan_state.slots, today_key)
 
     tonight_recipe =

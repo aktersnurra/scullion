@@ -6,7 +6,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Harness.PlanDiffBuilder
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
-  alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning
   alias Tore.Harness.Verifier.PlanVerifier
   alias Tore.Harness.Capsules
 
@@ -118,7 +118,7 @@ defmodule Tore.Harness.Orchestrator do
   end
 
   defp run_planner_loop(state, ctx, stream_id, user_text, opts, metadata) do
-    with {:ok, working_plan} <- PlanningHandler.load_plan(ctx.plan_stream_id),
+    with {:ok, working_plan} <- Planning.load_plan(ctx.plan_stream_id),
          {:ok, loop} <-
            PlannerAgent.run(
              system_prompt(ctx),
@@ -191,7 +191,7 @@ defmodule Tore.Harness.Orchestrator do
       :ok ->
         run_summary = RunSummary.from_artifacts([plan_diff], :applied)
 
-        with :ok <- PlanningHandler.apply_events(ctx.plan_stream_id, loop.plan_events),
+        with :ok <- Planning.apply_events(ctx.plan_stream_id, loop.plan_events),
              {:ok, state} <-
                apply_command(
                  state.stream_id,

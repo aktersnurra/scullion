@@ -60,7 +60,7 @@ config :tore, Tore.Scheduler,
     {"0 3 * * *", {Tore.Deals, :clear_expired, []}},
     {"0 6 * * 6", {Tore.Handlers.InsightsHandler, :synthesise_weekly, []}},
     {"0 8 * * 6", {Tore.Handlers.DealsHandler, :scrape_all, []}},
-    {"0 18 * * 6", {Tore.Handlers.PlanningHandler, :plan_upcoming_week, []}},
+    {"0 18 * * 6", {Tore.Planning, :plan_upcoming_week, []}},
     {"30 18 * * 6",
      fn ->
        Tore.Handlers.PrepHandler.generate_guide("plan:current", Date.utc_today())

@@ -1,9 +1,9 @@
-defmodule Tore.Handlers.PlanningHandlerTest do
+defmodule Tore.PlanningTest do
   use ExUnit.Case, async: false
 
   import Mox
 
-  alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning
 
   setup :verify_on_exit!
 
@@ -18,32 +18,32 @@ defmodule Tore.Handlers.PlanningHandlerTest do
   defp mock_usage, do: %{prompt_tokens: 100, completion_tokens: 50, cost_usd: 0.001}
 
   test "load_plan returns initial state for new plan" do
-    assert {:ok, state} = PlanningHandler.load_plan(plan_id())
+    assert {:ok, state} = Planning.load_plan(plan_id())
     assert state.slots == %{}
   end
 
   test "assign_recipe persists RecipeAssigned event" do
-    assert {:ok, _events} = PlanningHandler.assign_recipe(plan_id(), "mon_dinner", 1, 4)
-    assert {:ok, state} = PlanningHandler.load_plan(plan_id())
+    assert {:ok, _events} = Planning.assign_recipe(plan_id(), "mon_dinner", 1, 4)
+    assert {:ok, state} = Planning.load_plan(plan_id())
     assert state.slots["mon_dinner"].recipe_id == 1
     assert state.slots["mon_dinner"].servings == 4
   end
 
   test "assign_recipe broadcasts to plan topic" do
-    PlanningHandler.assign_recipe(plan_id(), "tue_dinner", 2, 2)
+    Planning.assign_recipe(plan_id(), "tue_dinner", 2, 2)
     assert_receive {:events, [%Tore.Planning.Events.RecipeAssigned{}]}
   end
 
   test "remove_recipe returns error for empty slot" do
-    assert {:error, :slot_empty} = PlanningHandler.remove_recipe(plan_id(), "mon_dinner")
+    assert {:error, :slot_empty} = Planning.remove_recipe(plan_id(), "mon_dinner")
   end
 
   test "load_plan returns current state after multiple events" do
-    PlanningHandler.assign_recipe(plan_id(), "mon_dinner", 10, 4)
-    PlanningHandler.assign_recipe(plan_id(), "tue_dinner", 11, 2)
-    PlanningHandler.skip_meal(plan_id(), "mon_dinner")
+    Planning.assign_recipe(plan_id(), "mon_dinner", 10, 4)
+    Planning.assign_recipe(plan_id(), "tue_dinner", 11, 2)
+    Planning.skip_meal(plan_id(), "mon_dinner")
 
-    {:ok, state} = PlanningHandler.load_plan(plan_id())
+    {:ok, state} = Planning.load_plan(plan_id())
     assert state.slots["mon_dinner"].skipped == true
     assert state.slots["tue_dinner"].recipe_id == 11
   end
@@ -71,7 +71,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
       Tore.Pantry.add_item(%{name: "chicken", quantity: Decimal.new(1)})
 
-      assert {:ok, results} = PlanningHandler.suggest_recipes_for_slot(plan_id(), "mon_dinner")
+      assert {:ok, results} = Planning.suggest_recipes_for_slot(plan_id(), "mon_dinner")
       assert is_list(results)
       assert length(results) >= 1
 
@@ -89,7 +89,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       Enum.each(1..6, fn i -> create_recipe("Recipe #{i}") end)
 
       assert {:ok, results} =
-               PlanningHandler.suggest_recipes_for_slot(plan_id(), "mon_dinner", limit: 3)
+               Planning.suggest_recipes_for_slot(plan_id(), "mon_dinner", limit: 3)
 
       assert length(results) <= 3
     end
@@ -104,7 +104,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       end)
 
       assert {:ok, results} =
-               PlanningHandler.suggest_recipes_for_slot(plan_id(), "tue_dinner",
+               Planning.suggest_recipes_for_slot(plan_id(), "tue_dinner",
                  include_llm: true,
                  limit: 5
                )
@@ -121,7 +121,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       |> expect(:suggest_slot_recipe, fn _ -> {:error, :timeout} end)
 
       assert {:ok, results} =
-               PlanningHandler.suggest_recipes_for_slot(plan_id(), "tue_dinner",
+               Planning.suggest_recipes_for_slot(plan_id(), "tue_dinner",
                  include_llm: true
                )
 
@@ -143,7 +143,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
         })
 
       assert {:ok, events} =
-               PlanningHandler.assign_with_leftovers(
+               Planning.assign_with_leftovers(
                  plan_id(),
                  "mon_dinner",
                  recipe.id,
@@ -154,7 +154,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       # Primary RecipeAssigned + 2 (assign + leftover) per leftover day
       assert length(events) >= 5
 
-      {:ok, state} = PlanningHandler.load_plan(plan_id())
+      {:ok, state} = Planning.load_plan(plan_id())
       assert state.slots["mon_dinner"].recipe_id == recipe.id
       assert state.slots["tue_dinner"].leftover == true
       assert state.slots["wed_dinner"].leftover == true
@@ -175,7 +175,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
         })
 
       assert {:ok, events} =
-               PlanningHandler.assign_with_leftovers(plan_id(), "mon_dinner", recipe.id, 2, [])
+               Planning.assign_with_leftovers(plan_id(), "mon_dinner", recipe.id, 2, [])
 
       assert length(events) == 1
     end
@@ -194,9 +194,9 @@ defmodule Tore.Handlers.PlanningHandlerTest do
     expected_week_start = Date.add(today, days_ahead)
     expected_stream = "plan:#{Date.to_iso8601(expected_week_start)}"
 
-    assert {:ok, state} = PlanningHandler.plan_upcoming_week()
+    assert {:ok, state} = Planning.plan_upcoming_week()
     assert state.__struct__ == Tore.Harness.Run.State.Applied
-    assert {:ok, _plan} = PlanningHandler.load_plan(expected_stream)
+    assert {:ok, _plan} = Planning.load_plan(expected_stream)
   end
 
   describe "swap_events/3 (pure)" do
@@ -219,7 +219,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
           servings: 2
         })
 
-      assert {:ok, events, next} = PlanningHandler.swap_events(state, "mon_dinner", "tue_dinner")
+      assert {:ok, events, next} = Planning.swap_events(state, "mon_dinner", "tue_dinner")
       assert events != []
       assert next.slots["mon_dinner"].recipe_id == r2.id
       assert next.slots["tue_dinner"].recipe_id == r1.id
@@ -227,7 +227,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
     test "returns :nothing_to_swap when both slots are empty" do
       assert {:error, :nothing_to_swap} =
-               PlanningHandler.swap_events(%State{}, "mon_dinner", "tue_dinner")
+               Planning.swap_events(%State{}, "mon_dinner", "tue_dinner")
     end
   end
 
@@ -240,14 +240,14 @@ defmodule Tore.Handlers.PlanningHandlerTest do
         %Tore.Planning.Events.RecipeAssigned{slot_key: "wed_dinner", recipe_id: r.id, servings: 3}
       ]
 
-      assert :ok = PlanningHandler.apply_events(plan, events)
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      assert :ok = Planning.apply_events(plan, events)
+      {:ok, state} = Planning.load_plan(plan)
       assert state.slots["wed_dinner"].recipe_id == r.id
     end
 
     test "is a no-op for an empty event list" do
-      assert :ok = PlanningHandler.apply_events("plan:empty-apply", [])
-      {:ok, state} = PlanningHandler.load_plan("plan:empty-apply")
+      assert :ok = Planning.apply_events("plan:empty-apply", [])
+      {:ok, state} = Planning.load_plan("plan:empty-apply")
       assert state.slots == %{}
     end
   end
@@ -255,12 +255,12 @@ defmodule Tore.Handlers.PlanningHandlerTest do
   describe "swap_slots/3" do
     test "swaps two occupied slots, preserving both recipes and their servings" do
       plan = "plan:swap-1"
-      PlanningHandler.assign_recipe(plan, "fri_dinner", 101, 4)
-      PlanningHandler.assign_recipe(plan, "sun_dinner", 202, 2)
+      Planning.assign_recipe(plan, "fri_dinner", 101, 4)
+      Planning.assign_recipe(plan, "sun_dinner", 202, 2)
 
-      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+      assert {:ok, _events} = Planning.swap_slots(plan, "fri_dinner", "sun_dinner")
 
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      {:ok, state} = Planning.load_plan(plan)
       assert state.slots["fri_dinner"].recipe_id == 202
       assert state.slots["fri_dinner"].servings == 2
       assert state.slots["sun_dinner"].recipe_id == 101
@@ -269,11 +269,11 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
     test "one slot empty: moves the recipe and clears the source" do
       plan = "plan:swap-2"
-      PlanningHandler.assign_recipe(plan, "fri_dinner", 101, 4)
+      Planning.assign_recipe(plan, "fri_dinner", 101, 4)
 
-      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+      assert {:ok, _events} = Planning.swap_slots(plan, "fri_dinner", "sun_dinner")
 
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      {:ok, state} = Planning.load_plan(plan)
       assert state.slots["sun_dinner"].recipe_id == 101
       assert state.slots["sun_dinner"].servings == 4
       refute Map.has_key?(state.slots, "fri_dinner")
@@ -281,11 +281,11 @@ defmodule Tore.Handlers.PlanningHandlerTest do
 
     test "empty source, occupied target: moves target into source, clears target" do
       plan = "plan:swap-2b"
-      PlanningHandler.assign_recipe(plan, "sun_dinner", 202, 2)
+      Planning.assign_recipe(plan, "sun_dinner", 202, 2)
 
-      assert {:ok, _events} = PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+      assert {:ok, _events} = Planning.swap_slots(plan, "fri_dinner", "sun_dinner")
 
-      {:ok, state} = PlanningHandler.load_plan(plan)
+      {:ok, state} = Planning.load_plan(plan)
       assert state.slots["fri_dinner"].recipe_id == 202
       refute Map.has_key?(state.slots, "sun_dinner")
     end
@@ -294,7 +294,7 @@ defmodule Tore.Handlers.PlanningHandlerTest do
       plan = "plan:swap-3"
 
       assert {:error, :nothing_to_swap} =
-               PlanningHandler.swap_slots(plan, "fri_dinner", "sun_dinner")
+               Planning.swap_slots(plan, "fri_dinner", "sun_dinner")
     end
   end
 end

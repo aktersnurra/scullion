@@ -1,7 +1,7 @@
 defmodule Tore.Harness.Capsules.WeekPlanCapsule do
   @behaviour Tore.Harness.Capsule
 
-  alias Tore.Handlers.PlanningHandler
+  alias Tore.Planning
 
   @day_names ~w(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
 
@@ -12,7 +12,7 @@ defmodule Tore.Harness.Capsules.WeekPlanCapsule do
 
   @impl true
   def build(ctx) do
-    case PlanningHandler.load_plan(ctx.plan_stream_id) do
+    case Planning.load_plan(ctx.plan_stream_id) do
       {:ok, state} ->
         %__MODULE__{week_start: ctx.week_start, slots: build_slots(state, ctx.week_start)}
 
