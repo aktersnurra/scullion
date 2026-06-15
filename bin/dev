@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+# First run: seed .env and stop so the user fills in creds before anything uses them.
+if [ ! -f .env ]; then
+  cp .env.example .env
+  echo "Created .env from .env.example. Fill in GARAGE_* creds + API keys, then re-run bin/dev."
+  exit 1
+fi
+
+# Load env FIRST — the bootstrap imports GARAGE_ACCESS_KEY_ID/SECRET into Garage.
+set -a
+. ./.env
+set +a
+
+# Bring up Garage and BLOCK until its healthcheck passes (no sleep, no poll loop).
+docker compose up -d --wait
+
+# Provision once / no-op on subsequent runs (imports .env creds, makes the bucket).
+./bin/garage-bootstrap.sh
+
+exec mix phx.server

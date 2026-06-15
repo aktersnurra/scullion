@@ -53,3 +53,6 @@ llm-native-mock.png
 
 # Symlink to nuc-setup deploy script
 /deploy
+
+# Local dev secrets
+.env
