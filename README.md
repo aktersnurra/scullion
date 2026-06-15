@@ -88,6 +88,29 @@ OPENROUTER_IMAGE_MODEL=google/gemini-3.1-flash-image-preview
 OPENROUTER_CHECK_MODEL=openai/gpt-oss-120b:free
 ```
 
+### Local development with image storage (Garage)
+
+Recipe images are stored in a local [Garage](https://garagehq.deuxfleurs.fr/)
+(S3-compatible) instance, matching production. Requires Docker with the Compose
+plugin.
+
+```sh
+bin/dev        # first run seeds .env and stops — fill it in, then re-run
+```
+
+`bin/dev` brings up Garage (`docker compose up -d --wait`), provisions the
+`tore-recipes` bucket on first run, and starts Phoenix. Fill `.env` with:
+
+- `OPENROUTER_API_KEY` — your OpenRouter key.
+- `GARAGE_ACCESS_KEY_ID` / `GARAGE_SECRET_ACCESS_KEY` — credentials you choose
+  (`GK`-prefixed id + 64-char hex secret; see the comments in `.env.example`).
+  `bin/garage-bootstrap.sh` imports them into Garage.
+
+Garage state persists in Docker named volumes, so restarts reuse it. To wipe and
+re-provision from scratch: `docker compose down -v`, then `bin/dev` again.
+
+Tests use an in-memory storage mock, so `mix test` needs nothing running.
+
 ---
 
 ## Running tests
