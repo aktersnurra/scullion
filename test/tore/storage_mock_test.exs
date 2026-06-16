@@ -22,15 +22,15 @@ defmodule Tore.StorageMockTest do
   end
 
   test "delete_object removes stored entry" do
-    Mock.put_object(Buckets.receipts(), "receipts/5/img.jpg", "data")
-    assert Mock.get(Buckets.receipts(), "receipts/5/img.jpg") == "data"
-    :ok = Mock.delete_object(Buckets.receipts(), "receipts/5/img.jpg")
-    assert Mock.get(Buckets.receipts(), "receipts/5/img.jpg") == nil
+    Mock.put_object(Buckets.recipes(), "recipes/5/img.jpg", "data")
+    assert Mock.get(Buckets.recipes(), "recipes/5/img.jpg") == "data"
+    :ok = Mock.delete_object(Buckets.recipes(), "recipes/5/img.jpg")
+    assert Mock.get(Buckets.recipes(), "recipes/5/img.jpg") == nil
   end
 
   test "reset clears all entries" do
-    Mock.put_object(Buckets.uploads(), "x/y.jpg", "z")
+    Mock.put_object(Buckets.recipes(), "x/y.jpg", "z")
     Mock.reset()
-    assert Mock.get(Buckets.uploads(), "x/y.jpg") == nil
+    assert Mock.get(Buckets.recipes(), "x/y.jpg") == nil
   end
 end
