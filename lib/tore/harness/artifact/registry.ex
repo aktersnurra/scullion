@@ -1,7 +1,8 @@
 defmodule Tore.Harness.Artifact.Registry do
-  alias Tore.Harness.Artifact.{PlanDiff, RunSummary}
+  alias Tore.Harness.Artifact.{MemoryUpdate, PlanDiff, RunSummary}
 
   @registry %{
+    "MemoryUpdate" => MemoryUpdate,
     "PlanDiff" => PlanDiff,
     "RunSummary" => RunSummary
   }

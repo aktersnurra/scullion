@@ -58,7 +58,7 @@ config :tore, :http_client, Tore.Adapters.ReqHTTP
 config :tore, Tore.Scheduler,
   jobs: [
     {"0 3 * * *", {Tore.Deals, :clear_expired, []}},
-    {"0 6 * * 6", {Tore.Insights, :synthesise_weekly, []}},
+    {"0 6 * * 6", {Tore.Harness.KitchenMemorySynthesis, :synthesise_weekly, []}},
     {"0 8 * * 6", {Tore.Deals, :scrape_all, []}},
     {"0 18 * * 6", {Tore.Planning, :plan_upcoming_week, []}},
     {"30 18 * * 6",

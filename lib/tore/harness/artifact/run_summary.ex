@@ -62,6 +62,8 @@ defmodule Tore.Harness.Artifact.RunSummary do
   defp count_key_atom("leftover"), do: :leftover
   defp count_key_atom("removed"), do: :removed
   defp count_key_atom("servings"), do: :servings
+  defp count_key_atom("superseded"), do: :superseded
+  defp count_key_atom("unchanged"), do: :unchanged
 
   defp text_for(counts, outcome) do
     body =
@@ -83,5 +85,7 @@ defmodule Tore.Harness.Artifact.RunSummary do
   defp change_label(:leftover), do: "leftovers"
   defp change_label(:removed), do: "removed"
   defp change_label(:servings), do: "servings adjusted"
+  defp change_label(:superseded), do: "superseded"
+  defp change_label(:unchanged), do: "unchanged"
   defp change_label(other), do: to_string(other)
 end
