@@ -51,6 +51,9 @@ llm-native-mock.png
 
 /docs/explain/
 
+# Hook-generated session log (PreCompact)
+/SESSION_SUMMARY.md
+
 # Symlink to nuc-setup deploy script
 /deploy
 
