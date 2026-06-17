@@ -19,6 +19,18 @@ defmodule Tore.RecipesTest do
       assert String.ends_with?(reloaded.image_path, ".jpg")
       refute String.contains?(reloaded.image_path, "://")
     end
+
+    test "broadcasts {:recipe_image, id, key} on the recipes topic" do
+      Tore.Storage.Mock.reset()
+      {:ok, recipe} = Recipes.create(recipe_attrs())
+      Phoenix.PubSub.subscribe(Tore.PubSub, "recipes")
+
+      :ok = Recipes.generate_image(recipe, nil)
+
+      assert_receive {:recipe_image, recipe_id, key}
+      assert recipe_id == recipe.id
+      assert String.starts_with?(key, "recipes/#{recipe.id}/")
+    end
   end
 
   describe "create/1" do

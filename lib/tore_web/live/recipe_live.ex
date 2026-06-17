@@ -7,6 +7,8 @@ defmodule ToreWeb.RecipeLive do
   @time_filters [:any, 30, 45, 60]
 
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Phoenix.PubSub.subscribe(Tore.PubSub, "recipes")
+
     {:ok,
      socket
      |> assign(
@@ -270,6 +272,21 @@ defmodule ToreWeb.RecipeLive do
       end)
 
     {:noreply, assign(socket, ingredient_rows: rows)}
+  end
+
+  def handle_info({:recipe_image, id, key}, socket) do
+    recipes =
+      Enum.map(socket.assigns.recipes, fn recipe ->
+        if recipe.id == id, do: %{recipe | image_path: key}, else: recipe
+      end)
+
+    selected =
+      case socket.assigns.selected do
+        %{id: ^id} = selected -> %{selected | image_path: key}
+        other -> other
+      end
+
+    {:noreply, assign(socket, recipes: recipes, selected: selected)}
   end
 
   def handle_info({:extract_images, binaries, locale}, socket) do

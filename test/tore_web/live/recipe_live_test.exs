@@ -39,6 +39,26 @@ defmodule ToreWeb.RecipeLiveTest do
     end
   end
 
+  describe "live image update" do
+    test "renders the proxy src when an image broadcast arrives", %{conn: conn, user: user} do
+      # A recipe with no image — inserted directly so no async image task fires.
+      {:ok, recipe} =
+        %Tore.Recipes.Recipe{title: "Carbonara", recipe_type: :meal}
+        |> Tore.Repo.insert()
+
+      {:ok, lv, _html} = live(authed(conn, user), "/recipes")
+      refute render(lv) =~ "/images/recipes/#{recipe.id}"
+
+      Phoenix.PubSub.broadcast(
+        Tore.PubSub,
+        "recipes",
+        {:recipe_image, recipe.id, "recipes/#{recipe.id}/abc.jpg"}
+      )
+
+      assert render(lv) =~ "/images/recipes/#{recipe.id}"
+    end
+  end
+
   describe "get_ideas" do
     test "shows coming soon flash", %{conn: conn, user: user} do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")

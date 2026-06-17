@@ -237,6 +237,8 @@ defmodule Tore.Recipes do
         set: [image_path: key]
       )
 
+      Phoenix.PubSub.broadcast(Tore.PubSub, "recipes", {:recipe_image, recipe.id, key})
+
       :ok
     end
   end
