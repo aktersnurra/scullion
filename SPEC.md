@@ -11,7 +11,7 @@
 - **2026-06-02:** Added §Agent Harness Layer. Tore is reframed as a household food-operations harness; every state-changing AI action is a `KitchenRun` producing typed artifacts, verified deterministically, applied atomically. §The Six LLM-Native Features rewritten in harness terms. Future sub-specs implement the harness primitives, verifiers, capsules, risk tiers, resolved references, and Kitchen Skills.
 - **2026-06-02:** UI/UX vocabulary adopted. Canonical names: `CounterNote` (artifact and code module — replaces the working name `Opportunity` from the first draft of §A), `Shop` (UI surface and route `/shop` — replaces `Groceries` / `/groceries`), `Capture` (UI surface and route `/capture` — replaces `Chat` / `/chat`), `Tore.Capture` (module namespace — replaces `Tore.Chat`). The code rename is a separate sub-plan; SPEC.md uses the new names throughout from this commit forward.
 - **Supersedes:** the original Scullion SPEC.md (2026-05-02), now archived in git history at commit `af0ad48`.
-- **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `UI_SPEC.md` (UI/UX contract — meets this spec at the artifact boundary), `PLAN.md` (module-by-module breakdown), `PLAN_FEAT_*.md` (per-feature plans).
+- **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `UI_SPEC.md` (UI/UX contract — meets this spec at the artifact boundary). Per-feature design notes live under `docs/superpowers/specs/`.
 - **Naming:** the project is *Tore*. Any remaining reference to Scullion or Family in code is legacy and slated for deletion (see §Removed in Rewrite).
 
 ---
@@ -923,6 +923,18 @@ A *household* owns all data: plans, groceries, pantry, costs, insights.
 *Users* belong to a household. A user is created with a 16-digit code; sessions are long-lived browser cookies.
 *Kiosks* authenticate with a per-device token, scoped to one household.
 `Tore.Household` is the canonical context. There is no `Tore.Family` module.
+
+---
+
+## Backlog
+
+Loose ideas captured here so they don't drift in a scratch file. Promote to a
+proper section or sub-spec when picked up.
+
+- **Locale on scraped recipes.** Scraped recipes should be translated into the household's locale at ingestion time.
+- **Per-household OpenRouter API key.** Set via an admin page in Settings. The app is unusable (every LLM-gated surface disabled) until a key is entered.
+- **Elixir 1.20 upgrade.** Move to the new type system and take advantage of it across `lib/tore/`.
+- **HTML in `.html.heex` files.** Move inline templates out of `*_live.ex` modules into colocated `.html.heex` files.
 
 ---
 

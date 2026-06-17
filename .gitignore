@@ -23,7 +23,7 @@ erl_crash.dump
 /tmp/
 
 # Ignore package tarball (built via "mix hex.build").
-scullion-*.tar
+tore-*.tar
 
 # Ignore assets that are produced by build tools.
 /priv/static/assets/
@@ -43,11 +43,9 @@ npm-debug.log
 
 /priv/static/uploads/
 
-search-mock.png
-mock-v2.png
-llm-native-mock.png
-
 .claude/
+.superpowers/
+.DS_Store
 
 /docs/explain/
 
