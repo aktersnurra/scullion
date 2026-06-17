@@ -7,6 +7,9 @@ defmodule Tore.Storage do
             ) ::
               {:ok, String.t()} | {:error, term()}
 
+  @callback get_object(bucket :: String.t(), key :: String.t()) ::
+              {:ok, binary()} | {:error, term()}
+
   @callback get_object_url(bucket :: String.t(), key :: String.t()) :: String.t()
 
   @callback delete_object(bucket :: String.t(), key :: String.t()) :: :ok | {:error, term()}

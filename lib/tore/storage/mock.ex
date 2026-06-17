@@ -14,6 +14,14 @@ defmodule Tore.Storage.Mock do
   end
 
   @impl true
+  def get_object(bucket, key) do
+    case Agent.get(__MODULE__, &Map.get(&1, {bucket, key})) do
+      nil -> {:error, :not_found}
+      body -> {:ok, body}
+    end
+  end
+
+  @impl true
   def get_object_url(bucket, key) do
     "http://mock-storage/#{bucket}/#{key}"
   end

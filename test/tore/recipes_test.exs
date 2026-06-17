@@ -7,6 +7,20 @@ defmodule Tore.RecipesTest do
     Map.merge(%{title: "Test Recipe", recipe_type: :meal}, overrides)
   end
 
+  describe "generate_image/2" do
+    test "stores the S3 object key in image_path, not a URL" do
+      Tore.Storage.Mock.reset()
+      {:ok, recipe} = Recipes.create(recipe_attrs())
+
+      :ok = Recipes.generate_image(recipe, nil)
+
+      reloaded = Recipes.get!(recipe.id)
+      assert String.starts_with?(reloaded.image_path, "recipes/#{recipe.id}/")
+      assert String.ends_with?(reloaded.image_path, ".jpg")
+      refute String.contains?(reloaded.image_path, "://")
+    end
+  end
+
   describe "create/1" do
     test "inserts a basic recipe" do
       assert {:ok, recipe} = Recipes.create(recipe_attrs())

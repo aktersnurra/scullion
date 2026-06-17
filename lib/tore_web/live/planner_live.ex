@@ -646,7 +646,7 @@ defmodule ToreWeb.PlannerLive do
         ]}>
           <img
             :if={@recipe && @recipe.image_path}
-            src={@recipe.image_path}
+            src={~p"/images/recipes/#{@recipe.id}"}
             alt=""
             class="h-full w-full object-cover"
           />
@@ -778,7 +778,7 @@ defmodule ToreWeb.PlannerLive do
               <div class="aspect-[16/9] w-full bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
                 <img
                   :if={@selected_recipe.image_path}
-                  src={@selected_recipe.image_path}
+                  src={~p"/images/recipes/#{@selected_recipe.id}"}
                   alt=""
                   class="h-full w-full object-cover"
                 />
@@ -1045,7 +1045,7 @@ defmodule ToreWeb.PlannerLive do
         <div class="size-12 shrink-0 rounded-[var(--r-md)] overflow-hidden bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
           <img
             :if={@recipe.image_path}
-            src={@recipe.image_path}
+            src={~p"/images/recipes/#{@recipe.id}"}
             alt=""
             class="h-full w-full object-cover"
           />

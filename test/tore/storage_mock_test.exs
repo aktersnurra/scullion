@@ -33,4 +33,13 @@ defmodule Tore.StorageMockTest do
     Mock.reset()
     assert Mock.get(Buckets.recipes(), "x/y.jpg") == nil
   end
+
+  test "get_object returns stored body" do
+    Mock.put_object(Buckets.recipes(), "recipes/1/abc.jpg", "image bytes")
+    assert Mock.get_object(Buckets.recipes(), "recipes/1/abc.jpg") == {:ok, "image bytes"}
+  end
+
+  test "get_object returns error for missing key" do
+    assert Mock.get_object(Buckets.recipes(), "recipes/1/missing.jpg") == {:error, :not_found}
+  end
 end

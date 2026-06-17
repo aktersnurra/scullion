@@ -567,7 +567,7 @@ defmodule ToreWeb.RecipeLive do
               <div class="aspect-[4/3] w-full bg-[color:var(--hairline)] flex items-center justify-center text-[color:var(--subtle)]">
                 <img
                   :if={recipe.image_path}
-                  src={recipe.image_path}
+                  src={~p"/images/recipes/#{recipe.id}"}
                   alt=""
                   class="h-full w-full object-cover transition-transform group-hover:scale-[1.02]"
                 />
@@ -628,7 +628,7 @@ defmodule ToreWeb.RecipeLive do
       ]}>
         <img
           :if={@selected.image_path}
-          src={@selected.image_path}
+          src={~p"/images/recipes/#{@selected.id}"}
           alt=""
           class="h-full w-full object-cover"
         />

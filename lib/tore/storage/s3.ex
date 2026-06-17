@@ -15,6 +15,17 @@ defmodule Tore.Storage.S3 do
   end
 
   @impl true
+  def get_object(bucket, key) do
+    bucket
+    |> ExAws.S3.get_object(key)
+    |> ExAws.request()
+    |> case do
+      {:ok, %{body: body}} -> {:ok, body}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @impl true
   def get_object_url(bucket, key) do
     config = ExAws.Config.new(:s3)
     scheme = config[:scheme] || "http://"
