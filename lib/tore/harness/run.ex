@@ -110,6 +110,14 @@ defmodule Tore.Harness.Run do
   defp failure_code_atom("missing_body"), do: :missing_body
   defp failure_code_atom("missing_evidence"), do: :missing_evidence
   defp failure_code_atom("too_many_active"), do: :too_many_active
+  defp failure_code_atom("missing_store"), do: :missing_store
+  defp failure_code_atom("missing_date"), do: :missing_date
+  defp failure_code_atom("missing_total"), do: :missing_total
+  defp failure_code_atom("date_in_future"), do: :date_in_future
+  defp failure_code_atom("sum_mismatch"), do: :sum_mismatch
+  defp failure_code_atom("missing_provenance"), do: :missing_provenance
+  defp failure_code_atom("negative_quantity"), do: :negative_quantity
+  defp failure_code_atom("last_seen_regressed"), do: :last_seen_regressed
   defp failure_code_atom(code) when is_atom(code), do: code
   defp failure_code_atom(other), do: safe_atom(other)
 

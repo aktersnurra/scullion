@@ -24,7 +24,14 @@ defmodule Tore.Pantry do
 
   @spec add_item(map()) :: {:ok, PantryItem.t()} | {:error, Ecto.Changeset.t()}
   def add_item(attrs) do
-    attrs = Map.put_new(attrs, :added_at, Date.utc_today())
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    attrs =
+      attrs
+      |> Map.put_new(:added_at, Date.utc_today())
+      |> Map.put_new(:provenance, "manual")
+      |> Map.put_new(:last_seen_at, now)
+
     %PantryItem{} |> PantryItem.changeset(attrs) |> Repo.insert()
   end
 

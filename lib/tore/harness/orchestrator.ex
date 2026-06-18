@@ -7,10 +7,10 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
   alias Tore.Planning
-  alias Tore.Harness.Verifier.{MemoryVerifier, PlanVerifier}
+  alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
   alias Tore.Harness.Capsules
-  alias Tore.Harness.KitchenMemorySynthesis
-  alias Tore.Harness.Artifact.MemoryUpdate
+  alias Tore.Harness.{KitchenMemorySynthesis, ReceiptIngestion}
+  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate}
 
   alias Tore.Harness.Capsules.{
     HouseholdPreferencesCapsule,
@@ -62,6 +62,38 @@ defmodule Tore.Harness.Orchestrator do
 
   @weekly_max_round_trips 10
   @weekly_max_action_calls 25
+
+  def dispatch(:receipt_ingestion_run, ctx) do
+    stream_id = Run.next_stream_id()
+    metadata = %{household_id: ctx.household_id}
+
+    open_cmd = %Commands.Open{
+      household_id: ctx.household_id,
+      kind: "receipt_ingestion_run",
+      surface: :plan,
+      started_by: Map.get(ctx, :started_by, "user"),
+      user_id: Map.get(ctx, :user_id),
+      input: %{image_path: Map.get(ctx, :image_path)}
+    }
+
+    run_dispatch(stream_id, metadata, "receipt_ingestion_run", fn ->
+      with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
+           {:ok, state} <- enter(state, :gathering_context, metadata),
+           {:ok, parsed} <- ReceiptIngestion.parse(ctx.image_binary),
+           {:ok, state} <- enter(state, :proposing, metadata),
+           {cost, pantry} =
+             ReceiptIngestion.build_artifacts(parsed,
+               date: Map.get(ctx, :date, Date.utc_today()),
+               image_path: Map.get(ctx, :image_path)
+             ),
+           {:ok, state} <- enter(state, :verifying, metadata),
+           {:ok, state} <- verify_and_surface_receipt(state, cost, pantry, metadata) do
+        {:ok, state}
+      else
+        {:error, reason} -> {:error, {:step_failed, reason}}
+      end
+    end)
+  end
 
   def dispatch(:kitchen_memory_synthesis_run, ctx) do
     stream_id = Run.next_stream_id()
@@ -121,6 +153,41 @@ defmodule Tore.Harness.Orchestrator do
         {:error, reason} -> {:error, {:step_failed, reason}}
       end
     end)
+  end
+
+  @doc """
+  Commit a receipt proposal after the user has reviewed (and possibly edited)
+  the artifacts on the `:needs_user` card. Re-runs verifiers against the
+  (possibly edited) artifacts, then atomically applies Costs + Pantry. UI
+  entrypoint; not part of `dispatch/2`.
+  """
+  @spec commit_receipt(String.t(), CostEntry.t(), PantryBeliefUpdate.t(), integer() | nil) ::
+          {:ok, State.t()} | {:error, term()}
+  def commit_receipt(stream_id, %CostEntry{} = cost, %PantryBeliefUpdate{} = pantry, user_id) do
+    {:ok, state} = Run.load(stream_id)
+    metadata = %{household_id: state.household_id}
+
+    with %State.NeedsUser{} <- state,
+         :ok <- CostEntryVerifier.verify(cost, %{}),
+         :ok <- PantryVerifier.verify(pantry, %{}),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AnswerQuestion{answer: "confirmed"}, state, metadata),
+         {:ok, _receipt} <- ReceiptIngestion.apply!(cost, pantry, user_id),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: cost}, state, metadata),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: pantry}, state, metadata),
+         run_summary = RunSummary.from_artifacts([cost, pantry], :applied),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
+      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+    else
+      %State.Running{} -> {:error, :not_awaiting_user}
+      %State.Applied{} -> {:error, :already_applied}
+      %State.Failed{} -> {:error, :already_failed}
+      {:fail, code, repair} -> {:error, {:verifier_failed, code, repair}}
+      other -> {:error, other}
+    end
   end
 
   defp open_run(sid, %Commands.Open{} = cmd, metadata) do
@@ -247,6 +314,36 @@ defmodule Tore.Harness.Orchestrator do
           state,
           metadata
         )
+    end
+  end
+
+  defp verify_and_surface_receipt(state, %CostEntry{} = cost, %PantryBeliefUpdate{} = pantry, metadata) do
+    # SPEC §A.5 atomic verifier set: any fail = the whole run fails. Per §A.6.1
+    # vision-input runs always transition to NeedsUser when verifiers pass —
+    # the user reviews on an editable card and commit_receipt/4 commits.
+    with :ok <- CostEntryVerifier.verify(cost, %{}),
+         :ok <- PantryVerifier.verify(pantry, %{}),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: cost}, state, metadata),
+         {:ok, state} <-
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: pantry}, state, metadata) do
+      apply_command(
+        state.stream_id,
+        %Commands.RaiseQuestion{question: "Review the parsed receipt before saving."},
+        state,
+        metadata
+      )
+    else
+      {:fail, code, repair} ->
+        apply_command(
+          state.stream_id,
+          %Commands.RecordFailure{code: code, user_message: nil, repair_action: repair},
+          state,
+          metadata
+        )
+
+      other ->
+        other
     end
   end
 
