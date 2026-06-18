@@ -18,6 +18,9 @@ defmodule ToreWeb.CaptureLive do
   end
 
   @impl true
+  def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  @impl true
   def handle_event("send_message", %{"message" => text}, socket) do
     text = String.trim(text)
 
@@ -159,12 +162,12 @@ defmodule ToreWeb.CaptureLive do
           </div>
           <div
             :if={Map.get(msg, :run_card)}
-            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%] min-w-[14rem]"
           >
             <p class="text-sm text-[color:var(--text)] mb-2">{msg.text}</p>
             <.link
               navigate={~p"/runs/#{msg.run_stream_id}"}
-              class="text-sm text-[color:var(--accent)] font-semibold"
+              class="text-sm text-[color:var(--accent)] font-semibold whitespace-nowrap"
             >
               {gettext("Review receipt")} →
             </.link>
@@ -194,7 +197,7 @@ defmodule ToreWeb.CaptureLive do
       </div>
 
       <div class="px-4 py-3 border-t border-[color:var(--border)]">
-        <form phx-submit="send_message" class="flex flex-col gap-2">
+        <form phx-submit="send_message" phx-change="validate" class="flex flex-col gap-2">
           <div class="flex items-center gap-2">
             <input
               type="text"
@@ -212,14 +215,21 @@ defmodule ToreWeb.CaptureLive do
               <.icon name="hero-paper-airplane" class="size-4 text-white" />
             </button>
           </div>
-          <.live_file_input upload={@uploads.chat_photos} class="hidden" id="chat-photos-input" />
-          <button
-            type="button"
-            onclick="document.getElementById('chat-photos-input').click()"
-            class="text-xs text-[color:var(--muted)] flex items-center gap-1"
-          >
-            <.icon name="hero-camera" class="size-3.5" /> {gettext("Attach photo")}
-          </button>
+          <div class="flex items-center gap-2 flex-wrap">
+            <label
+              for={@uploads.chat_photos.ref}
+              class="text-xs text-[color:var(--muted)] flex items-center gap-1 cursor-pointer w-fit"
+            >
+              <.icon name="hero-camera" class="size-3.5" /> {gettext("Attach photo")}
+            </label>
+            <span
+              :for={entry <- @uploads.chat_photos.entries}
+              class="text-xs text-[color:var(--accent)]"
+            >
+              {entry.client_name} ({entry.progress}%)
+            </span>
+          </div>
+          <.live_file_input upload={@uploads.chat_photos} class="hidden" />
         </form>
       </div>
     </div>
