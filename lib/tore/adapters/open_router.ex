@@ -951,7 +951,7 @@ defmodule Tore.Adapters.OpenRouter do
     do: Application.get_env(:tore, :openrouter_vision_model, "google/gemini-3.1-flash-lite")
 
   defp classifier_model,
-    do: Application.get_env(:tore, :openrouter_classifier_model, "google/gemma-4-31b-it:free")
+    do: Application.get_env(:tore, :openrouter_classifier_model, "google/gemini-3.1-flash-lite")
 
   defp image_model,
     do:

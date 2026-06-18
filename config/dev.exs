@@ -80,7 +80,7 @@ config :tore,
 
 config :tore,
        :openrouter_classifier_model,
-       System.get_env("OPENROUTER_CLASSIFIER_MODEL", "google/gemma-4-31b-it:free")
+       System.get_env("OPENROUTER_CLASSIFIER_MODEL", "google/gemini-3.1-flash-lite")
 
 config :tore,
        :openrouter_image_model,
