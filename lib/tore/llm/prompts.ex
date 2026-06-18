@@ -352,7 +352,9 @@ defmodule Tore.LLM.Prompts do
       If pack size is ambiguous, fall back to K packages.
     - Plain integer quantity with no weight/pack hint: simple count.
       (e.g. quantity "3" of an item with no pack code → quantity 3, count unit.)
-    - If you genuinely can't tell, set quantity and unit to null — don't guess.
+    - If a row has a quantity, ALWAYS emit a unit — decimals with per-weight
+      pricing → "kg"/"lb"; integer counts → the locale's count unit ("st"/"pcs"/etc).
+      Only emit a null unit when quantity is also null (item unidentifiable).
     #{locale_hint(locale)}
     Respond with a JSON object only. No prose.
     """

@@ -138,6 +138,9 @@ defmodule ToreWeb.RunReviewLive do
 
       <section>
         <h3 class="text-sm font-medium text-[color:var(--text)] mb-2">{gettext("Line items")}</h3>
+        <p :if={sum_mismatch?(@form_data)} class="text-xs text-amber-600 mb-2">
+          {gettext("Lines sum to")} {sum_display(@form_data)}; {gettext("receipt total")} {@form_data.total} — {gettext("looks off, is something missing?")}
+        </p>
         <div class="space-y-2">
           <div
             :for={{item, idx} <- Enum.with_index(@form_data.line_items)}
@@ -148,14 +151,14 @@ defmodule ToreWeb.RunReviewLive do
               name={"receipt[line_items][#{idx}][name]"}
               value={item.name}
               placeholder="Item"
-              class="col-span-5 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              class="col-span-6 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <input
               type="text"
               name={"receipt[line_items][#{idx}][quantity]"}
               value={item.quantity}
               placeholder="Qty"
-              class="col-span-2 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              class="col-span-3 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <input
               type="text"
@@ -165,11 +168,9 @@ defmodule ToreWeb.RunReviewLive do
               class="col-span-2 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <input
-              type="text"
+              type="hidden"
               name={"receipt[line_items][#{idx}][total_price]"}
               value={item.total_price}
-              placeholder="Price"
-              class="col-span-2 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <button
               type="button"
@@ -295,6 +296,32 @@ defmodule ToreWeb.RunReviewLive do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(s) when is_binary(s), do: String.trim(s)
+
+  defp line_sum(form) do
+    Enum.reduce(form.line_items, Decimal.new(0), fn it, acc ->
+      case parse_decimal(it.total_price) do
+        nil -> acc
+        d -> Decimal.add(acc, d)
+      end
+    end)
+  end
+
+  defp sum_display(form), do: form |> line_sum() |> Decimal.to_string(:normal)
+
+  defp sum_mismatch?(form) do
+    case {parse_decimal(form.total), line_sum(form)} do
+      {nil, _} ->
+        false
+
+      {_total, sum} ->
+        if Decimal.equal?(sum, Decimal.new(0)) do
+          false
+        else
+          diff = form.total |> parse_decimal() |> Decimal.sub(sum) |> Decimal.abs()
+          Decimal.compare(diff, Decimal.new("1.00")) == :gt
+        end
+    end
+  end
 
   defp build_pantry(%PantryBeliefUpdate{} = p, form) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
