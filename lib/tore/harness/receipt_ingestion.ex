@@ -12,11 +12,11 @@ defmodule Tore.Harness.ReceiptIngestion do
 
   @llm Application.compile_env(:tore, :llm_client)
 
-  @spec parse(binary()) ::
+  @spec parse(binary(), String.t() | nil) ::
           {:ok, %{store_name: String.t() | nil, total: Decimal.t() | nil, items: [map()]}}
           | {:error, term()}
-  def parse(image_binary) do
-    case @llm.parse_receipt_for_pantry(image_binary) do
+  def parse(image_binary, locale \\ nil) do
+    case @llm.parse_receipt_for_pantry(image_binary, locale) do
       {:ok, parsed, _usage} -> {:ok, parsed}
       {:error, _} = err -> err
     end

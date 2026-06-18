@@ -12,7 +12,7 @@ defmodule Tore.LLM do
               {:ok, map(), map()} | {:error, term()}
   @callback estimate_nutrition(recipe :: map()) :: {:ok, map(), map()} | {:error, term()}
   @callback parse_pantry_image(image :: binary()) :: {:ok, [map()], map()} | {:error, term()}
-  @callback parse_receipt_for_pantry(image :: binary()) ::
+  @callback parse_receipt_for_pantry(image :: binary(), locale :: String.t() | nil) ::
               {:ok, %{total: Decimal.t() | nil, store_name: String.t() | nil, items: [map()]},
                map()}
               | {:error, term()}

@@ -79,7 +79,7 @@ defmodule Tore.Harness.Orchestrator do
     run_dispatch(stream_id, metadata, "receipt_ingestion_run", fn ->
       with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
            {:ok, state} <- enter(state, :gathering_context, metadata),
-           {:ok, parsed} <- ReceiptIngestion.parse(ctx.image_binary),
+           {:ok, parsed} <- ReceiptIngestion.parse(ctx.image_binary, household_locale()),
            {:ok, state} <- enter(state, :proposing, metadata),
            {cost, pantry} =
              ReceiptIngestion.build_artifacts(parsed,
@@ -192,6 +192,13 @@ defmodule Tore.Harness.Orchestrator do
 
   defp open_run(sid, %Commands.Open{} = cmd, metadata) do
     apply_command(sid, cmd, %State.Draft{stream_id: sid}, metadata)
+  end
+
+  defp household_locale do
+    case Tore.Household.get_household!() do
+      %{locale: locale} when is_binary(locale) -> locale
+      _ -> nil
+    end
   end
 
   defp run_dispatch(stream_id, metadata, kind, fun) do

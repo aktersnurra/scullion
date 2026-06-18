@@ -330,43 +330,40 @@ defmodule Tore.LLM.Prompts do
     }
   end
 
-  def parse_receipt_for_pantry do
+  def parse_receipt_for_pantry(locale \\ nil) do
     system = """
     You are a receipt parser. Given a photo of a grocery receipt:
     1. Extract the store name (if visible).
-    2. Extract the total amount paid (the final total, in the receipt's currency).
-    3. Extract each purchased grocery item as a pantry entry with name, quantity, and unit.
-       - Omit non-food items like bags, fees, or deposits unless clearly a food product.
-       - Use standard Swedish units where appropriate (g, kg, ml, dl, l, st, förp).
+    2. Extract the total amount paid (the final total).
+    3. Extract each purchased grocery item with name, quantity, and unit.
+       - Omit non-food items (bags, fees, deposits) unless clearly a food product.
+       - Keep product names exactly as written on the receipt — do not translate.
+       - Use the unit conventions natural to the receipt's language.
 
-    UNIT INFERENCE — apply these rules in order:
-
-    a. WEIGHT-PRICED ROWS. A row with a decimal quantity (e.g. 0.835, 1.01) and a
-       per-kg price like "kg" or "kr/kg" means the customer bought that weight.
-       Emit quantity = the decimal, unit = "kg". Do NOT multiply.
-
-    b. PACK-ENCODED NAMES. Item names often encode pack size as a suffix:
-         "ÄGG FRIG L 10P"  → 10-pack of eggs
-         "YOGHURT 4P"      → 4-pack
-         "ÖL 6X33CL"       → 6 × 33 cl bottles
-         "TOAPAPPER 8-P"   → 8-pack
-       When you see a pack code (NP, N-P, NX, N×, NxNNN) read it as pack size.
-       If the customer bought K such packs, prefer reporting the TOTAL UNITS:
-         quantity = K * pack_size, unit = "st"
-       (e.g. 2 × "ÄGG ... 10P" → quantity 20, unit "st").
-       If pack size is ambiguous, fall back to quantity = K, unit = "förp".
-
-    c. PLAIN COUNTS. A row with an integer quantity and no weight/pack hint is a
-       simple count: quantity = the integer, unit = "st".
-
-    d. UNKNOWN. If you genuinely can't tell, set quantity = null, unit = null —
-       do NOT guess wildly. The user will correct in the UI.
-
+    Quantity policy:
+    - Weight-priced row (decimal quantity with a per-kg/per-lb price): emit the
+      weight as-is, do not multiply.
+    - Pack-encoded name (a suffix like "10P", "4P", "6X33CL" indicating pack
+      size): when the customer bought K such packs and the pack size is
+      unambiguous, report TOTAL UNITS (K × pack_size) as a count, not packs.
+      If pack size is ambiguous, fall back to K packages.
+    - Plain integer quantity with no weight/pack hint: simple count.
+    - If you genuinely can't tell, set quantity and unit to null — don't guess.
+    #{locale_hint(locale)}
     Respond with a JSON object only. No prose.
     """
 
     user = "Extract the store name, total, and grocery items from this receipt."
     {system, user}
+  end
+
+  defp locale_hint(nil), do: ""
+
+  defp locale_hint(locale) do
+    case Map.get(@locale_names, locale) do
+      nil -> ""
+      name -> "\nThis receipt is from a #{name}-speaking region."
+    end
   end
 
   @deals_json_schema %{

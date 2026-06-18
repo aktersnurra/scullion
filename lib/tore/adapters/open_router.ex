@@ -169,8 +169,8 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   @impl Tore.LLM
-  def parse_receipt_for_pantry(image_binary) do
-    {system, user_text} = Tore.LLM.Prompts.parse_receipt_for_pantry()
+  def parse_receipt_for_pantry(image_binary, locale \\ nil) do
+    {system, user_text} = Tore.LLM.Prompts.parse_receipt_for_pantry(locale)
     b64 = Base.encode64(image_binary)
 
     body = %{
