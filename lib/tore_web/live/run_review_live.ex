@@ -148,7 +148,7 @@ defmodule ToreWeb.RunReviewLive do
               name={"receipt[line_items][#{idx}][name]"}
               value={item.name}
               placeholder="Item"
-              class="col-span-6 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              class="col-span-5 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <input
               type="text"
@@ -159,10 +159,17 @@ defmodule ToreWeb.RunReviewLive do
             />
             <input
               type="text"
+              name={"receipt[line_items][#{idx}][unit]"}
+              value={item.unit}
+              placeholder="Unit"
+              class="col-span-2 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+            />
+            <input
+              type="text"
               name={"receipt[line_items][#{idx}][total_price]"}
               value={item.total_price}
               placeholder="Price"
-              class="col-span-3 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
+              class="col-span-2 rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm"
             />
             <button
               type="button"
@@ -227,7 +234,7 @@ defmodule ToreWeb.RunReviewLive do
             name: it.name || "",
             quantity: decimal_to_str(it[:quantity]),
             total_price: decimal_to_str(it[:total_price]),
-            unit: it[:unit],
+            unit: it[:unit] || "",
             category: it[:category]
           }
         end)
@@ -252,7 +259,7 @@ defmodule ToreWeb.RunReviewLive do
               name: attrs["name"] || existing[:name] || "",
               quantity: attrs["quantity"] || existing[:quantity] || "",
               total_price: attrs["total_price"] || existing[:total_price] || "",
-              unit: existing[:unit],
+              unit: attrs["unit"] || existing[:unit] || "",
               category: existing[:category]
             }
           end)
@@ -277,13 +284,17 @@ defmodule ToreWeb.RunReviewLive do
             %{
               name: String.trim(it.name),
               quantity: parse_decimal(it.quantity),
-              unit: it[:unit],
+              unit: blank_to_nil(it[:unit]),
               total_price: parse_decimal(it.total_price),
               category: it[:category]
             }
           end)
     }
   end
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(s) when is_binary(s), do: String.trim(s)
 
   defp build_pantry(%PantryBeliefUpdate{} = p, form) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -296,7 +307,7 @@ defmodule ToreWeb.RunReviewLive do
           name: String.trim(it.name),
           change: :added,
           quantity: parse_decimal(it.quantity),
-          unit: it[:unit],
+          unit: blank_to_nil(it[:unit]),
           category: it[:category],
           provenance: provenance_of(p),
           last_seen_at: now

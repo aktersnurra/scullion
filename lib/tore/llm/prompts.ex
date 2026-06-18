@@ -343,11 +343,15 @@ defmodule Tore.LLM.Prompts do
     Quantity policy:
     - Weight-priced row (decimal quantity with a per-kg/per-lb price): emit the
       weight as-is, do not multiply.
+      (e.g. a row showing "0.835" against a per-kg price → quantity 0.835, unit "kg".)
     - Pack-encoded name (a suffix like "10P", "4P", "6X33CL" indicating pack
       size): when the customer bought K such packs and the pack size is
       unambiguous, report TOTAL UNITS (K × pack_size) as a count, not packs.
+      (e.g. an item name ending in "10P" bought ×2 → quantity 20, unit is the
+      local count unit such as "pcs"/"st"/"Stk". NOT quantity 2.)
       If pack size is ambiguous, fall back to K packages.
     - Plain integer quantity with no weight/pack hint: simple count.
+      (e.g. quantity "3" of an item with no pack code → quantity 3, count unit.)
     - If you genuinely can't tell, set quantity and unit to null — don't guess.
     #{locale_hint(locale)}
     Respond with a JSON object only. No prose.

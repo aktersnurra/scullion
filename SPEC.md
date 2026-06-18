@@ -935,6 +935,7 @@ proper section or sub-spec when picked up.
 - **Per-household OpenRouter API key.** Set via an admin page in Settings. The app is unusable (every LLM-gated surface disabled) until a key is entered.
 - **Elixir 1.20 upgrade.** Move to the new type system and take advantage of it across `lib/tore/`.
 - **HTML in `.html.heex` files.** Move inline templates out of `*_live.ex` modules into colocated `.html.heex` files.
+- **Scraped recipe format** Even scraped recipes without llm should be sent to llm for translation if needed, and reformatted to the "tore format"
 
 ---
 
