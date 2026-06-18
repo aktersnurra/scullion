@@ -338,7 +338,30 @@ defmodule Tore.LLM.Prompts do
     3. Extract each purchased grocery item as a pantry entry with name, quantity, and unit.
        - Omit non-food items like bags, fees, or deposits unless clearly a food product.
        - Use standard Swedish units where appropriate (g, kg, ml, dl, l, st, förp).
-       - quantity and unit are null when not determinable from the receipt.
+
+    UNIT INFERENCE — apply these rules in order:
+
+    a. WEIGHT-PRICED ROWS. A row with a decimal quantity (e.g. 0.835, 1.01) and a
+       per-kg price like "kg" or "kr/kg" means the customer bought that weight.
+       Emit quantity = the decimal, unit = "kg". Do NOT multiply.
+
+    b. PACK-ENCODED NAMES. Item names often encode pack size as a suffix:
+         "ÄGG FRIG L 10P"  → 10-pack of eggs
+         "YOGHURT 4P"      → 4-pack
+         "ÖL 6X33CL"       → 6 × 33 cl bottles
+         "TOAPAPPER 8-P"   → 8-pack
+       When you see a pack code (NP, N-P, NX, N×, NxNNN) read it as pack size.
+       If the customer bought K such packs, prefer reporting the TOTAL UNITS:
+         quantity = K * pack_size, unit = "st"
+       (e.g. 2 × "ÄGG ... 10P" → quantity 20, unit "st").
+       If pack size is ambiguous, fall back to quantity = K, unit = "förp".
+
+    c. PLAIN COUNTS. A row with an integer quantity and no weight/pack hint is a
+       simple count: quantity = the integer, unit = "st".
+
+    d. UNKNOWN. If you genuinely can't tell, set quantity = null, unit = null —
+       do NOT guess wildly. The user will correct in the UI.
+
     Respond with a JSON object only. No prose.
     """
 
