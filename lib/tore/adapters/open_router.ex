@@ -441,6 +441,24 @@ defmodule Tore.Adapters.OpenRouter do
 
   @impl Tore.LLM
   def classify_image(image_binary) do
+    # Try the free classifier tier first; fall back to the paid vision model
+    # on transient errors (rate limit, budget, or upstream errors).
+    case do_classify_image(image_binary, classifier_model()) do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, reason} when reason in [:rate_limited, :provider_budget_exceeded] ->
+        do_classify_image(image_binary, vision_model())
+
+      {:error, {:openrouter_error, _, _}} ->
+        do_classify_image(image_binary, vision_model())
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp do_classify_image(image_binary, model) do
     system = """
     You are an image classifier for a meal planning app.
     Classify the image into exactly one of these categories: receipt, recipe, pantry_items, fridge, unknown.
@@ -456,7 +474,7 @@ defmodule Tore.Adapters.OpenRouter do
     b64 = Base.encode64(image_binary)
 
     body = %{
-      model: vision_model(),
+      model: model,
       messages: [
         %{role: "system", content: system},
         %{
@@ -930,7 +948,10 @@ defmodule Tore.Adapters.OpenRouter do
   defp model, do: Application.get_env(:tore, :openrouter_model, "openai/gpt-5-mini")
 
   defp vision_model,
-    do: Application.get_env(:tore, :openrouter_vision_model, "google/gemini-2.5-flash-lite")
+    do: Application.get_env(:tore, :openrouter_vision_model, "google/gemini-3.1-flash-lite")
+
+  defp classifier_model,
+    do: Application.get_env(:tore, :openrouter_classifier_model, "google/gemma-4-31b-it:free")
 
   defp image_model,
     do:
