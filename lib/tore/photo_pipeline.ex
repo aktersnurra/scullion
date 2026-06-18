@@ -3,8 +3,10 @@ defmodule Tore.PhotoPipeline do
 
   @confidence_threshold 0.6
 
-  @spec process_uploads([binary()], String.t()) :: {:ok, list()} | {:error, term()}
-  def process_uploads(binaries, _correlation_id) when is_list(binaries) do
+  @type ctx :: %{household_id: integer(), user_id: integer() | nil}
+
+  @spec process_uploads([binary()], ctx()) :: {:ok, list()} | {:error, term()}
+  def process_uploads(binaries, ctx) when is_list(binaries) and is_map(ctx) do
     classified =
       binaries
       |> Task.async_stream(&classify_one/1, timeout: 30_000, on_timeout: :kill_task)
@@ -18,7 +20,7 @@ defmodule Tore.PhotoPipeline do
       |> Enum.group_by(& &1.class)
       |> Enum.map(fn {class, entries} ->
         images = Enum.map(entries, & &1.binary)
-        route_group(class, images)
+        route_group(class, images, ctx)
       end)
 
     {:ok, results}
@@ -37,22 +39,37 @@ defmodule Tore.PhotoPipeline do
     end
   end
 
-  defp route_group(:recipe, images) do
+  defp route_group(:recipe, images, _ctx) do
     case Tore.Recipes.extract_from_images(images) do
       {:ok, recipe} -> %{class: :recipe, status: :ok, result: recipe}
       {:error, reason} -> %{class: :recipe, status: :error, result: reason}
     end
   end
 
-  defp route_group(:receipt, [image | _]) do
-    case Tore.Costs.parse_receipt_image(image) do
-      {:ok, parsed} -> %{class: :receipt, status: :ok, result: parsed}
-      {:ok, parsed, _usage} -> %{class: :receipt, status: :ok, result: parsed}
-      {:error, reason} -> %{class: :receipt, status: :error, result: reason}
+  # SPEC §5: receipt photo dispatches :receipt_ingestion_run via the harness;
+  # the run lands in :needs_user and the UI surfaces an editable card at
+  # /runs/:stream_id.
+  defp route_group(:receipt, [image | _], ctx) do
+    dispatch_ctx = %{
+      household_id: ctx.household_id,
+      user_id: ctx[:user_id],
+      image_binary: image,
+      image_path: nil
+    }
+
+    case Tore.Harness.Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
+      {:ok, %Tore.Harness.Run.State.NeedsUser{stream_id: sid}} ->
+        %{class: :receipt, status: :needs_review, run_stream_id: sid}
+
+      {:ok, %Tore.Harness.Run.State.Failed{stream_id: sid, failure_code: code}} ->
+        %{class: :receipt, status: :error, result: code, run_stream_id: sid}
+
+      {:error, reason} ->
+        %{class: :receipt, status: :error, result: reason}
     end
   end
 
-  defp route_group(:pantry_items, [image | _]) do
+  defp route_group(:pantry_items, [image | _], _ctx) do
     case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :pantry_items, status: :ok, result: items}
       {:ok, items, _usage} -> %{class: :pantry_items, status: :ok, result: items}
@@ -60,7 +77,7 @@ defmodule Tore.PhotoPipeline do
     end
   end
 
-  defp route_group(:fridge, [image | _]) do
+  defp route_group(:fridge, [image | _], _ctx) do
     case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :fridge, status: :ok, result: items}
       {:ok, items, _usage} -> %{class: :fridge, status: :ok, result: items}
@@ -68,7 +85,7 @@ defmodule Tore.PhotoPipeline do
     end
   end
 
-  defp route_group(:unknown, _images) do
+  defp route_group(:unknown, _images, _ctx) do
     %{class: :unknown, status: :ambiguous, result: nil}
   end
 end

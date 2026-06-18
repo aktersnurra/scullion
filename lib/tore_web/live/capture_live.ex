@@ -28,11 +28,15 @@ defmodule ToreWeb.CaptureLive do
 
     cond do
       photo_binaries != [] ->
-        correlation_id = Ecto.UUID.generate()
+        ctx = %{
+          household_id: Tore.Household.get_household!().id,
+          user_id: socket.assigns.current_user && socket.assigns.current_user.id
+        }
+
         pid = self()
 
         Task.start(fn ->
-          result = Tore.PhotoPipeline.process_uploads(photo_binaries, correlation_id)
+          result = Tore.PhotoPipeline.process_uploads(photo_binaries, ctx)
           send(pid, {:pipeline_complete, result})
         end)
 
@@ -84,6 +88,15 @@ defmodule ToreWeb.CaptureLive do
               else: "I can see #{names} in your fridge. Want me to suggest some recipes?"
 
           %{role: :assistant, text: text}
+
+        %{class: :receipt, status: :needs_review, run_stream_id: sid} ->
+          %{
+            role: :assistant,
+            run_card: true,
+            class: :receipt,
+            run_stream_id: sid,
+            text: "I parsed a receipt."
+          }
 
         %{class: class, status: :ok, result: result} ->
           review_id = Ecto.UUID.generate()
@@ -142,6 +155,18 @@ defmodule ToreWeb.CaptureLive do
               class="text-sm text-[color:var(--accent)] font-semibold"
             >
               {gettext("Review")} →
+            </.link>
+          </div>
+          <div
+            :if={Map.get(msg, :run_card)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
+          >
+            <p class="text-sm text-[color:var(--text)] mb-2">{msg.text}</p>
+            <.link
+              navigate={~p"/runs/#{msg.run_stream_id}"}
+              class="text-sm text-[color:var(--accent)] font-semibold"
+            >
+              {gettext("Review receipt")} →
             </.link>
           </div>
           <div

@@ -11,7 +11,7 @@ defmodule Tore.PhotoPipelineTest do
     end)
 
     assert {:ok, [%{class: :unknown, status: :ambiguous}]} =
-             Tore.PhotoPipeline.process_uploads([<<"blurry">>], "corr-1")
+             Tore.PhotoPipeline.process_uploads([<<"blurry">>], %{household_id: 1, user_id: nil})
   end
 
   test "process_uploads classifies recipe image" do
@@ -24,6 +24,6 @@ defmodule Tore.PhotoPipelineTest do
     end)
 
     assert {:ok, [%{class: :recipe, status: :ok}]} =
-             Tore.PhotoPipeline.process_uploads([<<"recipe_img">>], "corr-2")
+             Tore.PhotoPipeline.process_uploads([<<"recipe_img">>], %{household_id: 1, user_id: nil})
   end
 end
