@@ -9,7 +9,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Planning
   alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
   alias Tore.Harness.Capsules
-  alias Tore.Harness.{KitchenMemorySynthesis, ReceiptIngestion}
+  alias Tore.Harness.{KitchenMemorySynthesis, PantryUpdate, ReceiptIngestion}
   alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate}
 
   alias Tore.Harness.Capsules.{
@@ -88,6 +88,36 @@ defmodule Tore.Harness.Orchestrator do
              ),
            {:ok, state} <- enter(state, :verifying, metadata),
            {:ok, state} <- verify_and_surface_receipt(state, cost, pantry, metadata) do
+        {:ok, state}
+      else
+        {:error, reason} -> {:error, {:step_failed, reason}}
+      end
+    end)
+  end
+
+  def dispatch(:pantry_belief_update_run, ctx) do
+    stream_id = Run.next_stream_id()
+    metadata = %{household_id: ctx.household_id}
+    channel = Map.fetch!(ctx, :channel)
+
+    open_cmd = %Commands.Open{
+      household_id: ctx.household_id,
+      kind: "pantry_belief_update_run",
+      surface: :plan,
+      started_by: Map.get(ctx, :started_by, "user"),
+      user_id: Map.get(ctx, :user_id),
+      input: %{channel: Atom.to_string(channel)}
+    }
+
+    run_dispatch(stream_id, metadata, "pantry_belief_update_run", fn ->
+      with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
+           {:ok, state} <- enter(state, :gathering_context, metadata),
+           {:ok, items} <- gather_pantry_items(channel, ctx),
+           artifact = PantryUpdate.build_artifact(items, channel),
+           {:ok, state} <- enter(state, :proposing, metadata),
+           {:ok, state} <- enter(state, :verifying, metadata),
+           {:ok, state} <-
+             verify_and_finish_pantry(state, artifact, channel, ctx, metadata) do
         {:ok, state}
       else
         {:error, reason} -> {:error, {:step_failed, reason}}
@@ -340,6 +370,58 @@ defmodule Tore.Harness.Orchestrator do
         state,
         metadata
       )
+    else
+      {:fail, code, repair} ->
+        apply_command(
+          state.stream_id,
+          %Commands.RecordFailure{code: code, user_message: nil, repair_action: repair},
+          state,
+          metadata
+        )
+
+      other ->
+        other
+    end
+  end
+
+  defp gather_pantry_items(:shelf_photo, %{image_binary: bin}),
+    do: PantryUpdate.parse_shelf_photo(bin)
+
+  defp gather_pantry_items(_, %{items: items}) when is_list(items), do: {:ok, items}
+  defp gather_pantry_items(_, _), do: {:error, :missing_items}
+
+  defp verify_and_finish_pantry(state, %PantryBeliefUpdate{} = artifact, channel, ctx, metadata) do
+    needs_user? = PantryUpdate.needs_user?(channel, artifact.items)
+
+    with :ok <- PantryVerifier.verify(artifact, %{}),
+         {:ok, state} <-
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: artifact},
+             state,
+             metadata
+           ) do
+      if needs_user? do
+        apply_command(
+          state.stream_id,
+          %Commands.RaiseQuestion{question: "Review the parsed pantry items before saving."},
+          state,
+          metadata
+        )
+      else
+        with {:ok, counts} <- PantryUpdate.apply!(artifact, household_locale()),
+             run_summary = %RunSummary{counts: counts, outcome: :applied},
+             {:ok, state} <-
+               apply_command(
+                 state.stream_id,
+                 %Commands.AddArtifact{artifact: run_summary},
+                 state,
+                 metadata
+               ) do
+          _ = ctx
+          apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+        end
+      end
     else
       {:fail, code, repair} ->
         apply_command(

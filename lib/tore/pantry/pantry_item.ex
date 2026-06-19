@@ -14,7 +14,7 @@ defmodule Tore.Pantry.PantryItem do
     :other
   ]
 
-  @provenances ~w[manual receipt vision belief]
+  @provenances ~w[manual receipt vision belief grocery_checkoff]
 
   def categories, do: @categories
 
