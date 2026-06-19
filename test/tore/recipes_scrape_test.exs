@@ -30,8 +30,11 @@ defmodule Tore.RecipesScrapeTest do
       |> expect(:fetch, fn "https://example.com/plain" -> {:ok, @plain_html} end)
 
       Tore.MockLLM
-      |> expect(:extract_recipe_from_html, fn _html, _locale ->
-        {:ok, %{title: "LLM Recipe", ingredients: []}}
+      # 1st text call: check_html_parseable
+      |> expect(:text, fn _system, _user, _opts -> {:ok, %{"parseable" => true}, %{}} end)
+      # 2nd text call: extract_from_html (raw recipe JSON, shaped downstream)
+      |> expect(:text, fn _system, _user, _opts ->
+        {:ok, %{"title" => "LLM Recipe", "ingredients" => [], "steps" => []}, %{}}
       end)
 
       assert {:ok, recipe} = Recipes.scrape_and_create("https://example.com/plain")

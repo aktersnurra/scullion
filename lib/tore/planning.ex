@@ -448,15 +448,35 @@ defmodule Tore.Planning do
       dietary_guidance: dietary_guidance
     }
 
+    {system, user} = Tore.LLM.Prompts.suggest_slot_recipe(context)
+
     with :ok <- SpendGuard.allow?(:suggest_recipe),
-         {:ok, %{recipe_id: rid, reasoning: reasoning}, usage} <-
-           @llm.suggest_slot_recipe(context),
+         {:ok, %{recipe_id: rid, reasoning: reasoning}, usage} <- suggest(system, user, context),
          :ok <- SpendGuard.log_usage(:suggest_recipe, usage),
          recipe when not is_nil(recipe) <- Enum.find(recipes, &(&1.id == rid)) do
       {:ok, %{recipe: recipe, reasons: [reasoning], score: 999}}
     else
       nil -> {:error, :recipe_not_found}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp suggest(system, user, context) do
+    case @llm.text(system, user, []) do
+      {:ok, %{"recipe_id" => rid} = data, usage} when is_integer(rid) ->
+        candidates = MapSet.new(context.candidate_recipe_ids || [])
+
+        if MapSet.member?(candidates, rid) do
+          {:ok, %{recipe_id: rid, reasoning: data["reasoning"] || ""}, usage}
+        else
+          {:error, :hallucinated_recipe}
+        end
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
     end
   end
 end

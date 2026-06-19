@@ -372,6 +372,85 @@ defmodule Tore.LLM.Prompts do
     end
   end
 
+  @canonicalise_pantry_schema %{
+    type: "object",
+    required: ["items"],
+    additionalProperties: false,
+    properties: %{
+      items: %{
+        type: "array",
+        items: %{
+          type: "object",
+          required: ["raw_name", "display_name", "category", "default_unit", "matched_key"],
+          additionalProperties: false,
+          properties: %{
+            raw_name: %{type: "string"},
+            display_name: %{type: "string"},
+            category: %{type: ["string", "null"]},
+            default_unit: %{type: ["string", "null"]},
+            matched_key: %{type: ["string", "null"]}
+          }
+        }
+      }
+    }
+  }
+
+  def canonicalise_pantry_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "canonicalise_pantry", strict: true, schema: @canonicalise_pantry_schema}
+    }
+  end
+
+  def canonicalise_pantry_items(items, locale, catalogue) do
+    locale_name = Map.get(@locale_names, locale)
+
+    catalogue_lines =
+      catalogue
+      |> Enum.map(fn %{key: k, name: n} -> "  #{k}  (#{n})" end)
+      |> Enum.join("\n")
+
+    items_lines =
+      items
+      |> Enum.map(fn it -> "  - #{Map.get(it, :raw_name) || Map.get(it, "raw_name")}" end)
+      |> Enum.join("\n")
+
+    locale_phrase =
+      if locale_name,
+        do: "The items are in #{locale_name}; expand local abbreviations confidently.",
+        else: ""
+
+    system = """
+    You normalise raw grocery item names (often abbreviated/all-caps OCR output)
+    into clean display names and resolve them to a canonical ingredient catalogue.
+
+    For each raw item, emit:
+    - raw_name: the input, unchanged.
+    - display_name: the cleaned, human-readable form in the original language.
+      Expand common abbreviations using domain knowledge (e.g. "LF" → "laktosfri"
+      in Swedish, "ekol." → "ekologisk", "K-FRI" → "kornfri"). Capitalise
+      naturally. Keep diacritics correct. Preserve brand-specific terms.
+    - category: one of dairy, meat, produce, frozen, dry_goods, canned,
+      herbs_spices, condiments, other. Null only if truly unknowable.
+    - default_unit: the most natural single-purchase unit for this product
+      (e.g. "kg" for raw meat sold by weight, "st" for eggs, "l" for milk).
+    - matched_key: if this item refers to the same product as an existing
+      catalogue key, emit that key. Otherwise null (we'll create a new entry).
+      Match liberally on meaning, not surface form — "KYCKLINGLA FILE",
+      "Kycklinglårfilé", "chicken thigh fillet" all match the same key.
+
+    #{locale_phrase}
+
+    Existing catalogue keys (key — display name):
+    #{catalogue_lines}
+
+    Respond with a JSON object only. No prose.
+    """
+
+    user = "Canonicalise these items:\n#{items_lines}"
+    {system, user}
+  end
+
   @deals_json_schema %{
     type: "object",
     required: ["deals"],

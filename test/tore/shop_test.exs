@@ -9,10 +9,11 @@ defmodule Tore.ShopTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Tore.Repo)
     Phoenix.PubSub.subscribe(Tore.PubSub, "shop_list")
 
-    # Shop.add_item/build_list call the LLM to classify items and
-    # filter the pantry; stub them so these tests don't depend on a real model.
-    stub(Tore.MockLLM, :classify_grocery_item, fn _name -> {:ok, :other} end)
-    stub(Tore.MockLLM, :filter_pantry_items, fn items, _pantry -> {:ok, items} end)
+    # Shop.add_item/build_list call the LLM (via Tore.LLM.text/3) to classify
+    # items and filter the pantry; stub generic text responses for both shapes.
+    stub(Tore.MockLLM, :text, fn _system, _user, _opts ->
+      {:ok, %{"section" => "other", "items" => []}, %{}}
+    end)
 
     :ok
   end

@@ -18,7 +18,7 @@ defmodule Tore.Shop do
       if pantry == [] do
         all_items
       else
-        case @llm.filter_pantry_items(all_items, pantry) do
+        case filter_pantry_items(all_items, pantry) do
           {:ok, filtered} -> filtered
           _ -> all_items
         end
@@ -30,7 +30,7 @@ defmodule Tore.Shop do
 
   def add_item(list_id, name, quantity, unit, user_id) do
     section =
-      case @llm.classify_grocery_item(name) do
+      case classify_grocery_item(name) do
         {:ok, s} -> s
         _ -> :other
       end
@@ -44,6 +44,61 @@ defmodule Tore.Shop do
       added_by: user_id
     })
   end
+
+  @valid_sections ~w(produce meat fish dairy deli frozen bread dry_goods canned beverages herbs_spices condiments household other)
+
+  defp filter_pantry_items(ingredients, pantry) do
+    {system, user} = Tore.LLM.Prompts.filter_pantry_items(ingredients, pantry)
+
+    fallback = Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
+
+    case @llm.text(system, user,
+           model: fallback,
+           response_format: Tore.LLM.Prompts.filter_pantry_schema()
+         ) do
+      {:ok, items, _usage} when is_list(items) -> {:ok, build_filter_result(items)}
+      {:ok, %{"items" => items}, _usage} when is_list(items) -> {:ok, build_filter_result(items)}
+      {:ok, _, _} -> {:error, :invalid_response}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp classify_grocery_item(name) do
+    {system, user} = Tore.LLM.Prompts.classify_grocery_item(name)
+
+    case @llm.text(system, user, []) do
+      {:ok, %{"section" => section}, _usage} -> {:ok, to_section_atom(section)}
+      {:ok, _, _} -> {:error, :invalid_response}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp build_filter_result(items) do
+    items
+    |> Enum.map(&Map.put(&1, "name", &1["name"] || &1["item"] || &1["ingredient"]))
+    |> Enum.filter(&is_binary(&1["name"]))
+    |> Enum.map(fn i ->
+      qty =
+        case i["quantity"] do
+          nil -> nil
+          n when is_number(n) -> n
+          s when is_binary(s) -> s
+          _ -> nil
+        end
+
+      %{
+        id: Ecto.UUID.generate(),
+        name: i["name"],
+        quantity: qty,
+        unit: i["unit"],
+        section: to_section_atom(i["section"]),
+        checked: false
+      }
+    end)
+  end
+
+  defp to_section_atom(s) when is_binary(s) and s in @valid_sections, do: String.to_atom(s)
+  defp to_section_atom(_), do: :other
 
   def remove_item(list_id, item_id, user_id) do
     run(list_id, %Commands.RemoveItem{item_id: item_id, removed_by: user_id})

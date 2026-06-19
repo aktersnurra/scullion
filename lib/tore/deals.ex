@@ -131,7 +131,19 @@ defmodule Tore.Deals do
 
   @spec parse_pdf(binary()) :: {:ok, integer()} | {:error, term()}
   def parse_pdf(pdf_binary) do
-    with {:ok, deals} <- @llm.parse_deals_pdf(pdf_binary) do
+    {system, user} = Tore.LLM.Prompts.parse_deals_pdf()
+
+    with {:ok, data, _usage} <-
+           @llm.vision([{:pdf, pdf_binary}], system, user, []) do
+      raw_deals =
+        cond do
+          is_list(data) -> data
+          is_map(data) -> data["deals"] || []
+          true -> []
+        end
+
+      deals = Enum.map(raw_deals, &deal_from_raw/1)
+
       case deals do
         [] ->
           Logger.warning("PDF parse returned 0 deals")
@@ -140,6 +152,37 @@ defmodule Tore.Deals do
         _ ->
           upsert_deals(deals)
       end
+    end
+  end
+
+  defp deal_from_raw(d) do
+    %{
+      chain: d["chain"] || "other",
+      store: d["store"] || d["chain"] || "other",
+      product_name: d["product_name"],
+      brand: d["brand"],
+      size: d["size"],
+      price: deals_decimal(d["price"]),
+      price_unit: d["price_unit"],
+      offer_condition: d["offer_condition"],
+      regular_price: d["regular_price"],
+      comparison_price: d["comparison_price"],
+      valid_from: deals_date(d["valid_from"]),
+      valid_until: deals_date(d["valid_until"]),
+      source: :vision
+    }
+  end
+
+  defp deals_decimal(nil), do: nil
+  defp deals_decimal(n) when is_number(n), do: Decimal.from_float(n * 1.0)
+  defp deals_decimal(s) when is_binary(s), do: Decimal.new(s)
+
+  defp deals_date(nil), do: nil
+
+  defp deals_date(s) when is_binary(s) do
+    case Date.from_iso8601(s) do
+      {:ok, d} -> d
+      _ -> nil
     end
   end
 

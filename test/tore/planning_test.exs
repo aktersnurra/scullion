@@ -99,8 +99,8 @@ defmodule Tore.PlanningTest do
       r2 = create_recipe("Curry")
 
       Tore.MockLLM
-      |> expect(:suggest_slot_recipe, fn _ctx ->
-        {:ok, %{recipe_id: r2.id, reasoning: "good fit"}, mock_usage()}
+      |> expect(:text, fn _system, _user, _opts ->
+        {:ok, %{"recipe_id" => r2.id, "reasoning" => "good fit"}, mock_usage()}
       end)
 
       assert {:ok, results} =
@@ -118,7 +118,7 @@ defmodule Tore.PlanningTest do
       _r = create_recipe("Pasta")
 
       Tore.MockLLM
-      |> expect(:suggest_slot_recipe, fn _ -> {:error, :timeout} end)
+      |> expect(:text, fn _system, _user, _opts -> {:error, :timeout} end)
 
       assert {:ok, results} =
                Planning.suggest_recipes_for_slot(plan_id(), "tue_dinner",

@@ -9,7 +9,9 @@ defmodule Tore.Prep do
          {:ok, plan_state} <- Planning.load_plan(plan_id) do
       plan_for_prompt = build_plan_for_prompt(plan_state, week_start)
 
-      with {:ok, guide_data, usage} <- @llm.generate_prep_guide(plan_for_prompt, locale),
+      {system, user} = Tore.LLM.Prompts.prep_guide(plan_for_prompt, locale)
+
+      with {:ok, guide_data, usage} <- @llm.text(system, user, []),
            :ok <- SpendGuard.log_usage(:generate_prep_guide, usage) do
         attrs = Map.put(guide_data, "week_start", week_start)
         save_guide(attrs)

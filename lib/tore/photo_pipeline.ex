@@ -27,7 +27,7 @@ defmodule Tore.PhotoPipeline do
   end
 
   defp classify_one(binary) do
-    case @llm.classify_image(binary) do
+    case classify_image(binary) do
       {:ok, %{class: class, confidence: conf}} when conf >= @confidence_threshold ->
         {:ok, %{class: class, binary: binary}}
 
@@ -38,6 +38,36 @@ defmodule Tore.PhotoPipeline do
         {:ok, %{class: :unknown, binary: binary}}
     end
   end
+
+  @classifier_system """
+  You are an image classifier for a meal planning app.
+  Classify the image into exactly one of these categories: receipt, recipe, pantry_items, fridge, unknown.
+  - receipt: a store receipt or invoice with line items and prices
+  - recipe: a recipe card, cookbook page, or handwritten recipe
+  - pantry_items: individual food products, cans, boxes, ingredients on a shelf or counter
+  - fridge: an open fridge or freezer showing its contents
+  - unknown: anything else
+  Return JSON only: {"class": "<one of the five values>", "confidence": <0.0-1.0>}
+  """
+
+  defp classify_image(binary) do
+    case @llm.vision([{:image, binary}], @classifier_system, "Classify this image.", []) do
+      {:ok, %{"class" => cls, "confidence" => conf}, _usage} ->
+        {:ok, %{class: parse_image_class(cls), confidence: conf}}
+
+      {:ok, _, _} ->
+        {:ok, %{class: :unknown, confidence: 0.0}}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp parse_image_class("receipt"), do: :receipt
+  defp parse_image_class("recipe"), do: :recipe
+  defp parse_image_class("pantry_items"), do: :pantry_items
+  defp parse_image_class("fridge"), do: :fridge
+  defp parse_image_class(_), do: :unknown
 
   defp route_group(:recipe, images, _ctx) do
     case Tore.Recipes.extract_from_images(images) do
@@ -72,7 +102,6 @@ defmodule Tore.PhotoPipeline do
   defp route_group(:pantry_items, [image | _], _ctx) do
     case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :pantry_items, status: :ok, result: items}
-      {:ok, items, _usage} -> %{class: :pantry_items, status: :ok, result: items}
       {:error, reason} -> %{class: :pantry_items, status: :error, result: reason}
     end
   end
@@ -80,7 +109,6 @@ defmodule Tore.PhotoPipeline do
   defp route_group(:fridge, [image | _], _ctx) do
     case Tore.Pantry.parse_image(image) do
       {:ok, items} -> %{class: :fridge, status: :ok, result: items}
-      {:ok, items, _usage} -> %{class: :fridge, status: :ok, result: items}
       {:error, reason} -> %{class: :fridge, status: :error, result: reason}
     end
   end

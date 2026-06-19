@@ -105,21 +105,113 @@ defmodule Tore.Recipes do
 
   @spec extract_from_images([binary()], String.t() | nil) :: {:ok, map()} | {:error, term()}
   def extract_from_images(binaries, locale \\ nil) do
-    @llm.parse_recipe_images(binaries, locale)
+    system = Tore.LLM.Prompts.parse_recipe_images(locale)
+    blobs = Enum.map(binaries, &{:image, &1})
+
+    with {:ok, data, _usage} <-
+           @llm.vision(blobs, system, "Extract the recipe from these images.",
+             response_format: Tore.LLM.Prompts.recipe_json_schema()
+           ) do
+      {:ok, recipe_attrs_from_raw(data)}
+    end
   end
 
   @spec suggest_substitution(String.t(), String.t()) ::
           {:ok, %{suggestion: String.t(), updated_steps: String.t() | nil}} | {:error, term()}
   def suggest_substitution(missing, recipe_context) do
-    @llm.suggest_substitution(missing, recipe_context)
+    system = """
+    You are a practical cooking assistant. The user is missing an ingredient mid-cook.
+    Suggest a realistic substitution they can make right now with common kitchen items.
+    If the substitution requires changing the steps, include brief updated instructions.
+    Return JSON only: {"suggestion": "...", "updated_steps": "..." or null}
+    Keep the suggestion to 1-2 sentences. Be direct and practical.
+    """
+
+    user = "Recipe: #{recipe_context}\nMissing ingredient: #{missing}"
+
+    case @llm.text(system, user, []) do
+      {:ok, %{"suggestion" => suggestion} = data, _usage} ->
+        {:ok, %{suggestion: suggestion, updated_steps: data["updated_steps"]}}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
+    end
   end
 
   @spec cook_mode_steps(map()) ::
           {:ok, %{do_first: [String.t()], while_cooking: [String.t()], finish: [String.t()]}}
           | {:error, term()}
   def cook_mode_steps(recipe) do
-    @llm.cook_mode_steps(recipe)
+    system = """
+    You are a cooking assistant. Compress recipe steps into a 3-phase action list.
+    Phase 1 "do_first": things to start before anything else (pre-heat, prep, start slow things).
+    Phase 2 "while_cooking": things to do while the main component cooks.
+    Phase 3 "finish": final assembly and plating.
+    Each phase is a list of short action phrases (5-10 words each). Max 4 items per phase.
+    Return JSON only: {"do_first": [...], "while_cooking": [...], "finish": [...]}
+    """
+
+    title = recipe["title"] || recipe[:title] || "Unknown"
+    instructions = recipe["instructions"] || recipe[:instructions] || "No instructions"
+    user = "Recipe: #{title}\nSteps: #{instructions}"
+
+    case @llm.text(system, user, []) do
+      {:ok, %{"do_first" => df, "while_cooking" => wc, "finish" => fin}, _usage} ->
+        {:ok, %{do_first: df, while_cooking: wc, finish: fin}}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
+    end
   end
+
+  defp recipe_attrs_from_raw(data) do
+    raw_steps = data["steps"] || []
+    steps = Enum.sort_by(raw_steps, & &1["order"])
+
+    instructions =
+      steps
+      |> Enum.chunk_by(& &1["phase"])
+      |> Enum.map(fn phase_steps ->
+        phase = hd(phase_steps)["phase"]
+        lines = Enum.map(phase_steps, &"#{&1["order"]}. #{&1["action"]}") |> Enum.join("\n")
+        "## #{phase}\n\n#{lines}"
+      end)
+      |> Enum.join("\n\n")
+
+    %{
+      title: data["title"],
+      description: data["description"],
+      prep_time_minutes: data["prep_time_minutes"],
+      cook_time_minutes: data["cook_time_minutes"],
+      base_servings: data["base_servings"],
+      image_url: data["image_url"],
+      ingredients: ingredients_from_raw(data["ingredients"] || []),
+      tags: data["tags"] || [],
+      steps: if(steps == [], do: nil, else: Jason.encode!(steps)),
+      instructions: if(instructions == "", do: nil, else: instructions)
+    }
+    |> Map.reject(fn {_, v} -> is_nil(v) end)
+  end
+
+  defp ingredients_from_raw(list) do
+    Enum.map(list, fn item ->
+      %{
+        name: item["item"] || item["name"],
+        quantity: parse_decimal(item["quantity"]),
+        unit: item["unit"]
+      }
+    end)
+  end
+
+  defp parse_decimal(nil), do: nil
+  defp parse_decimal(n) when is_number(n), do: Decimal.from_float(n * 1.0)
+  defp parse_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   # ── Private helpers ────────────────────────────────────────────────────────
 
@@ -245,7 +337,39 @@ defmodule Tore.Recipes do
 
   defp parse_or_extract(html, locale) do
     with {:error, :not_found} <- Tore.Recipes.Parser.parse_html(html) do
-      @llm.extract_recipe_from_html(html, locale)
+      extract_from_html(html, locale)
+    end
+  end
+
+  defp extract_from_html(html, locale) do
+    with :ok <- check_html_parseable(html) do
+      {system, user} = Tore.LLM.Prompts.extract_recipe(html, locale)
+
+      with {:ok, data, _usage} <-
+             @llm.text(system, user, response_format: Tore.LLM.Prompts.recipe_json_schema()) do
+        {:ok, recipe_attrs_from_raw(data)}
+      end
+    end
+  end
+
+  defp check_html_parseable(html) do
+    {system, user} = Tore.LLM.Prompts.check_recipe_html(html)
+    check_model = Application.get_env(:tore, :openrouter_check_model, "openai/gpt-oss-120b:free")
+
+    fallback =
+      Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
+
+    result =
+      case @llm.text(system, user, model: check_model) do
+        {:ok, _, _} = ok -> ok
+        {:error, _} -> @llm.text(system, user, model: fallback)
+      end
+
+    case result do
+      {:ok, %{"parseable" => true}, _} -> :ok
+      {:ok, %{"parseable" => false}, _} -> {:error, :not_a_recipe}
+      {:ok, _, _} -> {:error, :not_a_recipe}
+      {:error, _} = err -> err
     end
   end
 

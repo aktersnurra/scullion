@@ -10,16 +10,11 @@ defmodule Tore.Harness.ReceiptIngestion do
   alias Tore.Harness.Artifact.{CostEntry, PantryBeliefUpdate}
   alias Tore.{Costs, Pantry, Repo}
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @spec parse(binary(), String.t() | nil) ::
           {:ok, %{store_name: String.t() | nil, total: Decimal.t() | nil, items: [map()]}}
           | {:error, term()}
   def parse(image_binary, locale \\ nil) do
-    case @llm.parse_receipt_for_pantry(image_binary, locale) do
-      {:ok, parsed, _usage} -> {:ok, parsed}
-      {:error, _} = err -> err
-    end
+    Tore.Costs.parse_receipt_for_pantry(image_binary, locale)
   end
 
   @spec build_artifacts(map(), keyword()) :: {CostEntry.t(), PantryBeliefUpdate.t()}

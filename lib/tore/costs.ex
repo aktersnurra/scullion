@@ -147,13 +147,54 @@ defmodule Tore.Costs do
   end
 
   def parse_receipt_image(image_binary) do
-    @llm.parse_receipt_for_pantry(image_binary)
+    parse_receipt_for_pantry(image_binary, nil)
+  end
+
+  def parse_receipt_for_pantry(image_binary, locale) do
+    {system, user} = Tore.LLM.Prompts.parse_receipt_for_pantry(locale)
+
+    with {:ok, data, _usage} <-
+           @llm.vision([{:image, image_binary}], system, user,
+             response_format: Tore.LLM.Prompts.receipt_pantry_json_schema()
+           ) do
+      items =
+        Enum.map(data["items"] || [], fn it ->
+          %{
+            name: it["name"],
+            quantity: receipt_to_decimal(it["quantity"]),
+            unit: it["unit"],
+            category: it["category"]
+          }
+        end)
+
+      {:ok,
+       %{
+         total: receipt_to_decimal(data["total"]),
+         store_name: data["store_name"],
+         items: items
+       }}
+    end
   end
 
   def parse_and_log_receipt(image_binary, user_id) do
     image_path = store_receipt_image(image_binary)
+    {system, user} = Tore.LLM.Prompts.parse_receipt()
 
-    with {:ok, line_items, _usage} <- @llm.parse_receipt_image(image_binary) do
+    with {:ok, data, _usage} <-
+           @llm.vision([{:image, image_binary}], system, user,
+             response_format: Tore.LLM.Prompts.receipt_json_schema()
+           ) do
+      line_items =
+        Enum.map(data["line_items"] || [], fn it ->
+          %{
+            product_name: it["product_name"],
+            quantity: receipt_to_decimal(it["quantity"]),
+            unit_price: receipt_to_decimal(it["unit_price"]),
+            total_price: receipt_to_decimal(it["total_price"]),
+            category: it["category"]
+          }
+        end)
+
       total =
         line_items
         |> Enum.map(fn item -> item.total_price || Decimal.new(0) end)

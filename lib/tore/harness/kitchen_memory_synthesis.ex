@@ -63,7 +63,28 @@ defmodule Tore.Harness.KitchenMemorySynthesis do
           {:ok,
            [%{kind: String.t(), body: String.t(), confidence: float(), evidence: [integer()]}]}
           | {:error, term()}
-  def synthesise(summary), do: @llm.synthesise_insights(summary)
+  def synthesise(summary) do
+    {system, user} = Tore.LLM.Prompts.synthesise_insights(summary)
+
+    case @llm.text(system, user, []) do
+      {:ok, %{"insights" => insights}, _usage} when is_list(insights) ->
+        {:ok,
+         Enum.map(insights, fn i ->
+           %{
+             kind: i["kind"],
+             body: i["body"],
+             confidence: i["confidence"] || 0.5,
+             evidence: i["evidence"] || []
+           }
+         end)}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
+    end
+  end
 
   @spec build_artifact([map()]) :: MemoryUpdate.t()
   def build_artifact(new_insights) do

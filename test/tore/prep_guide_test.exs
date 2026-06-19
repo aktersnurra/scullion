@@ -19,7 +19,7 @@ defmodule Tore.PrepGuideTest do
 
   test "generate_guide calls LLM and persists prep guide" do
     Tore.MockLLM
-    |> expect(:generate_prep_guide, fn _plan, _locale ->
+    |> expect(:text, fn _system, _user, _opts ->
       {:ok,
        %{
          "timeline" => [
@@ -44,7 +44,7 @@ defmodule Tore.PrepGuideTest do
   end
 
   test "generate_guide returns error when LLM fails" do
-    Tore.MockLLM |> expect(:generate_prep_guide, fn _, _ -> {:error, :timeout} end)
+    Tore.MockLLM |> expect(:text, fn _system, _user, _opts -> {:error, :timeout} end)
     assert {:error, :timeout} = Prep.generate_guide(plan_id(), week_start())
   end
 

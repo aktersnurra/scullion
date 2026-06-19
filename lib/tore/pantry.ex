@@ -2,12 +2,34 @@ defmodule Tore.Pantry do
   import Ecto.Query
   alias Tore.Repo
   alias Tore.Pantry.PantryItem
+  alias Tore.Recipes.Ingredient
 
   @llm Application.compile_env(:tore, :llm_client)
 
   def parse_image(image_binary) do
-    @llm.parse_pantry_image(image_binary)
+    {system, user} = Tore.LLM.Prompts.parse_pantry_image()
+
+    with {:ok, data, _usage} <-
+           @llm.vision([{:image, image_binary}], system, user,
+             response_format: Tore.LLM.Prompts.pantry_json_schema()
+           ) do
+      items =
+        Enum.map(data["items"] || [], fn it ->
+          %{
+            name: it["name"],
+            quantity: parse_decimal(it["quantity"]),
+            unit: it["unit"],
+            category: it["category"]
+          }
+        end)
+
+      {:ok, items}
+    end
   end
+
+  defp parse_decimal(nil), do: nil
+  defp parse_decimal(n) when is_number(n), do: Decimal.from_float(n * 1.0)
+  defp parse_decimal(s) when is_binary(s), do: Decimal.new(s)
 
   def confirm_items(items) do
     Enum.reduce_while(items, {:ok, []}, fn item, {:ok, acc} ->
@@ -21,6 +43,136 @@ defmodule Tore.Pantry do
       error -> error
     end
   end
+
+  @doc """
+  Catalogue snapshot used to ground the LLM canonicaliser.
+  """
+  @spec catalogue() :: [%{key: String.t(), name: String.t(), category: String.t() | nil}]
+  def catalogue do
+    Repo.all(from i in Ingredient, select: %{key: i.key, name: i.name, category: i.category})
+  end
+
+  @doc """
+  Send raw pantry items through the LLM canonicaliser. Returns a list of
+  `{raw_name, display_name, category, default_unit, matched_key}` maps.
+  """
+  @spec canonicalise([map()], String.t() | nil) :: {:ok, [map()]} | {:error, term()}
+  def canonicalise(items, locale) do
+    {system, user} = Tore.LLM.Prompts.canonicalise_pantry_items(items, locale, catalogue())
+
+    case @llm.text(system, user, response_format: Tore.LLM.Prompts.canonicalise_pantry_schema()) do
+      {:ok, %{"items" => norm}, _usage} when is_list(norm) ->
+        {:ok,
+         Enum.map(norm, fn it ->
+           %{
+             raw_name: it["raw_name"],
+             display_name: it["display_name"],
+             category: it["category"],
+             default_unit: it["default_unit"],
+             matched_key: it["matched_key"]
+           }
+         end)}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  @doc """
+  Upsert a single canonicalised pantry belief.
+
+  Expects an attrs map with `display_name`, optional `matched_key`, plus
+  `quantity`, `unit`, `category`, `default_unit`, `provenance`, `last_seen_at`.
+  Resolves the ingredient by key (find-or-create), then bumps an existing
+  pantry row keyed on ingredient_id, or inserts a new one.
+
+  Returns `{:ok, %PantryItem{}, :added | :bumped}`.
+  """
+  @spec upsert_belief(map()) :: {:ok, PantryItem.t(), :added | :bumped} | {:error, term()}
+  def upsert_belief(attrs) do
+    Repo.transaction(fn ->
+      ingredient = find_or_create_ingredient(attrs)
+
+      case Repo.get_by(PantryItem, ingredient_id: ingredient.id) do
+        nil ->
+          {:ok, item} =
+            attrs
+            |> base_pantry_attrs(ingredient)
+            |> Map.put(:quantity, attrs[:quantity])
+            |> add_item()
+
+          {item, :added}
+
+        existing ->
+          {:ok, item} = bump_existing(existing, attrs)
+          {item, :bumped}
+      end
+    end)
+    |> case do
+      {:ok, {item, change}} -> {:ok, item, change}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp find_or_create_ingredient(attrs) do
+    key =
+      case attrs[:matched_key] do
+        k when is_binary(k) and k != "" -> k
+        _ -> Ingredient.to_key(attrs[:display_name] || attrs[:name] || "")
+      end
+
+    case Repo.get_by(Ingredient, key: key) do
+      nil ->
+        {:ok, ing} =
+          %Ingredient{}
+          |> Ingredient.changeset(%{
+            name: attrs[:display_name] || attrs[:name],
+            key: key,
+            category: attrs[:category],
+            default_unit: attrs[:default_unit] || attrs[:unit]
+          })
+          |> Repo.insert()
+
+        ing
+
+      ing ->
+        ing
+    end
+  end
+
+  defp base_pantry_attrs(attrs, ingredient) do
+    %{
+      name: attrs[:display_name] || ingredient.name,
+      unit: attrs[:unit] || ingredient.default_unit,
+      category: attrs[:category] || ingredient.category,
+      provenance: attrs[:provenance] || "manual",
+      last_seen_at: attrs[:last_seen_at] || now(),
+      ingredient_id: ingredient.id
+    }
+  end
+
+  defp bump_existing(%PantryItem{} = item, attrs) do
+    new_qty =
+      case {item.quantity, attrs[:quantity]} do
+        {nil, q} -> q
+        {q, nil} -> q
+        {a, b} -> Decimal.add(a, b)
+      end
+
+    item
+    |> PantryItem.changeset(%{
+      quantity: new_qty,
+      unit: item.unit || attrs[:unit],
+      last_seen_at: attrs[:last_seen_at] || now(),
+      provenance: attrs[:provenance] || item.provenance
+    })
+    |> Repo.update()
+  end
+
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
 
   @spec add_item(map()) :: {:ok, PantryItem.t()} | {:error, Ecto.Changeset.t()}
   def add_item(attrs) do
