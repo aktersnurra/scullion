@@ -110,7 +110,16 @@ defmodule Tore.Shop do
          :ok <- EventStore.append(list_id, events) do
       PubSub.broadcast(@pubsub, @topic, {:events, events})
       item = Map.get(state.items, item_id)
-      if item, do: Pantry.add_item(%{name: item.name, quantity: item.quantity, unit: item.unit})
+
+      if item do
+        Tore.Harness.Orchestrator.dispatch(:pantry_belief_update_run, %{
+          household_id: Tore.Household.get_household!().id,
+          user_id: user_id,
+          channel: :grocery_checkoff,
+          items: [%{name: item.name, quantity: item.quantity, unit: item.unit}]
+        })
+      end
+
       {:ok, events}
     end
   end

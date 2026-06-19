@@ -109,4 +109,5 @@ defmodule Tore.Harness.Artifact.PantryBeliefUpdate do
   defp decimal_to_string(nil), do: nil
   defp decimal_to_string(%Decimal{} = d), do: Decimal.to_string(d)
   defp decimal_to_string(n) when is_number(n), do: to_string(n)
+  defp decimal_to_string(s) when is_binary(s), do: s
 end

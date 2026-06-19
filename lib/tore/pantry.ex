@@ -154,7 +154,7 @@ defmodule Tore.Pantry do
 
   defp bump_existing(%PantryItem{} = item, attrs) do
     new_qty =
-      case {item.quantity, attrs[:quantity]} do
+      case {to_decimal(item.quantity), to_decimal(attrs[:quantity])} do
         {nil, q} -> q
         {q, nil} -> q
         {a, b} -> Decimal.add(a, b)
@@ -171,6 +171,18 @@ defmodule Tore.Pantry do
   end
 
   defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
+
+  defp to_decimal(nil), do: nil
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+
+  defp to_decimal(s) when is_binary(s) do
+    case Decimal.parse(s) do
+      {d, _} -> d
+      :error -> nil
+    end
+  end
 
   @spec add_item(map()) :: {:ok, PantryItem.t()} | {:error, Ecto.Changeset.t()}
   def add_item(attrs) do

@@ -97,10 +97,29 @@ defmodule Tore.PhotoPipeline do
     end
   end
 
-  defp route_group(:pantry_items, [image | _], _ctx) do
-    case Tore.Pantry.parse_image(image) do
-      {:ok, items} -> %{class: :pantry_items, status: :ok, result: items}
-      {:error, reason} -> %{class: :pantry_items, status: :error, result: reason}
+  # SPEC §4: shelf photo dispatches :pantry_belief_update_run via the harness.
+  # Tier 2 — if ≥5 items the run lands in :needs_user with an editable card;
+  # otherwise auto-applies via canonicalisation + upsert.
+  defp route_group(:pantry_items, [image | _], ctx) do
+    dispatch_ctx = %{
+      household_id: ctx.household_id,
+      user_id: ctx[:user_id],
+      channel: :shelf_photo,
+      image_binary: image
+    }
+
+    case Tore.Harness.Orchestrator.dispatch(:pantry_belief_update_run, dispatch_ctx) do
+      {:ok, %Tore.Harness.Run.State.NeedsUser{stream_id: sid}} ->
+        %{class: :pantry_items, status: :needs_review, run_stream_id: sid}
+
+      {:ok, %Tore.Harness.Run.State.Applied{}} ->
+        %{class: :pantry_items, status: :ok, result: :applied}
+
+      {:ok, %Tore.Harness.Run.State.Failed{failure_code: code}} ->
+        %{class: :pantry_items, status: :error, result: code}
+
+      {:error, reason} ->
+        %{class: :pantry_items, status: :error, result: reason}
     end
   end
 
