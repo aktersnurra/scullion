@@ -172,7 +172,7 @@ defmodule Tore.Harness.Orchestrator do
          :ok <- PantryVerifier.verify(pantry, %{}),
          {:ok, state} <-
            apply_command(state.stream_id, %Commands.AnswerQuestion{answer: "confirmed"}, state, metadata),
-         {:ok, _receipt} <- ReceiptIngestion.apply!(cost, pantry, user_id),
+         {:ok, _receipt} <- ReceiptIngestion.apply!(cost, pantry, user_id, household_locale()),
          {:ok, state} <-
            apply_command(state.stream_id, %Commands.AddArtifact{artifact: cost}, state, metadata),
          {:ok, state} <-

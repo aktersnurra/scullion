@@ -61,20 +61,56 @@ defmodule Tore.Harness.ReceiptIngestion do
   end
 
   @doc """
-  Atomically commit both artifacts: Costs.log_receipt + Pantry add_item per
-  line. Either both land or neither does. Returns {:ok, receipt} on success.
+  Atomically commit both artifacts: Costs.log_receipt + canonicalised
+  Pantry upsert per line. Either both land or neither does. Returns
+  `{:ok, receipt}` on success.
+
+  Canonicalisation runs the raw/edited names through the LLM (locale-aware)
+  before the upsert, so repeated buys collapse into one pantry row per
+  ingredient and `KYCKLINGLA FILE` / `Kycklinglår filé` / `kycklinglårfile`
+  all dedupe.
   """
-  @spec apply!(CostEntry.t(), PantryBeliefUpdate.t(), integer() | nil) ::
+  @spec apply!(CostEntry.t(), PantryBeliefUpdate.t(), integer() | nil, String.t() | nil) ::
           {:ok, Costs.Receipt.t()} | {:error, term()}
-  def apply!(%CostEntry{} = cost, %PantryBeliefUpdate{} = pantry, user_id) do
-    Repo.transaction(fn ->
-      with {:ok, receipt} <- log_receipt(cost, user_id),
-           :ok <- add_pantry(pantry) do
-        receipt
-      else
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
+  def apply!(%CostEntry{} = cost, %PantryBeliefUpdate{} = pantry, user_id, locale \\ nil) do
+    with {:ok, canonicalised} <- canonicalise(pantry, locale) do
+      Repo.transaction(fn ->
+        with {:ok, receipt} <- log_receipt(cost, user_id),
+             :ok <- upsert_pantry(canonicalised) do
+          receipt
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  # Run the pantry items through the LLM canonicaliser, then merge the
+  # canonicalised display name + matched key + category + default_unit back
+  # onto each original item map.
+  defp canonicalise(%PantryBeliefUpdate{items: items}, locale) do
+    raws = Enum.map(items, &%{raw_name: &1.name})
+
+    with {:ok, norms} <- Pantry.canonicalise(raws, locale) do
+      indexed = Map.new(norms, fn n -> {n.raw_name, n} end)
+
+      merged =
+        Enum.map(items, fn it ->
+          case Map.get(indexed, it.name) do
+            nil ->
+              it
+
+            n ->
+              it
+              |> Map.put(:display_name, n.display_name || it.name)
+              |> Map.put(:matched_key, n.matched_key)
+              |> Map.put(:category, it[:category] || n.category)
+              |> Map.put(:default_unit, n.default_unit)
+          end
+        end)
+
+      {:ok, merged}
+    end
   end
 
   defp log_receipt(%CostEntry{} = cost, user_id) do
@@ -97,20 +133,11 @@ defmodule Tore.Harness.ReceiptIngestion do
     }
   end
 
-  defp add_pantry(%PantryBeliefUpdate{items: items}) do
+  defp upsert_pantry(items) do
     Enum.reduce_while(items, :ok, fn it, :ok ->
-      attrs = %{
-        name: it.name,
-        quantity: it[:quantity],
-        unit: it[:unit],
-        category: it[:category],
-        provenance: it.provenance,
-        last_seen_at: it.last_seen_at
-      }
-
-      case Pantry.add_item(attrs) do
-        {:ok, _} -> {:cont, :ok}
-        {:error, cs} -> {:halt, {:error, cs}}
+      case Pantry.upsert_belief(it) do
+        {:ok, _item, _change} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
