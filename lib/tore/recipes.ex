@@ -101,15 +101,13 @@ defmodule Tore.Recipes do
     scrape_and_create(url, locale)
   end
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @spec extract_from_images([binary()], String.t() | nil) :: {:ok, map()} | {:error, term()}
   def extract_from_images(binaries, locale \\ nil) do
     system = Tore.LLM.Prompts.parse_recipe_images(locale)
     blobs = Enum.map(binaries, &{:image, &1})
 
     with {:ok, data, _usage} <-
-           @llm.vision(blobs, system, "Extract the recipe from these images.",
+           Tore.LLM.vision(blobs, system, "Extract the recipe from these images.",
              response_format: Tore.LLM.Prompts.recipe_json_schema()
            ) do
       {:ok, recipe_attrs_from_raw(data)}
@@ -129,7 +127,7 @@ defmodule Tore.Recipes do
 
     user = "Recipe: #{recipe_context}\nMissing ingredient: #{missing}"
 
-    case @llm.text(system, user, []) do
+    case Tore.LLM.text(system, user, []) do
       {:ok, %{"suggestion" => suggestion} = data, _usage} ->
         {:ok, %{suggestion: suggestion, updated_steps: data["updated_steps"]}}
 
@@ -158,7 +156,7 @@ defmodule Tore.Recipes do
     instructions = recipe["instructions"] || recipe[:instructions] || "No instructions"
     user = "Recipe: #{title}\nSteps: #{instructions}"
 
-    case @llm.text(system, user, []) do
+    case Tore.LLM.text(system, user, []) do
       {:ok, %{"do_first" => df, "while_cooking" => wc, "finish" => fin}, _usage} ->
         {:ok, %{do_first: df, while_cooking: wc, finish: fin}}
 
@@ -346,7 +344,7 @@ defmodule Tore.Recipes do
       {system, user} = Tore.LLM.Prompts.extract_recipe(html, locale)
 
       with {:ok, data, _usage} <-
-             @llm.text(system, user, response_format: Tore.LLM.Prompts.recipe_json_schema()) do
+             Tore.LLM.text(system, user, response_format: Tore.LLM.Prompts.recipe_json_schema()) do
         {:ok, recipe_attrs_from_raw(data)}
       end
     end
@@ -360,9 +358,9 @@ defmodule Tore.Recipes do
       Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
 
     result =
-      case @llm.text(system, user, model: check_model) do
+      case Tore.LLM.text(system, user, model: check_model) do
         {:ok, _, _} = ok -> ok
-        {:error, _} -> @llm.text(system, user, model: fallback)
+        {:error, _} -> Tore.LLM.text(system, user, model: fallback)
       end
 
     case result do

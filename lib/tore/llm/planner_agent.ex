@@ -6,8 +6,6 @@ defmodule Tore.LLM.PlannerAgent do
 
   alias Tore.LLM.{Tool, PlannerTools}
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @default_max_round_trips 6
   @default_max_action_calls 12
 
@@ -66,7 +64,7 @@ defmodule Tore.LLM.PlannerAgent do
   # ---------- Loop ----------
 
   defp loop(system, %{round_trips: rt, max_round_trips: max} = state) when rt >= max do
-    case @llm.chat_with_tools(system, state.messages, [], []) do
+    case Tore.LLM.chat_with_tools(system, state.messages, [], []) do
       {:ok, {:message, text}, usage} ->
         finish(record_step(state, :message, %{text: text}, usage), {:capped, text})
 
@@ -82,7 +80,7 @@ defmodule Tore.LLM.PlannerAgent do
   end
 
   defp loop(system, state) do
-    case @llm.chat_with_tools(system, state.messages, state.tools_json, []) do
+    case Tore.LLM.chat_with_tools(system, state.messages, state.tools_json, []) do
       {:ok, {:message, text}, usage} ->
         finish(record_step(state, :message, %{text: text}, usage), {:message, text})
 

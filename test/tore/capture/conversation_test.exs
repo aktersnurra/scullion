@@ -6,7 +6,7 @@ defmodule Tore.Capture.ConversationTest do
 
   test "reply/1 returns reply from LLM" do
     Tore.MockLLM
-    |> expect(:chat, fn _system, _messages ->
+    |> expect(:chat, fn _system, _messages, _opts ->
       {:ok, "Pasta sounds great!", %{prompt_tokens: 20, completion_tokens: 10, cost_usd: 0.0001}}
     end)
 
@@ -16,7 +16,7 @@ defmodule Tore.Capture.ConversationTest do
 
   test "reply/1 logs to ai_operations" do
     Tore.MockLLM
-    |> expect(:chat, fn _system, _messages ->
+    |> expect(:chat, fn _system, _messages, _opts ->
       {:ok, "Soup!", %{prompt_tokens: 5, completion_tokens: 3, cost_usd: 0.00001}}
     end)
 
@@ -30,7 +30,7 @@ defmodule Tore.Capture.ConversationTest do
 
   test "reply/1 propagates LLM errors" do
     Tore.MockLLM
-    |> expect(:chat, fn _system, _messages -> {:error, :rate_limited} end)
+    |> expect(:chat, fn _system, _messages, _opts -> {:error, :rate_limited} end)
 
     assert {:error, :rate_limited} =
              Tore.Capture.Conversation.reply("hello")
@@ -40,7 +40,7 @@ defmodule Tore.Capture.ConversationTest do
     {:ok, _} = Tore.Household.update_preferences(%{dietary_restrictions: ["vegetarian"]})
     test_pid = self()
 
-    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages ->
+    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages, _opts ->
       send(test_pid, {:system_prompt, sys})
       {:ok, "Hej!", %{}}
     end)
@@ -55,7 +55,7 @@ defmodule Tore.Capture.ConversationTest do
   test "the chat system prompt states today's date" do
     test_pid = self()
 
-    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages ->
+    Mox.expect(Tore.MockLLM, :chat, fn sys, _messages, _opts ->
       send(test_pid, {:system_prompt, sys})
       {:ok, "Hej!", %{}}
     end)

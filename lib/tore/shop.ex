@@ -2,7 +2,6 @@ defmodule Tore.Shop do
   alias Tore.{EventStore, Shop.Decider, Shop.Commands, Shop.Aggregator, Pantry}
   alias Phoenix.PubSub
 
-  @llm Application.compile_env(:tore, :llm_client)
   @pubsub Tore.PubSub
   @topic "shop_list"
 
@@ -52,7 +51,7 @@ defmodule Tore.Shop do
 
     fallback = Application.get_env(:tore, :openrouter_check_model_fallback, "openai/gpt-oss-120b")
 
-    case @llm.text(system, user,
+    case Tore.LLM.text(system, user,
            model: fallback,
            response_format: Tore.LLM.Prompts.filter_pantry_schema()
          ) do
@@ -66,7 +65,7 @@ defmodule Tore.Shop do
   defp classify_grocery_item(name) do
     {system, user} = Tore.LLM.Prompts.classify_grocery_item(name)
 
-    case @llm.text(system, user, []) do
+    case Tore.LLM.text(system, user, []) do
       {:ok, %{"section" => section}, _usage} -> {:ok, to_section_atom(section)}
       {:ok, _, _} -> {:error, :invalid_response}
       {:error, _} = err -> err

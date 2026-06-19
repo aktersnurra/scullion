@@ -1,8 +1,6 @@
 defmodule ToreWeb.KioskCaptureLive do
   use ToreWeb, :live_view
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @system_prompt "You are a cooking assistant on a kitchen kiosk. Answer cooking questions only (techniques, substitutions, timing, temperatures, ingredient questions). Do not modify the meal plan or grocery list. Keep answers concise and practical."
 
   def mount(_params, _session, socket) do
@@ -22,7 +20,7 @@ defmodule ToreWeb.KioskCaptureLive do
   end
 
   def handle_info({:ask_llm, messages}, socket) do
-    case @llm.chat(@system_prompt, messages) do
+    case Tore.LLM.chat(@system_prompt, messages) do
       {:ok, reply, _usage} ->
         updated = messages ++ [%{role: "assistant", content: reply}]
         {:noreply, assign(socket, messages: updated, loading: false)}

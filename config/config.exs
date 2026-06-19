@@ -51,8 +51,11 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# Port injection — adapters injected per environment
-config :tore, :llm_client, Tore.Adapters.OpenRouter
+# Port injection — wire spec + transport adapter injected per environment.
+# Contexts call `Tore.LLM` (the facade) which dispatches to `:llm_spec`;
+# the spec module then calls `:llm_adapter` for HTTP.
+config :tore, :llm_spec, Tore.LLM.OpenAI
+config :tore, :llm_adapter, Tore.Adapters.OpenRouter
 config :tore, :http_client, Tore.Adapters.ReqHTTP
 
 config :tore, Tore.Scheduler,

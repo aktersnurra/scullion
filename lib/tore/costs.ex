@@ -2,8 +2,6 @@ defmodule Tore.Costs do
   alias Tore.{Repo, Costs.LLMUsage, Costs.Receipt, Costs.LineItem, Costs.DiningOut}
   import Ecto.Query
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   def log_llm_usage(attrs) do
     %LLMUsage{} |> LLMUsage.changeset(attrs) |> Repo.insert()
   end
@@ -154,7 +152,7 @@ defmodule Tore.Costs do
     {system, user} = Tore.LLM.Prompts.parse_receipt_for_pantry(locale)
 
     with {:ok, data, _usage} <-
-           @llm.vision([{:image, image_binary}], system, user,
+           Tore.LLM.vision([{:image, image_binary}], system, user,
              response_format: Tore.LLM.Prompts.receipt_pantry_json_schema()
            ) do
       items =
@@ -181,7 +179,7 @@ defmodule Tore.Costs do
     {system, user} = Tore.LLM.Prompts.parse_receipt()
 
     with {:ok, data, _usage} <-
-           @llm.vision([{:image, image_binary}], system, user,
+           Tore.LLM.vision([{:image, image_binary}], system, user,
              response_format: Tore.LLM.Prompts.receipt_json_schema()
            ) do
       line_items =

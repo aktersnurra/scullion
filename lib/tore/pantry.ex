@@ -4,13 +4,11 @@ defmodule Tore.Pantry do
   alias Tore.Pantry.PantryItem
   alias Tore.Recipes.Ingredient
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   def parse_image(image_binary) do
     {system, user} = Tore.LLM.Prompts.parse_pantry_image()
 
     with {:ok, data, _usage} <-
-           @llm.vision([{:image, image_binary}], system, user,
+           Tore.LLM.vision([{:image, image_binary}], system, user,
              response_format: Tore.LLM.Prompts.pantry_json_schema()
            ) do
       items =
@@ -60,7 +58,7 @@ defmodule Tore.Pantry do
   def canonicalise(items, locale) do
     {system, user} = Tore.LLM.Prompts.canonicalise_pantry_items(items, locale, catalogue())
 
-    case @llm.text(system, user, response_format: Tore.LLM.Prompts.canonicalise_pantry_schema()) do
+    case Tore.LLM.text(system, user, response_format: Tore.LLM.Prompts.canonicalise_pantry_schema()) do
       {:ok, %{"items" => norm}, _usage} when is_list(norm) ->
         {:ok,
          Enum.map(norm, fn it ->

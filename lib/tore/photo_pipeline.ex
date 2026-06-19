@@ -1,6 +1,4 @@
 defmodule Tore.PhotoPipeline do
-  @llm Application.compile_env(:tore, :llm_client)
-
   @confidence_threshold 0.6
 
   @type ctx :: %{household_id: integer(), user_id: integer() | nil}
@@ -51,7 +49,7 @@ defmodule Tore.PhotoPipeline do
   """
 
   defp classify_image(binary) do
-    case @llm.vision([{:image, binary}], @classifier_system, "Classify this image.", []) do
+    case Tore.LLM.vision([{:image, binary}], @classifier_system, "Classify this image.", []) do
       {:ok, %{"class" => cls, "confidence" => conf}, _usage} ->
         {:ok, %{class: parse_image_class(cls), confidence: conf}}
 

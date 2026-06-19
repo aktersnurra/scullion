@@ -5,7 +5,6 @@ defmodule Tore.Planning do
 
   @pubsub Tore.PubSub
   @topic "plan"
-  @llm Application.compile_env(:tore, :llm_client)
 
   def load_plan(plan_id) do
     EventStore.load(plan_id, Decider)
@@ -462,7 +461,7 @@ defmodule Tore.Planning do
   end
 
   defp suggest(system, user, context) do
-    case @llm.text(system, user, []) do
+    case Tore.LLM.text(system, user, []) do
       {:ok, %{"recipe_id" => rid} = data, usage} when is_integer(rid) ->
         candidates = MapSet.new(context.candidate_recipe_ids || [])
 

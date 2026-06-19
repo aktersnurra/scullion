@@ -9,8 +9,6 @@ defmodule Tore.Capture.Conversation do
     PantryBeliefsCapsule
   }
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @chat_capsules [
     HouseholdPreferencesCapsule,
     ActiveInsightsCapsule,
@@ -36,7 +34,7 @@ defmodule Tore.Capture.Conversation do
       payload: text
     })
 
-    case @llm.chat(system, messages) do
+    case Tore.LLM.chat(system, messages) do
       {:ok, reply, _usage} ->
         AiOperations.log(%{
           run_stream_id: "#{correlation_id}:reply",

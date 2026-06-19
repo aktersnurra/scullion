@@ -21,8 +21,6 @@ defmodule Tore.Harness.KitchenMemorySynthesis do
   alias Tore.Household
   alias Tore.Harness.Orchestrator
 
-  @llm Application.compile_env(:tore, :llm_client)
-
   @capsules [
     ActiveInsightsCapsule,
     RecentHistoryCapsule,
@@ -66,7 +64,7 @@ defmodule Tore.Harness.KitchenMemorySynthesis do
   def synthesise(summary) do
     {system, user} = Tore.LLM.Prompts.synthesise_insights(summary)
 
-    case @llm.text(system, user, []) do
+    case Tore.LLM.text(system, user, []) do
       {:ok, %{"insights" => insights}, _usage} when is_list(insights) ->
         {:ok,
          Enum.map(insights, fn i ->

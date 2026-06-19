@@ -42,6 +42,6 @@ config :tore, :uploads_dir, Path.expand("../tmp/uploads", __DIR__)
 
 config :tore, :image_gen_client, Tore.Adapters.StubImageGen
 config :tore, :http_client, Tore.MockHTTP
-config :tore, :llm_client, Tore.MockLLM
+config :tore, :llm_spec, Tore.MockLLM
 config :tore, :storage_client, Tore.Storage.Mock
 config :tore, :env, :test

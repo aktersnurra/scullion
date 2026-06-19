@@ -22,7 +22,7 @@ defmodule ToreWeb.KioskCaptureLiveTest do
 
   test "sending a message triggers LLM and shows reply", %{conn: conn} do
     Tore.MockLLM
-    |> expect(:chat, fn _system, _messages ->
+    |> expect(:chat, fn _system, _messages, _opts ->
       {:ok, "Cook at 180°C for 25 minutes.", %{}}
     end)
 

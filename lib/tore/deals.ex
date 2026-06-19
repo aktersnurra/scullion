@@ -4,7 +4,6 @@ defmodule Tore.Deals do
   import Ecto.Query
 
   @http Application.compile_env(:tore, :http_client)
-  @llm Application.compile_env(:tore, :llm_client)
 
   @spec upsert_deals([map()]) :: {:ok, integer()} | {:error, term()}
   def upsert_deals(deals) do
@@ -134,7 +133,7 @@ defmodule Tore.Deals do
     {system, user} = Tore.LLM.Prompts.parse_deals_pdf()
 
     with {:ok, data, _usage} <-
-           @llm.vision([{:pdf, pdf_binary}], system, user, []) do
+           Tore.LLM.vision([{:pdf, pdf_binary}], system, user, []) do
       raw_deals =
         cond do
           is_list(data) -> data
