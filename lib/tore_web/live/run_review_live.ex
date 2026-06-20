@@ -28,6 +28,7 @@ defmodule ToreWeb.RunReviewLive do
           |> assign(:pantry, pantry)
           |> assign(:form_data, form_data_from(cost))
           |> assign(:error, nil)
+          |> assign(:saving?, false)
 
         {:ok, socket}
 
@@ -56,24 +57,43 @@ defmodule ToreWeb.RunReviewLive do
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
   end
 
+  def handle_event("confirm", _params, %{assigns: %{saving?: true}} = socket) do
+    # Re-submits while a commit is in flight — ignore.
+    {:noreply, socket}
+  end
+
   def handle_event("confirm", _params, socket) do
     cost = build_cost(socket.assigns.cost, socket.assigns.form_data)
     pantry = build_pantry(socket.assigns.pantry, socket.assigns.form_data)
     user_id = socket.assigns.current_user && socket.assigns.current_user.id
+    stream_id = socket.assigns.stream_id
+    pid = self()
 
-    case Orchestrator.commit_receipt(socket.assigns.stream_id, cost, pantry, user_id) do
-      {:ok, _state} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Receipt saved.")
-         |> push_navigate(to: ~p"/capture")}
+    # Commit takes ~3-8s (verifiers re-run, LLM canonicaliser, atomic write).
+    # Run it off the LiveView process so the UI can show a saving state
+    # immediately and survive a brief socket disconnect.
+    Task.Supervisor.start_child(Tore.TaskSupervisor, fn ->
+      result = Orchestrator.commit_receipt(stream_id, cost, pantry, user_id)
+      send(pid, {:commit_result, result})
+    end)
 
-      {:error, {:verifier_failed, code, _repair}} ->
-        {:noreply, assign(socket, :error, code)}
+    {:noreply, assign(socket, saving?: true, error: nil)}
+  end
 
-      {:error, reason} ->
-        {:noreply, assign(socket, :error, reason)}
-    end
+  @impl true
+  def handle_info({:commit_result, {:ok, _state}}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, "Receipt saved.")
+     |> push_navigate(to: ~p"/capture")}
+  end
+
+  def handle_info({:commit_result, {:error, {:verifier_failed, code, _repair}}}, socket) do
+    {:noreply, assign(socket, saving?: false, error: code)}
+  end
+
+  def handle_info({:commit_result, {:error, reason}}, socket) do
+    {:noreply, assign(socket, saving?: false, error: reason)}
   end
 
   @impl true
@@ -190,9 +210,23 @@ defmodule ToreWeb.RunReviewLive do
 
       <button
         type="submit"
-        class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+        disabled={@saving?}
+        class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
       >
-        {gettext("Save receipt")}
+        <%= if @saving? do %>
+          <svg
+            class="animate-spin size-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3" />
+            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          {gettext("Saving…")}
+        <% else %>
+          {gettext("Save receipt")}
+        <% end %>
       </button>
     </form>
     """

@@ -19,6 +19,7 @@ defmodule Tore.Application do
       Tore.Accounts.RateLimiter,
       Tore.Accounts.LoginToken,
       Tore.Scheduler,
+      {Task.Supervisor, name: Tore.TaskSupervisor},
       # Start to serve requests, typically the last entry
       ToreWeb.Endpoint
     ]
