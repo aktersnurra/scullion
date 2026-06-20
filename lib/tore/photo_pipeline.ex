@@ -115,16 +115,23 @@ defmodule Tore.PhotoPipeline do
       image_path: image_path
     }
 
-    case Tore.Harness.Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
-      {:ok, %Tore.Harness.Run.State.NeedsUser{stream_id: sid}} ->
-        %{class: :receipt, status: :needs_review, run_stream_id: sid}
+    result =
+      case Tore.Harness.Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
+        {:ok, %Tore.Harness.Run.State.NeedsUser{stream_id: sid}} ->
+          %{class: :receipt, status: :needs_review, run_stream_id: sid}
 
-      {:ok, %Tore.Harness.Run.State.Failed{stream_id: sid, failure_code: code}} ->
-        %{class: :receipt, status: :error, result: code, run_stream_id: sid}
+        {:ok, %Tore.Harness.Run.State.Failed{stream_id: sid, failure_code: code}} ->
+          %{class: :receipt, status: :error, result: code, run_stream_id: sid}
 
-      {:error, reason} ->
-        %{class: :receipt, status: :error, result: reason}
-    end
+        {:error, reason} ->
+          %{class: :receipt, status: :error, result: reason}
+      end
+
+    # Photo's only worth keeping while we're going to ask the user to
+    # validate the parse. Failed parses can't be reviewed — drop the bytes.
+    if result.status == :error, do: Tore.Storage.RunPhotos.delete_async(image_path)
+
+    result
   end
 
   # SPEC §4: shelf photo dispatches :pantry_belief_update_run via the harness.

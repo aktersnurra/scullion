@@ -16,6 +16,7 @@ defmodule Tore.LLM.OpenAI do
     %{
       model: Keyword.get(opts, :model, model()),
       response_format: Keyword.get(opts, :response_format, %{type: "json_object"}),
+      stream: false,
       messages: [
         %{role: "system", content: system},
         %{role: "user", content: user}
@@ -30,6 +31,7 @@ defmodule Tore.LLM.OpenAI do
     %{
       model: Keyword.get(opts, :model, vision_model()),
       response_format: Keyword.get(opts, :response_format, %{type: "json_object"}),
+      stream: false,
       messages: [
         %{role: "system", content: system},
         %{
@@ -46,6 +48,7 @@ defmodule Tore.LLM.OpenAI do
   def chat(system, messages, opts) do
     %{
       model: Keyword.get(opts, :model, model()),
+      stream: false,
       messages: [%{role: "system", content: system} | messages]
     }
     |> adapter().request()
@@ -64,6 +67,7 @@ defmodule Tore.LLM.OpenAI do
     body =
       %{
         model: Keyword.get(opts, :model, model()),
+        stream: false,
         messages: [%{role: "system", content: system} | messages],
         tools: tools
       }
