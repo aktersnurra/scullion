@@ -9,9 +9,20 @@ defmodule Tore.Adapters.OpenRouter do
 
   @api_url "https://openrouter.ai/api/v1/chat/completions"
 
+  # Bound the model call so a stuck upstream can't wedge the caller.
+  # 120s covers slow vision + cold-start on Vertex; tune via opts if needed.
+  @receive_timeout_ms 120_000
+  @connect_timeout_ms 10_000
+
   @impl Tore.Adapter
   def request(body) do
-    case Req.post(@api_url, json: body, headers: headers()) do
+    Req.post(@api_url,
+      json: body,
+      headers: headers(),
+      receive_timeout: @receive_timeout_ms,
+      connect_options: [timeout: @connect_timeout_ms]
+    )
+    |> case do
       {:ok, %{status: 200, body: resp}} -> {:ok, resp}
       {:ok, %{status: 402}} -> {:error, :provider_budget_exceeded}
       {:ok, %{status: 429}} -> {:error, :rate_limited}

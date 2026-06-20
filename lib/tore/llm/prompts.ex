@@ -339,6 +339,10 @@ defmodule Tore.LLM.Prompts do
        - Omit non-food items (bags, fees, deposits) unless clearly a food product.
        - Keep product names exactly as written on the receipt — do not translate.
        - Use the unit conventions natural to the receipt's language.
+       - Column alignment matters: each quantity belongs to the row it sits
+         on. Before emitting, sanity-check that you have not pulled a number
+         from a neighbouring row. If two adjacent items share the same name,
+         emit two separate rows with their own quantities — do not merge.
 
     Quantity policy:
     - Weight-priced row (decimal quantity with a per-kg/per-lb price): emit the
@@ -367,10 +371,36 @@ defmodule Tore.LLM.Prompts do
 
   defp locale_hint(locale) do
     case Map.get(@locale_names, locale) do
-      nil -> ""
-      name -> "\nThis receipt is from a #{name}-speaking region."
+      nil ->
+        ""
+
+      name ->
+        diacritics = locale_diacritics(locale)
+
+        hint =
+          "\nThis receipt is from a #{name}-speaking region."
+
+        if diacritics == "" do
+          hint
+        else
+          hint <>
+            " Preserve all diacritics exactly as printed (#{diacritics}). " <>
+            "Do NOT strip them to ASCII. If the print is unclear, prefer the " <>
+            "diacritic form when the word would normally carry it."
+        end
     end
   end
+
+  # Characters the LLM tends to drop when OCR is rough. Locale-specific so we
+  # don't tell, say, an English-region prompt to watch for å/ö.
+  defp locale_diacritics("sv"), do: "å, ä, ö, é"
+  defp locale_diacritics("no"), do: "å, æ, ø"
+  defp locale_diacritics("da"), do: "å, æ, ø"
+  defp locale_diacritics("fi"), do: "ä, ö"
+  defp locale_diacritics("de"), do: "ä, ö, ü, ß"
+  defp locale_diacritics("fr"), do: "à, â, ç, é, è, ê, ë, î, ï, ô, ù, û, ü, ÿ"
+  defp locale_diacritics("es"), do: "á, é, í, ñ, ó, ú, ü"
+  defp locale_diacritics(_), do: ""
 
   @canonicalise_pantry_schema %{
     type: "object",
