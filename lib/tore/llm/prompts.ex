@@ -397,7 +397,11 @@ defmodule Tore.LLM.Prompts do
     1. Extract the store name (if visible).
     2. Extract the total amount paid (the final total).
     3. Extract each purchased grocery item with name, quantity, and unit.
-       - Omit non-food items (bags, fees, deposits) unless clearly a food product.
+       - Omit administrative line items: shopping bags, deposit/pant, returns,
+         loyalty discounts, fees. These are not products.
+       - Include food AND kitchen/cooking consumables a household would track
+         (e.g. baking parchment, foil, plastic wrap, cling film, baking cups,
+         paper towels used for cooking). These categorise as "other".
        - Keep product names exactly as written on the receipt — do not translate.
        - Use the unit conventions natural to the receipt's language.
        - Column alignment matters: each quantity belongs to the row it sits

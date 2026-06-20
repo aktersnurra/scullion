@@ -13,15 +13,32 @@ defmodule Tore.PhotoPipeline do
         _ -> []
       end)
 
-    results =
-      classified
-      |> Enum.group_by(& &1.class)
-      |> Enum.map(fn {class, entries} ->
-        images = Enum.map(entries, & &1.binary)
-        route_group(class, images, ctx)
+    # Routing model — robust to mixed/abusive uploads:
+    #
+    #   - :recipe        → grouped together (multi-page recipe is a real case)
+    #   - :receipt       → one run per image (two receipts ≠ one combined)
+    #   - :pantry_items  → one run per image (two shelves ≠ one shelf)
+    #   - :fridge        → one suggestion set per image
+    #   - :unknown       → one ambiguous bubble per image
+    #
+    # This means a single "Send" with three receipts + a fridge photo
+    # produces three receipt runs and one fridge result — no silent merging.
+    by_class = Enum.group_by(classified, & &1.class)
+
+    recipe_result =
+      case Map.get(by_class, :recipe, []) do
+        [] -> []
+        entries -> [route_group(:recipe, Enum.map(entries, & &1.binary), ctx)]
+      end
+
+    per_image_results =
+      by_class
+      |> Map.drop([:recipe])
+      |> Enum.flat_map(fn {class, entries} ->
+        Enum.map(entries, fn %{binary: bin} -> route_group(class, [bin], ctx) end)
       end)
 
-    {:ok, results}
+    {:ok, recipe_result ++ per_image_results}
   end
 
   defp classify_one(binary) do

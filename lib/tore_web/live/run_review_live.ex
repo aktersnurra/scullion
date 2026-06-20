@@ -56,6 +56,15 @@ defmodule ToreWeb.RunReviewLive do
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
   end
 
+  def handle_event("add_item", _params, socket) do
+    items = socket.assigns.form_data.line_items ++ [blank_line_item()]
+    {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
+  end
+
+  defp blank_line_item do
+    %{name: "", quantity: "", total_price: "", unit: "", category: nil}
+  end
+
   def handle_event("confirm", _params, socket) do
     cost = build_cost(socket.assigns.cost, socket.assigns.form_data)
     pantry = build_pantry(socket.assigns.pantry, socket.assigns.form_data)
@@ -199,6 +208,14 @@ defmodule ToreWeb.RunReviewLive do
         <p :if={@form_data.line_items == []} class="text-xs text-[color:var(--muted)] mt-2">
           {gettext("No items parsed. Nothing will be added to the pantry.")}
         </p>
+
+        <button
+          type="button"
+          phx-click="add_item"
+          class="mt-3 inline-flex items-center gap-1 text-sm text-[color:var(--accent)] hover:underline"
+        >
+          <.icon name="hero-plus" class="size-4" /> {gettext("Add item")}
+        </button>
       </section>
 
       <button
