@@ -45,6 +45,24 @@ defmodule ToreWeb.CaptureLive do
 
         {:noreply, assign(socket, :processing_photos, true)}
 
+      url = extract_url(text) ->
+        # Single input surface: pasting a URL is a scrape, not a chat turn.
+        # Echo the URL as the user's message; the scrape runs off-process and
+        # the assistant reply ({:scrape_complete, ...}) lands when done.
+        messages =
+          socket.assigns.messages ++
+            [%{role: :user, text: text}, %{role: :assistant, text: gettext("Importing recipe…")}]
+
+        pid = self()
+        locale = socket.assigns.current_user && socket.assigns.current_user.locale
+
+        Task.start(fn ->
+          result = Tore.Recipes.scrape_from_url(url, locale)
+          send(pid, {:scrape_complete, result})
+        end)
+
+        {:noreply, assign(socket, messages: messages, input: "")}
+
       text != "" ->
         messages = socket.assigns.messages ++ [%{role: :user, text: text}]
         send(self(), {:chat, text})
@@ -55,7 +73,37 @@ defmodule ToreWeb.CaptureLive do
     end
   end
 
+  # Pull the first http(s) token out of the input. Returns the URL string or
+  # nil. Whitespace and surrounding punctuation are tolerated; one URL per
+  # message — multi-URL pastes would need explicit batching the user opts
+  # into, otherwise paste-spam becomes auto-scrape-spam.
+  defp extract_url(text) when is_binary(text) do
+    case Regex.run(~r{(https?://[^\s]+)}, text) do
+      [_, url] -> String.trim_trailing(url, ".,;:!?\"'")
+      _ -> nil
+    end
+  end
+
+  defp extract_url(_), do: nil
+
   @impl true
+  def handle_info({:scrape_complete, {:ok, recipe}}, socket) do
+    # Replace the "Importing recipe…" placeholder (last message) with the result.
+    bubble = %{role: :assistant, recipe_card: true, recipe_id: recipe.id, title: recipe.title}
+    {:noreply, replace_last_message(socket, bubble)}
+  end
+
+  def handle_info({:scrape_complete, {:error, reason}}, socket) do
+    text =
+      case reason do
+        :not_a_recipe -> gettext("That page doesn't look like a recipe.")
+        :timeout -> gettext("The site didn't respond. Try again in a moment.")
+        _ -> gettext("Couldn't import that URL.")
+      end
+
+    {:noreply, replace_last_message(socket, %{role: :assistant, text: text})}
+  end
+
   def handle_info({:chat, text}, socket) do
     case Conversation.reply(text) do
       {:ok, reply, _action} ->
@@ -71,7 +119,6 @@ defmodule ToreWeb.CaptureLive do
     end
   end
 
-  @impl true
   def handle_info({:pipeline_complete, {:ok, results}}, socket) do
     # Pull out the receipt batch first so multi-receipt uploads collapse to
     # one inbox-pointing reply instead of N "I parsed a receipt." bubbles.
@@ -87,6 +134,10 @@ defmodule ToreWeb.CaptureLive do
      socket
      |> assign(:processing_photos, false)
      |> update(:messages, &(&1 ++ new_messages))}
+  end
+
+  def handle_info({:pipeline_complete, {:error, _}}, socket) do
+    {:noreply, assign(socket, :processing_photos, false)}
   end
 
   defp receipt_inbox_message([]), do: nil
@@ -119,9 +170,10 @@ defmodule ToreWeb.CaptureLive do
     text =
       if names == "",
         do: gettext("I can see your fridge but it looks empty."),
-        else: gettext("I can see %{names} in your fridge. Want me to suggest some recipes?",
-          names: names
-        )
+        else:
+          gettext("I can see %{names} in your fridge. Want me to suggest some recipes?",
+            names: names
+          )
 
     %{role: :assistant, text: text}
   end
@@ -152,12 +204,19 @@ defmodule ToreWeb.CaptureLive do
   end
 
   defp message_for_result(%{class: class, status: :error}) do
-    %{role: :assistant, text: gettext("Something went wrong processing the %{class} photo.", class: class)}
+    %{
+      role: :assistant,
+      text: gettext("Something went wrong processing the %{class} photo.", class: class)
+    }
   end
 
-  @impl true
-  def handle_info({:pipeline_complete, {:error, _}}, socket) do
-    {:noreply, assign(socket, :processing_photos, false)}
+  defp replace_last_message(socket, message) do
+    update(socket, :messages, fn msgs ->
+      case Enum.reverse(msgs) do
+        [_last | rest] -> Enum.reverse([message | rest])
+        [] -> [message]
+      end
+    end)
   end
 
   @impl true
@@ -205,7 +264,24 @@ defmodule ToreWeb.CaptureLive do
             </.link>
           </div>
           <div
-            :if={!Map.get(msg, :review_card) && !Map.get(msg, :inbox_link)}
+            :if={Map.get(msg, :recipe_card)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
+          >
+            <p class="text-sm text-[color:var(--text)] mb-2">
+              {gettext("Imported")} <span class="font-semibold">{msg.title}</span>.
+            </p>
+            <.link
+              navigate={~p"/recipes"}
+              class="text-sm text-[color:var(--accent)] font-semibold whitespace-nowrap"
+            >
+              {gettext("Open recipe")} →
+            </.link>
+          </div>
+          <div
+            :if={
+              !Map.get(msg, :review_card) && !Map.get(msg, :inbox_link) &&
+                !Map.get(msg, :recipe_card)
+            }
             class={[
               "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               msg.role == :user && "bg-[color:var(--accent)] text-white",

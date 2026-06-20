@@ -18,7 +18,6 @@ defmodule ToreWeb.RecipeLiveTest do
       assert html =~ recipe.title
       assert html =~ "Sök recept"
       assert html =~ "Vad kan vi laga ikväll?"
-      assert html =~ "Klistra in en recept-URL"
     end
 
     test "more filters hidden by default", %{conn: conn, user: user} do
@@ -64,14 +63,6 @@ defmodule ToreWeb.RecipeLiveTest do
       {:ok, lv, _html} = live(authed(conn, user), "/recipes")
       html = render_click(lv, "get_ideas")
       assert html =~ "Kommer snart"
-    end
-  end
-
-  describe "import_action" do
-    test "shows error when url and uploads are both empty", %{conn: conn, user: user} do
-      {:ok, lv, _html} = live(authed(conn, user), "/recipes")
-      html = render_submit(lv, "import_action", %{"url" => ""})
-      assert html =~ "Klistra in en URL eller dra och släpp skärmdumpar först"
     end
   end
 

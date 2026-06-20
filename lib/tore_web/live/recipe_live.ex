@@ -18,8 +18,6 @@ defmodule ToreWeb.RecipeLive do
        filter_type: :all,
        filter_max_min: :any,
        sort: :recently_added,
-       scrape_state: :idle,
-       image_extract_state: :idle,
        extracted_attrs: nil,
        selected: nil,
        form: nil,
@@ -36,11 +34,6 @@ defmodule ToreWeb.RecipeLive do
        cook_mode: false,
        cook_mode_steps: nil,
        cook_mode_loading: false
-     )
-     |> allow_upload(:recipe_images,
-       accept: ~w(.jpg .jpeg .png .webp),
-       max_entries: 10,
-       max_file_size: 10_000_000
      )}
   end
 
@@ -78,28 +71,6 @@ defmodule ToreWeb.RecipeLive do
 
   def handle_event("get_ideas", _, socket) do
     {:noreply, put_flash(socket, :info, gettext("Coming soon"))}
-  end
-
-  def handle_event("import_action", %{"url" => url}, socket) do
-    cond do
-      socket.assigns.uploads.recipe_images.entries != [] ->
-        binaries =
-          consume_uploaded_entries(socket, :recipe_images, fn %{path: path}, _entry ->
-            {:ok, File.read!(path)}
-          end)
-
-        locale = socket.assigns.current_user && socket.assigns.current_user.locale
-        send(self(), {:extract_images, binaries, locale})
-        {:noreply, assign(socket, image_extract_state: :loading, error: nil)}
-
-      String.trim(url) != "" ->
-        locale = socket.assigns.current_user && socket.assigns.current_user.locale
-        send(self(), {:scrape, String.trim(url), locale})
-        {:noreply, assign(socket, scrape_state: :loading, error: nil)}
-
-      true ->
-        {:noreply, assign(socket, error: gettext("Paste a URL or drop screenshots first"))}
-    end
   end
 
   def handle_event("new_recipe", _, socket) do
@@ -248,10 +219,6 @@ defmodule ToreWeb.RecipeLive do
 
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
-  def handle_event("cancel_upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :recipe_images, ref)}
-  end
-
   def handle_event("add_ingredient_row", _, socket) do
     rows = socket.assigns.ingredient_rows ++ [%{name: "", quantity: "", unit: ""}]
     {:noreply, assign(socket, ingredient_rows: rows)}
@@ -287,57 +254,6 @@ defmodule ToreWeb.RecipeLive do
       end
 
     {:noreply, assign(socket, recipes: recipes, selected: selected)}
-  end
-
-  def handle_info({:extract_images, binaries, locale}, socket) do
-    case Recipes.extract_from_images(binaries, locale) do
-      {:ok, attrs} ->
-        form = %{
-          title: attrs[:title] || "",
-          recipe_type: "meal",
-          prep_time_minutes: attrs[:prep_time_minutes],
-          cook_time_minutes: attrs[:cook_time_minutes],
-          base_servings: attrs[:base_servings],
-          tags: (attrs[:tags] || []) |> Enum.join(", "),
-          source_url: attrs[:source_url] || "",
-          instructions: attrs[:instructions] || ""
-        }
-
-        rows =
-          Enum.map(attrs[:ingredients] || [], fn ing ->
-            %{
-              name: to_string(Map.get(ing, :name) || Map.get(ing, "name") || ""),
-              quantity: to_string(Map.get(ing, :quantity) || Map.get(ing, "quantity") || ""),
-              unit: to_string(Map.get(ing, :unit) || Map.get(ing, "unit") || "")
-            }
-          end)
-
-        {:noreply,
-         assign(socket,
-           image_extract_state: :idle,
-           form: form,
-           extracted_attrs: attrs,
-           selected: nil,
-           error: nil,
-           ingredient_rows: rows
-         )}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, image_extract_state: :idle, error: extract_error(reason))}
-    end
-  end
-
-  def handle_info({:scrape, url, locale}, socket) do
-    case Recipes.scrape_from_url(url, locale) do
-      {:ok, recipe} ->
-        {:noreply,
-         assign(socket, scrape_state: :idle)
-         |> reload_recipes()
-         |> assign(selected: recipe)}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, scrape_state: :idle, error: scrape_error(reason))}
-    end
   end
 
   def handle_info({:run_substitution, missing, recipe_context}, socket) do
@@ -514,51 +430,15 @@ defmodule ToreWeb.RecipeLive do
               <.button variant={:secondary} phx-click="get_ideas">{gettext("Get ideas")}</.button>
             </div>
 
-            <%!-- Import row --%>
-            <form phx-submit="import_action" phx-change="validate" class="space-y-2">
-              <div class="flex gap-2">
-                <div class="relative flex-1">
-                  <input
-                    type="text"
-                    name="url"
-                    value=""
-                    placeholder={gettext("Paste a recipe URL or drop screenshots…")}
-                    class="w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)] pr-10"
-                    style="font-size: var(--t-body);"
-                  />
-                  <label class="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[color:var(--subtle)] hover:text-[color:var(--muted)]">
-                    <.live_file_input upload={@uploads.recipe_images} class="sr-only" />
-                    <.icon name="hero-camera" class="size-5" />
-                  </label>
-                </div>
-                <.button
-                  type="submit"
-                  variant={:primary}
-                  disabled={@scrape_state == :loading or @image_extract_state == :loading}
-                >
-                  {cond do
-                    @scrape_state == :loading -> gettext("Importing…")
-                    @image_extract_state == :loading -> gettext("Extracting…")
-                    true -> gettext("Import")
-                  end}
-                </.button>
-              </div>
-              <div
-                :for={entry <- @uploads.recipe_images.entries}
-                class="flex items-center gap-2 text-[color:var(--muted)]"
-                style="font-size: var(--t-meta);"
-              >
-                <span class="flex-1 truncate">{entry.client_name}</span>
-                <button
-                  type="button"
-                  phx-click="cancel_upload"
-                  phx-value-ref={entry.ref}
-                  class="text-[color:var(--subtle)] hover:text-[color:var(--danger)]"
-                >
-                  ✕
-                </button>
-              </div>
-            </form>
+            <%!-- Import row — single input surface lives in /capture --%>
+            <.link
+              navigate={~p"/capture"}
+              class="flex items-center gap-3 h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-dashed border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--text)]"
+              style="font-size: var(--t-body);"
+            >
+              <.icon name="hero-plus" class="size-4" />
+              {gettext("Paste a recipe URL or drop a photo in capture")}
+            </.link>
           </div>
         </.card>
 
@@ -1204,32 +1084,6 @@ defmodule ToreWeb.RecipeLive do
     total = prep + cook
     if total > 0, do: "#{total} min", else: "—"
   end
-
-  defp extract_error(:provider_budget_exceeded), do: gettext("Monthly LLM budget reached")
-  defp extract_error(:rate_limited), do: gettext("Too many requests — try again in a moment")
-
-  defp extract_error({:openrouter_error, status, _}),
-    do: gettext("Extraction failed (API error %{status})", status: status)
-
-  defp extract_error(_), do: gettext("Could not extract recipe from the images")
-
-  defp scrape_error({:http_error, status}) when is_integer(status),
-    do: gettext("Could not fetch page (HTTP %{status})", status: status)
-
-  defp scrape_error({:req_error, _}),
-    do: gettext("Could not reach the URL — check your connection or the address")
-
-  defp scrape_error(:not_implemented),
-    do:
-      gettext(
-        "This site uses JavaScript to load content and cannot be scraped — try uploading a photo instead"
-      )
-
-  defp scrape_error({:openrouter_error, status, _}),
-    do: gettext("Recipe extraction failed (API error %{status})", status: status)
-
-  defp scrape_error(_),
-    do: gettext("Could not extract a recipe from this page")
 
   defp error_message(changeset) do
     changeset.errors
