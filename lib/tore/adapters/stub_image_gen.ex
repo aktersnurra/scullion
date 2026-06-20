@@ -7,5 +7,5 @@ defmodule Tore.Adapters.StubImageGen do
          1, 227, 81, 25, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130>>
 
   @impl true
-  def generate_food_image(_title, _recipe_text), do: {:ok, @png}
+  def generate_food_image(_prompt), do: {:ok, @png}
 end

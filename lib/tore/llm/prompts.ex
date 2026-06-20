@@ -639,4 +639,87 @@ defmodule Tore.LLM.Prompts do
     path = Path.join(@prompts_dir, template)
     EEx.eval_file(path, assigns: Map.to_list(assigns))
   end
+
+  # Strict JSON-schema so OpenRouter's structured-output mode enforces the
+  # `{"prompt": "..."}` shape — no defensive parsing on the caller.
+  @write_image_prompt_schema %{
+    type: "object",
+    required: ["prompt"],
+    additionalProperties: false,
+    properties: %{prompt: %{type: "string"}}
+  }
+
+  def write_image_prompt_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "image_prompt", strict: true, schema: @write_image_prompt_schema}
+    }
+  end
+
+  @doc """
+  Build a system + user prompt pair that asks a text LLM to write an image-gen
+  prompt for `recipe`. The text LLM picks composition, lighting, mood, plating
+  and cultural context based on the dish itself — so generated images vary in
+  style across recipes rather than all looking like the same overhead-shot
+  template.
+
+  Use with `Tore.LLM.text/3` and `write_image_prompt_schema/0` as the
+  `:response_format`. The reply will be `%{"prompt" => "<the image prompt>"}`.
+  """
+  def write_image_prompt(recipe, locale \\ nil) do
+    system = """
+    You write short, varied prompts for an image-generation model that
+    illustrates cooked dishes.
+
+    Goals for the prompt you write:
+    - Describe the finished dish on a plate, in a bowl, or in whichever vessel
+      best fits the cuisine.
+    - Pick a composition (overhead, three-quarter, close-up, side-on) that
+      flatters this specific dish — do not default to overhead for everything.
+    - Pick a lighting mood (bright daylight, warm tungsten, golden hour, soft
+      window light, moody low-key) that suits the dish. Vary it across calls.
+    - Pick a surface and props (rustic wood, marble, linen, ceramic, enamel,
+      glass) that suit the cuisine; avoid the same combo every time.
+    - Mention typical garnishes, sauces, or side dishes that belong with the
+      cuisine when relevant.
+    - Keep the prompt 40-80 words. No markdown, no preamble — just the prompt
+      itself as one paragraph of natural English (the image model speaks
+      English).
+    - Do not invent ingredients or details that contradict the recipe.
+    #{locale_hint(locale)}
+    """
+
+    ingredients_line =
+      case recipe[:ingredients] || recipe["ingredients"] do
+        list when is_list(list) and list != [] ->
+          names =
+            list
+            |> Enum.take(12)
+            |> Enum.map(fn i -> Map.get(i, :name) || Map.get(i, "name") || "" end)
+            |> Enum.reject(&(&1 == ""))
+            |> Enum.join(", ")
+
+          "Ingredients: #{names}"
+
+        _ ->
+          ""
+      end
+
+    instructions_excerpt =
+      case recipe[:instructions] || recipe["instructions"] do
+        s when is_binary(s) and s != "" -> "Method excerpt: #{String.slice(s, 0, 400)}"
+        _ -> ""
+      end
+
+    user =
+      [
+        "Title: #{recipe[:title] || recipe["title"] || ""}",
+        ingredients_line,
+        instructions_excerpt
+      ]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.join("\n")
+
+    {system, user}
+  end
 end

@@ -32,14 +32,7 @@ defmodule Tore.Adapters.OpenRouter do
   end
 
   @impl Tore.ImageGen
-  def generate_food_image(title, recipe_text) do
-    context =
-      if recipe_text && recipe_text != "", do: "\n\nRecipe context:\n#{recipe_text}", else: ""
-
-    prompt =
-      "Food photography, overhead shot, natural light, #{title}.#{context} " <>
-        "Clean white plate, rustic wooden table, appetizing, high resolution."
-
+  def generate_food_image(prompt) do
     body = %{
       model: image_model(),
       modalities: ["image"],
@@ -85,5 +78,5 @@ defmodule Tore.Adapters.OpenRouter do
 
   defp image_model,
     do:
-      Application.get_env(:tore, :openrouter_image_model, "google/gemini-3.1-flash-image-preview")
+      Application.get_env(:tore, :openrouter_image_model, "google/gemini-3.1-flash-image")
 end

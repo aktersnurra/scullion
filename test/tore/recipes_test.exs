@@ -1,7 +1,22 @@
 defmodule Tore.RecipesTest do
   use Tore.DataCase, async: false
+  import Mox
   alias Tore.Recipes
   alias Tore.Recipes.Ingredient
+
+  setup :set_mox_from_context
+  setup :verify_on_exit!
+
+  setup do
+    # Recipes.generate_image/2 calls Tore.LLM.text to write an image-gen
+    # prompt before invoking the image gen stub. Any prompt-string is fine
+    # for these tests.
+    stub(Tore.MockLLM, :text, fn _system, _user, _opts ->
+      {:ok, %{"prompt" => "A plate of food."}, %{}}
+    end)
+
+    :ok
+  end
 
   defp recipe_attrs(overrides \\ %{}) do
     Map.merge(%{title: "Test Recipe", recipe_type: :meal}, overrides)

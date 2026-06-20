@@ -376,7 +376,58 @@ defmodule Tore.Recipes do
   end
 
   defp fetch_or_generate(recipe, _image_url) do
-    @image_gen.generate_food_image(recipe.title, recipe.instructions)
+    with {:ok, prompt} <- write_image_prompt(recipe) do
+      @image_gen.generate_food_image(prompt)
+    end
+  end
+
+  defp write_image_prompt(recipe) do
+    locale = household_locale()
+    payload = recipe_for_image_prompt(recipe)
+    {system, user} = Tore.LLM.Prompts.write_image_prompt(payload, locale)
+
+    case Tore.LLM.text(system, user,
+           response_format: Tore.LLM.Prompts.write_image_prompt_schema()
+         ) do
+      {:ok, %{"prompt" => prompt}, _usage} when is_binary(prompt) and prompt != "" ->
+        {:ok, prompt}
+
+      {:ok, _, _} ->
+        {:error, :invalid_response}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  # Shrink the recipe to what the image-prompt writer actually needs.
+  defp recipe_for_image_prompt(recipe) do
+    %{
+      title: recipe.title,
+      instructions: recipe.instructions,
+      ingredients:
+        recipe
+        |> Map.get(:recipe_ingredients, [])
+        |> List.wrap()
+        |> Enum.map(fn ri ->
+          name =
+            case ri do
+              %{ingredient: %{name: n}} -> n
+              %{name: n} -> n
+              _ -> nil
+            end
+
+          %{name: name}
+        end)
+        |> Enum.reject(&is_nil(&1.name))
+    }
+  end
+
+  defp household_locale do
+    case Tore.Household.get_household!() do
+      %{locale: locale} when is_binary(locale) -> locale
+      _ -> nil
+    end
   end
 
   # ── Query filters ──────────────────────────────────────────────────────────
