@@ -15,7 +15,9 @@ defmodule ToreWeb.RunReviewLive do
   alias Tore.Harness.Run.State
 
   @impl true
-  def mount(%{"stream_id" => stream_id}, _session, socket) do
+  def mount(%{"stream_id" => stream_id} = params, _session, socket) do
+    socket = assign(socket, :return_to, return_to_from_params(params))
+
     case Run.load(stream_id) do
       {:ok, %State.NeedsUser{} = state} ->
         {cost, pantry} = extract_artifacts(state)
@@ -41,9 +43,18 @@ defmodule ToreWeb.RunReviewLive do
         {:ok,
          socket
          |> put_flash(:error, "Run not found.")
-         |> push_navigate(to: ~p"/capture")}
+         |> push_navigate(to: socket.assigns.return_to)}
     end
   end
+
+  # Only allow same-origin paths in ?from= — never honour an absolute URL or
+  # anything that could push the user off-site. Defaults to /inbox because
+  # that's where pending work lives.
+  defp return_to_from_params(%{"from" => "/" <> _ = path}) do
+    if String.contains?(path, "://"), do: "/inbox", else: path
+  end
+
+  defp return_to_from_params(_), do: "/inbox"
 
   @impl true
   def handle_event("update", %{"receipt" => params}, socket) do
@@ -85,7 +96,7 @@ defmodule ToreWeb.RunReviewLive do
       end
     end)
 
-    {:noreply, push_navigate(socket, to: ~p"/capture")}
+    {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
   end
 
   defp broadcast_toast(nil, _kind, _msg), do: :ok

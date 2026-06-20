@@ -73,7 +73,7 @@ defmodule ToreWeb.InboxLive do
           <ul class="space-y-2">
             <li :for={run <- @runs}>
               <.link
-                navigate={~p"/runs/#{run.stream_id}"}
+                navigate={~p"/runs/#{run.stream_id}?from=/inbox"}
                 class="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-3 hover:bg-[color:var(--accent-soft)]/40 transition-colors"
               >
                 <.thumbnail stream_id={run.stream_id} has_photo?={has_photo?(run)} />

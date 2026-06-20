@@ -166,7 +166,7 @@ defmodule ToreWeb.CaptureLive do
           >
             <p class="text-sm text-[color:var(--text)] mb-2">{msg.text}</p>
             <.link
-              navigate={~p"/runs/#{msg.run_stream_id}"}
+              navigate={~p"/runs/#{msg.run_stream_id}?from=/capture"}
               class="text-sm text-[color:var(--accent)] font-semibold whitespace-nowrap"
             >
               {gettext("Review receipt")} →
