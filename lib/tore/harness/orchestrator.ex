@@ -90,7 +90,9 @@ defmodule Tore.Harness.Orchestrator do
            {:ok, state} <- verify_and_surface_receipt(state, cost, pantry, metadata) do
         {:ok, state}
       else
-        {:error, reason} -> {:error, {:step_failed, reason}}
+        {:error, reason} ->
+          Logger.error("receipt_ingestion_run step failed: #{inspect(reason, limit: :infinity)}")
+          {:error, {:step_failed, reason}}
       end
     end)
   end
