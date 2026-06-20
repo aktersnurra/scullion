@@ -64,7 +64,7 @@ defmodule Tore.Harness.Orchestrator do
   @weekly_max_action_calls 25
 
   def dispatch(:receipt_ingestion_run, ctx) do
-    stream_id = Run.next_stream_id()
+    stream_id = Map.get(ctx, :stream_id) || Run.next_stream_id()
     metadata = %{household_id: ctx.household_id}
 
     open_cmd = %Commands.Open{
@@ -98,7 +98,7 @@ defmodule Tore.Harness.Orchestrator do
   end
 
   def dispatch(:pantry_belief_update_run, ctx) do
-    stream_id = Run.next_stream_id()
+    stream_id = Map.get(ctx, :stream_id) || Run.next_stream_id()
     metadata = %{household_id: ctx.household_id}
     channel = Map.fetch!(ctx, :channel)
 
@@ -108,7 +108,7 @@ defmodule Tore.Harness.Orchestrator do
       surface: :plan,
       started_by: Map.get(ctx, :started_by, "user"),
       user_id: Map.get(ctx, :user_id),
-      input: %{channel: Atom.to_string(channel)}
+      input: %{channel: Atom.to_string(channel), image_path: Map.get(ctx, :image_path)}
     }
 
     run_dispatch(stream_id, metadata, "pantry_belief_update_run", fn ->

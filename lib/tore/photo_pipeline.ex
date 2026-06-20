@@ -100,13 +100,19 @@ defmodule Tore.PhotoPipeline do
 
   # SPEC §5: receipt photo dispatches :receipt_ingestion_run via the harness;
   # the run lands in :needs_user and the UI surfaces an editable card at
-  # /runs/:stream_id.
+  # /runs/:stream_id. The photo is persisted to S3 under the run's stream_id
+  # so the inbox + run-review surface can render it as ground truth — and
+  # so a post-commit Task can delete it cleanly.
   defp route_group(:receipt, [image | _], ctx) do
+    stream_id = Tore.Harness.Run.next_stream_id()
+    image_path = stash_photo(stream_id, image)
+
     dispatch_ctx = %{
       household_id: ctx.household_id,
       user_id: ctx[:user_id],
+      stream_id: stream_id,
       image_binary: image,
-      image_path: nil
+      image_path: image_path
     }
 
     case Tore.Harness.Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
@@ -125,11 +131,16 @@ defmodule Tore.PhotoPipeline do
   # Tier 2 — if ≥5 items the run lands in :needs_user with an editable card;
   # otherwise auto-applies via canonicalisation + upsert.
   defp route_group(:pantry_items, [image | _], ctx) do
+    stream_id = Tore.Harness.Run.next_stream_id()
+    image_path = stash_photo(stream_id, image)
+
     dispatch_ctx = %{
       household_id: ctx.household_id,
       user_id: ctx[:user_id],
+      stream_id: stream_id,
       channel: :shelf_photo,
-      image_binary: image
+      image_binary: image,
+      image_path: image_path
     }
 
     case Tore.Harness.Orchestrator.dispatch(:pantry_belief_update_run, dispatch_ctx) do
@@ -156,5 +167,21 @@ defmodule Tore.PhotoPipeline do
 
   defp route_group(:unknown, _images, _ctx) do
     %{class: :unknown, status: :ambiguous, result: nil}
+  end
+
+  # Persist the upload before dispatching the run so the inbox + run-review
+  # surfaces have a ground-truth image to show. Returns the S3 key, or nil if
+  # storage is unavailable — the run still proceeds (the orchestrator hands
+  # the binary to the LLM directly), only the ground-truth view degrades.
+  defp stash_photo(stream_id, image_binary) do
+    case Tore.Storage.RunPhotos.store(stream_id, image_binary) do
+      {:ok, key} ->
+        key
+
+      {:error, reason} ->
+        require Logger
+        Logger.warning("RunPhotos.store failed: #{inspect(reason)} (run continues)")
+        nil
+    end
   end
 end

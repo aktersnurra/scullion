@@ -52,6 +52,24 @@ defmodule Tore.Harness.Projector do
     end
   end
 
+  @doc """
+  All `:needs_user` runs for the household — the inbox queue. Newest first.
+  """
+  @spec list_pending(integer()) :: [State.NeedsUser.t()]
+  def list_pending(household_id) do
+    with [{pid, _}] <- Registry.lookup(ProjectorRegistry, household_id),
+         {:ok, %{table: table}} <- GenServer.call(pid, :state) do
+      :ets.match_object(table, {{:stream, :_}, :_})
+      |> Enum.flat_map(fn
+        {_, %State.NeedsUser{} = s} -> [s]
+        _ -> []
+      end)
+      |> Enum.sort_by(& &1.opened_at, {:desc, DateTime})
+    else
+      _ -> []
+    end
+  end
+
   # ---------- Server ----------
 
   @impl true
