@@ -73,54 +73,86 @@ defmodule ToreWeb.CaptureLive do
 
   @impl true
   def handle_info({:pipeline_complete, {:ok, results}}, socket) do
-    new_messages =
-      Enum.map(results, fn
-        %{class: :unknown, status: :ambiguous} ->
-          %{
-            role: :assistant,
-            text:
-              "I wasn't sure what that photo showed. Could you tell me — is it a receipt, a recipe, or your fridge?"
-          }
+    # Pull out the receipt batch first so multi-receipt uploads collapse to
+    # one inbox-pointing reply instead of N "I parsed a receipt." bubbles.
+    {receipt_results, other_results} =
+      Enum.split_with(results, &match?(%{class: :receipt, status: :needs_review}, &1))
 
-        %{class: :fridge, status: :ok, result: items} ->
-          names = items |> Enum.map(&(&1[:name] || &1["name"])) |> Enum.take(5) |> Enum.join(", ")
+    receipt_message = receipt_inbox_message(receipt_results)
+    other_messages = Enum.map(other_results, &message_for_result/1)
 
-          text =
-            if names == "",
-              do: "I can see your fridge but it looks empty.",
-              else: "I can see #{names} in your fridge. Want me to suggest some recipes?"
-
-          %{role: :assistant, text: text}
-
-        %{class: :receipt, status: :needs_review, run_stream_id: sid} ->
-          %{
-            role: :assistant,
-            run_card: true,
-            class: :receipt,
-            run_stream_id: sid,
-            text: "I parsed a receipt."
-          }
-
-        %{class: class, status: :ok, result: result} ->
-          review_id = Ecto.UUID.generate()
-          :ets.insert(:chat_reviews, {review_id, %{class: class, result: result}})
-
-          %{
-            role: :assistant,
-            review_card: true,
-            class: class,
-            review_id: review_id,
-            text: "I found a #{class}."
-          }
-
-        %{class: class, status: :error} ->
-          %{role: :assistant, text: "Something went wrong processing the #{class} photo."}
-      end)
+    new_messages = Enum.reject([receipt_message | other_messages], &is_nil/1)
 
     {:noreply,
      socket
      |> assign(:processing_photos, false)
      |> update(:messages, &(&1 ++ new_messages))}
+  end
+
+  defp receipt_inbox_message([]), do: nil
+
+  defp receipt_inbox_message(receipts) do
+    count = length(receipts)
+
+    text =
+      case count do
+        1 -> gettext("I parsed a receipt. Review it in your inbox.")
+        n -> gettext("I parsed %{n} receipts. Review them in your inbox.", n: n)
+      end
+
+    %{role: :assistant, inbox_link: true, text: text}
+  end
+
+  defp message_for_result(%{class: :unknown, status: :ambiguous}) do
+    %{
+      role: :assistant,
+      text:
+        gettext(
+          "I wasn't sure what that photo showed. Could you tell me — is it a receipt, a recipe, or your fridge?"
+        )
+    }
+  end
+
+  defp message_for_result(%{class: :fridge, status: :ok, result: items}) do
+    names = items |> Enum.map(&(&1[:name] || &1["name"])) |> Enum.take(5) |> Enum.join(", ")
+
+    text =
+      if names == "",
+        do: gettext("I can see your fridge but it looks empty."),
+        else: gettext("I can see %{names} in your fridge. Want me to suggest some recipes?",
+          names: names
+        )
+
+    %{role: :assistant, text: text}
+  end
+
+  defp message_for_result(%{class: :pantry_items, status: :needs_review, run_stream_id: _sid}) do
+    %{
+      role: :assistant,
+      inbox_link: true,
+      text: gettext("I parsed your shelf photo. Review it in your inbox.")
+    }
+  end
+
+  defp message_for_result(%{class: :pantry_items, status: :ok}) do
+    %{role: :assistant, text: gettext("Added the pantry items from your photo.")}
+  end
+
+  defp message_for_result(%{class: class, status: :ok, result: result}) do
+    review_id = Ecto.UUID.generate()
+    :ets.insert(:chat_reviews, {review_id, %{class: class, result: result}})
+
+    %{
+      role: :assistant,
+      review_card: true,
+      class: class,
+      review_id: review_id,
+      text: gettext("I found a %{class}.", class: class)
+    }
+  end
+
+  defp message_for_result(%{class: class, status: :error}) do
+    %{role: :assistant, text: gettext("Something went wrong processing the %{class} photo.", class: class)}
   end
 
   @impl true
@@ -161,19 +193,19 @@ defmodule ToreWeb.CaptureLive do
             </.link>
           </div>
           <div
-            :if={Map.get(msg, :run_card)}
-            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%] min-w-[14rem]"
+            :if={Map.get(msg, :inbox_link)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
           >
             <p class="text-sm text-[color:var(--text)] mb-2">{msg.text}</p>
             <.link
-              navigate={~p"/runs/#{msg.run_stream_id}?from=/capture"}
+              navigate={~p"/inbox"}
               class="text-sm text-[color:var(--accent)] font-semibold whitespace-nowrap"
             >
-              {gettext("Review receipt")} →
+              {gettext("Open inbox")} →
             </.link>
           </div>
           <div
-            :if={!Map.get(msg, :review_card)}
+            :if={!Map.get(msg, :review_card) && !Map.get(msg, :inbox_link)}
             class={[
               "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               msg.role == :user && "bg-[color:var(--accent)] text-white",
