@@ -52,8 +52,14 @@ defmodule Tore.Harness.Projector do
     end
   end
 
+  # Runs that surface in the inbox — only the ones a user initiated by
+  # uploading or typing something. Cron-fired headless runs (weekly
+  # planning, kitchen memory synthesis) stay out of sight even if a
+  # verifier slip puts one in NeedsUser.
+  @inbox_kinds ~w[receipt_ingestion_run pantry_belief_update_run recipe_ingestion_run]
+
   @doc """
-  All `:needs_user` runs for the household — the inbox queue. Newest first.
+  Pending `:needs_user` runs the user is meant to act on, newest first.
   """
   @spec list_pending(integer()) :: [State.NeedsUser.t()]
   def list_pending(household_id) do
@@ -61,7 +67,7 @@ defmodule Tore.Harness.Projector do
          {:ok, %{table: table}} <- GenServer.call(pid, :state) do
       :ets.match_object(table, {{:stream, :_}, :_})
       |> Enum.flat_map(fn
-        {_, %State.NeedsUser{} = s} -> [s]
+        {_, %State.NeedsUser{kind: kind} = s} when kind in @inbox_kinds -> [s]
         _ -> []
       end)
       |> Enum.sort_by(&sort_key(&1.opened_at), :desc)
