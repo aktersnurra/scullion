@@ -62,6 +62,7 @@ defmodule ToreWeb.Router do
       live "/settings/pantry", PantryLive
       live "/settings/costs", CostLive
       live "/capture", CaptureLive
+      live "/inbox", InboxLive
       live "/review/:class/:id", ReviewLive
       live "/runs/:stream_id", RunReviewLive
     end
