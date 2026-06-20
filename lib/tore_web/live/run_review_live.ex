@@ -28,7 +28,6 @@ defmodule ToreWeb.RunReviewLive do
           |> assign(:pantry, pantry)
           |> assign(:form_data, form_data_from(cost))
           |> assign(:error, nil)
-          |> assign(:saving?, false)
 
         {:ok, socket}
 
@@ -57,43 +56,37 @@ defmodule ToreWeb.RunReviewLive do
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
   end
 
-  def handle_event("confirm", _params, %{assigns: %{saving?: true}} = socket) do
-    # Re-submits while a commit is in flight — ignore.
-    {:noreply, socket}
-  end
-
   def handle_event("confirm", _params, socket) do
     cost = build_cost(socket.assigns.cost, socket.assigns.form_data)
     pantry = build_pantry(socket.assigns.pantry, socket.assigns.form_data)
     user_id = socket.assigns.current_user && socket.assigns.current_user.id
     stream_id = socket.assigns.stream_id
-    pid = self()
 
-    # Commit takes ~3-8s (verifiers re-run, LLM canonicaliser, atomic write).
-    # Run it off the LiveView process so the UI can show a saving state
-    # immediately and survive a brief socket disconnect.
+    # Fire-and-forget: the commit takes ~3-8s (verifiers re-run + LLM
+    # canonicaliser + atomic write). Kick it to Task.Supervisor and bounce
+    # the user back to /capture immediately. The toast on completion lands
+    # wherever they happen to be (PubSub topic "toasts:user:<id>").
     Task.Supervisor.start_child(Tore.TaskSupervisor, fn ->
-      result = Orchestrator.commit_receipt(stream_id, cost, pantry, user_id)
-      send(pid, {:commit_result, result})
+      Orchestrator.commit_receipt(stream_id, cost, pantry, user_id)
+      |> case do
+        {:ok, _} ->
+          broadcast_toast(user_id, :info, "Receipt saved.")
+
+        {:error, {:verifier_failed, code, _}} ->
+          broadcast_toast(user_id, :error, "Couldn't save receipt: #{code}.")
+
+        {:error, reason} ->
+          broadcast_toast(user_id, :error, "Couldn't save receipt: #{inspect(reason)}.")
+      end
     end)
 
-    {:noreply, assign(socket, saving?: true, error: nil)}
+    {:noreply, push_navigate(socket, to: ~p"/capture")}
   end
 
-  @impl true
-  def handle_info({:commit_result, {:ok, _state}}, socket) do
-    {:noreply,
-     socket
-     |> put_flash(:info, "Receipt saved.")
-     |> push_navigate(to: ~p"/capture")}
-  end
+  defp broadcast_toast(nil, _kind, _msg), do: :ok
 
-  def handle_info({:commit_result, {:error, {:verifier_failed, code, _repair}}}, socket) do
-    {:noreply, assign(socket, saving?: false, error: code)}
-  end
-
-  def handle_info({:commit_result, {:error, reason}}, socket) do
-    {:noreply, assign(socket, saving?: false, error: reason)}
+  defp broadcast_toast(user_id, kind, message) do
+    Phoenix.PubSub.broadcast(Tore.PubSub, "toasts:user:#{user_id}", {:toast, kind, message})
   end
 
   @impl true
@@ -210,23 +203,9 @@ defmodule ToreWeb.RunReviewLive do
 
       <button
         type="submit"
-        disabled={@saving?}
-        class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+        class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
       >
-        <%= if @saving? do %>
-          <svg
-            class="animate-spin size-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3" />
-            <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-          </svg>
-          {gettext("Saving…")}
-        <% else %>
-          {gettext("Save receipt")}
-        <% end %>
+        {gettext("Save receipt")}
       </button>
     </form>
     """

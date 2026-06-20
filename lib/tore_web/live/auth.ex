@@ -7,7 +7,11 @@ defmodule ToreWeb.Live.Auth do
     socket = socket |> mount_current_user(session) |> attach_current_path()
 
     if socket.assigns.current_user do
-      {:cont, socket}
+      if Phoenix.LiveView.connected?(socket) do
+        Phoenix.PubSub.subscribe(Tore.PubSub, "toasts:user:#{socket.assigns.current_user.id}")
+      end
+
+      {:cont, attach_toast_hook(socket)}
     else
       {:halt, redirect(socket, to: "/login")}
     end
@@ -48,17 +52,30 @@ defmodule ToreWeb.Live.Auth do
   defp mount_current_user(socket, session) do
     case session["user_id"] do
       nil ->
-        Gettext.put_locale(ToreWeb.Gettext, "sv")
+        Gettext.put_locale(ToreWeb.Gettext, "en")
         assign(socket, :current_user, nil)
 
       user_id ->
         user = Accounts.get_user!(user_id)
-        Gettext.put_locale(ToreWeb.Gettext, user.locale || "sv")
+        Gettext.put_locale(ToreWeb.Gettext, user.locale || "en")
         assign(socket, :current_user, user)
     end
   rescue
     Ecto.NoResultsError ->
-      Gettext.put_locale(ToreWeb.Gettext, "sv")
+      Gettext.put_locale(ToreWeb.Gettext, "en")
       assign(socket, :current_user, nil)
+  end
+
+  # Per-user PubSub topic for background jobs that need to surface a result
+  # toast wherever the user happens to be at the moment they complete.
+  defp attach_toast_hook(socket) do
+    Phoenix.LiveView.attach_hook(socket, :toasts, :handle_info, fn
+      {:toast, kind, message}, socket ->
+        flash_key = if kind in [:error, :danger], do: :error, else: :info
+        {:halt, Phoenix.LiveView.put_flash(socket, flash_key, message)}
+
+      _other, socket ->
+        {:cont, socket}
+    end)
   end
 end
