@@ -297,7 +297,20 @@ defmodule Tore.LLM.Prompts do
             name: %{type: "string"},
             quantity: %{type: ["number", "null"]},
             unit: %{type: ["string", "null"]},
-            category: %{type: ["string", "null"]}
+            category: %{
+              type: "string",
+              enum: [
+                "dairy",
+                "meat",
+                "produce",
+                "frozen",
+                "dry_goods",
+                "canned",
+                "herbs_spices",
+                "condiments",
+                "other"
+              ]
+            }
           }
         }
       }
@@ -348,7 +361,23 @@ defmodule Tore.LLM.Prompts do
             name: %{type: "string"},
             quantity: %{type: ["number", "null"]},
             unit: %{type: ["string", "null"]},
-            category: %{type: ["string", "null"]}
+            # Constrain to the canonical English keys our schemas accept —
+            # locale-aware names (e.g. "Mejeri & Ost") get rejected downstream
+            # at the changeset, so force the model to pick from this set.
+            category: %{
+              type: "string",
+              enum: [
+                "dairy",
+                "meat",
+                "produce",
+                "frozen",
+                "dry_goods",
+                "canned",
+                "herbs_spices",
+                "condiments",
+                "other"
+              ]
+            }
           }
         }
       }
@@ -422,7 +451,20 @@ defmodule Tore.LLM.Prompts do
           properties: %{
             raw_name: %{type: "string"},
             catalogue_name: %{type: "string"},
-            category: %{type: ["string", "null"]},
+            category: %{
+              type: "string",
+              enum: [
+                "dairy",
+                "meat",
+                "produce",
+                "frozen",
+                "dry_goods",
+                "canned",
+                "herbs_spices",
+                "condiments",
+                "other"
+              ]
+            },
             default_unit: %{type: ["string", "null"]},
             matched_key: %{type: ["string", "null"]}
           }
@@ -470,8 +512,9 @@ defmodule Tore.LLM.Prompts do
       percentage, packaging, supplier or organic-certification qualifiers.
       Use the locale's natural orthography (diacritics, capitalisation, word
       boundaries) — the OCR is unreliable, you are not. Be confident.
-    - category: one of dairy, meat, produce, frozen, dry_goods, canned,
-      herbs_spices, condiments, other. Null only if truly unknowable.
+    - category: pick the best fit from dairy, meat, produce, frozen, dry_goods,
+      canned, herbs_spices, condiments, other. Use "other" when nothing else
+      fits — never leave it empty.
     - default_unit: the most natural single-purchase unit for this ingredient
       in the locale's conventions.
     - matched_key: if this catalogue_name maps to an existing catalogue key,
