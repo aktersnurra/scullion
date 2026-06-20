@@ -173,6 +173,28 @@ defmodule Tore.LLM.Prompts do
     {system, html}
   end
 
+  @doc """
+  Reformat and translate a recipe to the Tore schema. Use when a deterministic
+  scraper (JSON-LD / microdata) already produced a structured recipe but it
+  may be in another language or shaped differently from `recipe_json_schema/0`.
+  """
+  def normalise_recipe(attrs, locale \\ nil) do
+    system = """
+    You normalise an already-structured recipe into the Tore recipe schema.
+    The input is a JSON-shaped recipe that may use different field names, units,
+    or formatting from what Tore expects. Reformat it.
+
+    Return a JSON object matching this exact structure:
+    #{@recipe_schema}
+    Rules:
+    #{@recipe_rules}
+    #{translation_instruction(locale)}
+    """
+
+    user = Jason.encode!(attrs)
+    {system, user}
+  end
+
   def parse_recipe_images(locale \\ nil) do
     """
     You are a recipe extractor. The user has photographed one or more pages of a recipe — ingredients may be on one image, instructions on another.

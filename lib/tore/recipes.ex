@@ -98,7 +98,7 @@ defmodule Tore.Recipes do
 
   @spec scrape_from_url(String.t(), String.t() | nil) :: {:ok, Recipe.t()} | {:error, term()}
   def scrape_from_url(url, locale \\ nil) do
-    scrape_and_create(url, locale)
+    scrape_and_create(url, locale || household_locale())
   end
 
   @spec extract_from_images([binary()], String.t() | nil) :: {:ok, map()} | {:error, term()}
@@ -306,6 +306,8 @@ defmodule Tore.Recipes do
   @spec scrape_and_create(String.t(), String.t() | nil) ::
           {:ok, Recipe.t()} | {:error, term()}
   def scrape_and_create(url, locale \\ nil) do
+    locale = locale || household_locale()
+
     with {:ok, html} <- @http.fetch(url),
          {:ok, attrs} <- parse_or_extract(html, locale) do
       create(Map.put(attrs, :source_url, url))
@@ -333,9 +335,14 @@ defmodule Tore.Recipes do
     end
   end
 
+  # Two paths in, one shape out. Whether the deterministic parser succeeded
+  # or we had to fall back to LLM extraction, the result goes through the
+  # LLM normaliser so every scraped recipe ends up translated to the
+  # household's locale and reformatted to the Tore schema.
   defp parse_or_extract(html, locale) do
-    with {:error, :not_found} <- Tore.Recipes.Parser.parse_html(html) do
-      extract_from_html(html, locale)
+    case Tore.Recipes.Parser.parse_html(html) do
+      {:ok, scraped_attrs} -> normalise_recipe(scraped_attrs, locale)
+      {:error, :not_found} -> extract_from_html(html, locale)
     end
   end
 
@@ -347,6 +354,15 @@ defmodule Tore.Recipes do
              Tore.LLM.text(system, user, response_format: Tore.LLM.Prompts.recipe_json_schema()) do
         {:ok, recipe_attrs_from_raw(data)}
       end
+    end
+  end
+
+  defp normalise_recipe(scraped_attrs, locale) do
+    {system, user} = Tore.LLM.Prompts.normalise_recipe(scraped_attrs, locale)
+
+    with {:ok, data, _usage} <-
+           Tore.LLM.text(system, user, response_format: Tore.LLM.Prompts.recipe_json_schema()) do
+      {:ok, recipe_attrs_from_raw(data)}
     end
   end
 

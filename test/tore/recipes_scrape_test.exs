@@ -16,12 +16,18 @@ defmodule Tore.RecipesScrapeTest do
   @plain_html "<html><body><h1>A recipe page</h1></body></html>"
 
   describe "scrape_and_create/1" do
-    test "uses Parser result when JSON-LD found" do
+    test "Parser result still passes through LLM normaliser for reformatting + translation" do
       Tore.MockHTTP
       |> expect(:fetch, fn "https://example.com/recipe" -> {:ok, @ld_json_html} end)
 
+      Tore.MockLLM
+      |> expect(:text, fn _system, _user, _opts ->
+        {:ok,
+         %{"title" => "Skrapad Pasta", "ingredients" => [], "steps" => [], "tags" => []}, %{}}
+      end)
+
       assert {:ok, recipe} = Recipes.scrape_and_create("https://example.com/recipe")
-      assert recipe.title == "Scraped Pasta"
+      assert recipe.title == "Skrapad Pasta"
       assert recipe.source_url == "https://example.com/recipe"
     end
 
