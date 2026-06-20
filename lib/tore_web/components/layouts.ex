@@ -23,6 +23,7 @@ defmodule ToreWeb.Layouts do
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
   attr :current_path, :string, default: "/"
+  attr :inbox_count, :integer, default: 0
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -37,6 +38,7 @@ defmodule ToreWeb.Layouts do
           current={@current_path}
           icon={icon}
           label={label}
+          badge={badge_for(path, @inbox_count)}
         />
       </nav>
     </header>
@@ -51,6 +53,7 @@ defmodule ToreWeb.Layouts do
         path={path}
         current={@current_path}
         icon={icon}
+        badge={badge_for(path, @inbox_count)}
       />
     </nav>
 
@@ -58,10 +61,15 @@ defmodule ToreWeb.Layouts do
     """
   end
 
+  # Surface the pending-runs count on the inbox nav entry. nil = no badge.
+  defp badge_for("/inbox", count) when is_integer(count) and count > 0, do: count
+  defp badge_for(_, _), do: nil
+
   attr :path, :string, required: true
   attr :current, :string, required: true
   attr :icon, :string, required: true
   attr :label, :string, required: true
+  attr :badge, :integer, default: nil
 
   defp nav_link(assigns) do
     assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
@@ -73,12 +81,13 @@ defmodule ToreWeb.Layouts do
       aria-label={@label}
       data-active={if @active?, do: "true"}
       class={[
-        "px-3 h-[var(--nav-height)] inline-flex items-center justify-center border-b-2 transition-colors",
+        "relative px-3 h-[var(--nav-height)] inline-flex items-center justify-center border-b-2 transition-colors",
         @active? && "text-[color:var(--accent)] border-[color:var(--accent)]",
         !@active? && "text-[color:var(--muted)] border-transparent hover:text-[var(--text)]"
       ]}
     >
       <.icon name={@icon} class="size-5" />
+      <.nav_badge :if={@badge} count={@badge} />
     </a>
     """
   end
@@ -86,6 +95,7 @@ defmodule ToreWeb.Layouts do
   attr :path, :string, required: true
   attr :current, :string, required: true
   attr :icon, :string, required: true
+  attr :badge, :integer, default: nil
 
   defp bottom_link(assigns) do
     assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
@@ -95,13 +105,24 @@ defmodule ToreWeb.Layouts do
       href={@path}
       data-active={if @active?, do: "true"}
       class={[
-        "flex items-center justify-center h-14",
+        "relative flex items-center justify-center h-14",
         @active? && "text-[color:var(--accent)]",
         !@active? && "text-[color:var(--muted)]"
       ]}
     >
       <.icon name={@icon} class="size-5" />
+      <.nav_badge :if={@badge} count={@badge} />
     </a>
+    """
+  end
+
+  attr :count, :integer, required: true
+
+  defp nav_badge(assigns) do
+    ~H"""
+    <span class="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+      {if @count > 99, do: "99+", else: @count}
+    </span>
     """
   end
 

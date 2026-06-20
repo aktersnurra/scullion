@@ -152,7 +152,7 @@ defmodule ToreWeb.RunReviewLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_path={~p"/runs/#{@stream_id}"}>
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={~p"/runs/#{@stream_id}"}>
       <div class="max-w-2xl mx-auto px-4 py-6">
         <.link
           navigate={@return_to}

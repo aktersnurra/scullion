@@ -398,7 +398,7 @@ defmodule ToreWeb.PlannerLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/"}>
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={assigns[:current_path] || "/"}>
       <.page max_width={:md}>
         <header class="flex items-center justify-between gap-4 mb-5">
           <button

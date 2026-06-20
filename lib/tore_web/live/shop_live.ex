@@ -94,7 +94,7 @@ defmodule ToreWeb.ShopLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/shop"}>
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={assigns[:current_path] || "/shop"}>
       <.page max_width={:md}>
         <.card padded={false}>
           <header class="flex items-start justify-between gap-4 px-6 pt-6 pb-4">

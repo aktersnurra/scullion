@@ -7,11 +7,20 @@ defmodule ToreWeb.Live.Auth do
     socket = socket |> mount_current_user(session) |> attach_current_path()
 
     if socket.assigns.current_user do
+      household_id = household_id()
+
       if Phoenix.LiveView.connected?(socket) do
         Phoenix.PubSub.subscribe(Tore.PubSub, "toasts:user:#{socket.assigns.current_user.id}")
+        Phoenix.PubSub.subscribe(Tore.PubSub, "harness:household:#{household_id}")
       end
 
-      {:cont, attach_toast_hook(socket)}
+      socket =
+        socket
+        |> assign(:inbox_count, inbox_count(household_id))
+        |> attach_toast_hook()
+        |> attach_inbox_count_hook(household_id)
+
+      {:cont, socket}
     else
       {:halt, redirect(socket, to: "/login")}
     end
@@ -77,5 +86,24 @@ defmodule ToreWeb.Live.Auth do
       _other, socket ->
         {:cont, socket}
     end)
+  end
+
+  # Keep the global :inbox_count assign in sync — every authenticated
+  # LiveView shares the layout's nav badge via @inbox_count.
+  defp attach_inbox_count_hook(socket, household_id) do
+    Phoenix.LiveView.attach_hook(socket, :inbox_count, :handle_info, fn
+      {:run_state_changed, _stream_id, _state}, socket ->
+        {:cont, assign(socket, :inbox_count, inbox_count(household_id))}
+
+      _other, socket ->
+        {:cont, socket}
+    end)
+  end
+
+  defp household_id, do: Tore.Household.get_household!().id
+
+  defp inbox_count(household_id) do
+    Tore.Harness.ProjectorSupervisor.start_or_lookup(household_id)
+    length(Tore.Harness.Projector.list_pending(household_id))
   end
 end

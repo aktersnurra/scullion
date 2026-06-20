@@ -309,6 +309,7 @@ defmodule ToreWeb.CostLive do
     ~H"""
     <Layouts.app
       flash={@flash}
+      inbox_count={@inbox_count}
       current_scope={assigns[:current_scope]}
       current_path={assigns[:current_path] || "/costs"}
     >

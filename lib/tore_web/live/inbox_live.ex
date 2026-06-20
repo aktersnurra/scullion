@@ -43,7 +43,7 @@ defmodule ToreWeb.InboxLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_path={~p"/inbox"}>
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={~p"/inbox"}>
       <div class="max-w-2xl mx-auto px-4 py-6">
         <header class="mb-6">
           <h1 class="text-2xl font-semibold text-[color:var(--text)]">

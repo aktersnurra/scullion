@@ -273,7 +273,7 @@ defmodule ToreWeb.DealsLive do
     assigns = assign(assigns, grouped: grouped)
 
     ~H"""
-    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/deals"}>
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={assigns[:current_path] || "/deals"}>
       <.page max_width={:md}>
         <.card padded={false}>
           <header class="px-6 pt-6 pb-3 flex items-center justify-between">

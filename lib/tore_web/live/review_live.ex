@@ -68,7 +68,7 @@ defmodule ToreWeb.ReviewLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_path="/review">
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path="/review">
       <div class="max-w-2xl mx-auto px-4 py-6">
         <.link
           navigate={~p"/capture"}

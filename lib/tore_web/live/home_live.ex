@@ -41,7 +41,7 @@ defmodule ToreWeb.HomeLive do
 
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_path="/">
+    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path="/">
       <%!-- Counter notes for home surface --%>
       <div :if={@home_notes != []} class="mb-4 flex flex-col gap-2">
         <div
