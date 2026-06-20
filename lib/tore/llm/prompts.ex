@@ -371,36 +371,10 @@ defmodule Tore.LLM.Prompts do
 
   defp locale_hint(locale) do
     case Map.get(@locale_names, locale) do
-      nil ->
-        ""
-
-      name ->
-        diacritics = locale_diacritics(locale)
-
-        hint =
-          "\nThis receipt is from a #{name}-speaking region."
-
-        if diacritics == "" do
-          hint
-        else
-          hint <>
-            " Preserve all diacritics exactly as printed (#{diacritics}). " <>
-            "Do NOT strip them to ASCII. If the print is unclear, prefer the " <>
-            "diacritic form when the word would normally carry it."
-        end
+      nil -> ""
+      name -> "\nThis receipt is from a #{name}-speaking region."
     end
   end
-
-  # Characters the LLM tends to drop when OCR is rough. Locale-specific so we
-  # don't tell, say, an English-region prompt to watch for å/ö.
-  defp locale_diacritics("sv"), do: "å, ä, ö, é"
-  defp locale_diacritics("no"), do: "å, æ, ø"
-  defp locale_diacritics("da"), do: "å, æ, ø"
-  defp locale_diacritics("fi"), do: "ä, ö"
-  defp locale_diacritics("de"), do: "ä, ö, ü, ß"
-  defp locale_diacritics("fr"), do: "à, â, ç, é, è, ê, ë, î, ï, ô, ù, û, ü, ÿ"
-  defp locale_diacritics("es"), do: "á, é, í, ñ, ó, ú, ü"
-  defp locale_diacritics(_), do: ""
 
   @canonicalise_pantry_schema %{
     type: "object",
