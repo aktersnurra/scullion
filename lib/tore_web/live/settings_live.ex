@@ -1,7 +1,7 @@
 defmodule ToreWeb.SettingsLive do
   use ToreWeb, :live_view
 
-  alias Tore.{Accounts, Costs}
+  alias Tore.{Accounts, Costs, Household}
 
   def mount(_params, _session, socket) do
     users = Accounts.list_users()
@@ -20,8 +20,17 @@ defmodule ToreWeb.SettingsLive do
        revealed_codes: %{},
        add_error: nil,
        ai: ai,
-       memory_insights: Tore.Household.list_active_insights()
+       memory_insights: Household.list_active_insights(),
+       household: Household.get_household!(),
+       locales: Household.supported_locales()
      )}
+  end
+
+  def handle_event("update_locale", %{"locale" => locale}, socket) do
+    case Household.update_household(%{locale: locale}) do
+      {:ok, household} -> {:noreply, assign(socket, household: household)}
+      {:error, _} -> {:noreply, socket}
+    end
   end
 
   def handle_event("add_user", _params, %{assigns: %{current_user: %{role: role}}} = socket)
@@ -188,6 +197,39 @@ defmodule ToreWeb.SettingsLive do
             >
               {@add_error}
             </p>
+          </section>
+
+          <%!-- Household --%>
+          <section class="px-6 pt-5 pb-5 border-t border-[color:var(--hairline)]">
+            <h2
+              class="uppercase tracking-wider text-[color:var(--subtle)] mb-3"
+              style="font-size: var(--t-micro); font-weight: 600;"
+            >
+              {gettext("Household")}
+            </h2>
+            <form phx-change="update_locale" class="flex items-center justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <p class="font-medium text-[var(--text)]" style="font-size: var(--t-body);">
+                  {gettext("Language")}
+                </p>
+                <p class="text-[color:var(--muted)]" style="font-size: var(--t-meta);">
+                  {gettext("Used for reading receipts, recipes and grocery labels.")}
+                </p>
+              </div>
+              <select
+                name="locale"
+                class="rounded-lg border border-[color:var(--hairline)] bg-[var(--surface)] px-3 py-1.5 text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              >
+                <option
+                  :for={{code, label} <- @locales}
+                  value={code}
+                  selected={code == @household.locale}
+                >
+                  {label}
+                </option>
+              </select>
+            </form>
           </section>
 
           <%!-- Device tokens --%>

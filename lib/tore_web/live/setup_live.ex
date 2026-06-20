@@ -1,20 +1,29 @@
 defmodule ToreWeb.SetupLive do
   use ToreWeb, :live_view
-  alias Tore.Accounts
+  alias Tore.{Accounts, Household}
 
   def mount(_params, _session, socket) do
     if Accounts.setup_complete?() do
       {:ok, push_navigate(socket, to: "/login")}
     else
-      {:ok, assign(socket, name: "", code: nil, error: nil)}
+      {:ok,
+       assign(socket,
+         name: "",
+         locale: "en",
+         locales: Household.supported_locales(),
+         code: nil,
+         error: nil
+       )}
     end
   end
 
-  def handle_event("submit", %{"name" => name}, socket) do
-    case Accounts.create_admin(String.trim(name)) do
-      {:ok, {_user, code}} ->
-        {:noreply, assign(socket, code: format_code(code), error: nil)}
+  def handle_event("submit", %{"name" => name} = params, socket) do
+    locale = Map.get(params, "locale", socket.assigns.locale)
 
+    with {:ok, _} <- Household.update_household(%{locale: locale}),
+         {:ok, {_user, code}} <- Accounts.create_admin(String.trim(name)) do
+      {:noreply, assign(socket, code: format_code(code), error: nil)}
+    else
       {:error, _changeset} ->
         {:noreply, assign(socket, error: gettext("Name is required"))}
     end
@@ -82,6 +91,27 @@ defmodule ToreWeb.SetupLive do
                 class="w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none focus:border-[color:var(--accent)]"
                 style="font-size: var(--t-body);"
               />
+            </div>
+
+            <div>
+              <label
+                class="block mb-1.5 text-[color:var(--muted)]"
+                style="font-size: var(--t-meta); font-weight: 500;"
+              >
+                {gettext("Language")}
+              </label>
+              <select
+                name="locale"
+                class="w-full h-11 px-3.5 bg-[var(--surface)] rounded-[var(--r-lg)] border border-[color:var(--border)] text-[var(--text)] focus:outline-none focus:border-[color:var(--accent)]"
+                style="font-size: var(--t-body);"
+              >
+                <option :for={{code, label} <- @locales} value={code} selected={code == @locale}>
+                  {label}
+                </option>
+              </select>
+              <p class="mt-1 text-[color:var(--subtle)]" style="font-size: var(--t-meta);">
+                {gettext("Used for reading receipts, recipes and grocery labels.")}
+              </p>
             </div>
 
             <p
