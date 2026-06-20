@@ -16,16 +16,20 @@ defmodule ToreWeb.RunReviewLive do
 
   @impl true
   def mount(%{"stream_id" => stream_id} = params, _session, socket) do
-    socket = assign(socket, :return_to, return_to_from_params(params))
+    socket =
+      socket
+      |> assign(:return_to, return_to_from_params(params))
+      |> assign(:confirming_discard?, false)
 
     case Run.load(stream_id) do
-      {:ok, %State.NeedsUser{} = state} ->
+      {:ok, %State.NeedsUser{input: input} = state} ->
         {cost, pantry} = extract_artifacts(state)
 
         socket =
           socket
           |> assign(:stream_id, stream_id)
           |> assign(:state, :needs_user)
+          |> assign(:has_photo?, has_image_path?(input))
           |> assign(:cost, cost)
           |> assign(:pantry, pantry)
           |> assign(:form_data, form_data_from(cost))
@@ -39,6 +43,9 @@ defmodule ToreWeb.RunReviewLive do
       {:ok, %State.Failed{failure_code: code}} ->
         {:ok, assign(socket, stream_id: stream_id, state: :failed, error: code)}
 
+      {:ok, %State.Discarded{}} ->
+        {:ok, assign(socket, stream_id: stream_id, state: :discarded, error: nil)}
+
       _ ->
         {:ok,
          socket
@@ -46,6 +53,10 @@ defmodule ToreWeb.RunReviewLive do
          |> push_navigate(to: socket.assigns.return_to)}
     end
   end
+
+  defp has_image_path?(%{image_path: p}) when is_binary(p) and p != "", do: true
+  defp has_image_path?(%{"image_path" => p}) when is_binary(p) and p != "", do: true
+  defp has_image_path?(_), do: false
 
   # Only allow same-origin paths in ?from= — never honour an absolute URL or
   # anything that could push the user off-site. Defaults to /inbox because
@@ -70,6 +81,28 @@ defmodule ToreWeb.RunReviewLive do
   def handle_event("add_item", _params, socket) do
     items = socket.assigns.form_data.line_items ++ [blank_line_item()]
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
+  end
+
+  def handle_event("ask_discard", _params, socket),
+    do: {:noreply, assign(socket, :confirming_discard?, true)}
+
+  def handle_event("cancel_discard", _params, socket),
+    do: {:noreply, assign(socket, :confirming_discard?, false)}
+
+  def handle_event("confirm_discard", _params, socket) do
+    stream_id = socket.assigns.stream_id
+    user_id = socket.assigns.current_user && socket.assigns.current_user.id
+
+    # Discard is fast (no LLM), but we still fire-and-forget for symmetry with
+    # save — the page navigates instantly, the toast confirms it landed.
+    Task.Supervisor.start_child(Tore.TaskSupervisor, fn ->
+      case Orchestrator.discard_run(stream_id, reason: :user_discarded) do
+        {:ok, _} -> broadcast_toast(user_id, :info, "Receipt discarded.")
+        {:error, reason} -> broadcast_toast(user_id, :error, "Couldn't discard: #{inspect(reason)}.")
+      end
+    end)
+
+    {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
   end
 
   def handle_event("confirm", _params, socket) do
@@ -115,16 +148,20 @@ defmodule ToreWeb.RunReviewLive do
     <Layouts.app flash={@flash} current_path={~p"/runs/#{@stream_id}"}>
       <div class="max-w-2xl mx-auto px-4 py-6">
         <.link
-          navigate={~p"/capture"}
+          navigate={@return_to}
           class="text-[color:var(--muted)] text-sm mb-4 inline-flex items-center gap-1"
         >
-          <.icon name="hero-arrow-left" class="size-4" /> {gettext("Back to chat")}
+          <.icon name="hero-arrow-left" class="size-4" /> {back_label(@return_to)}
         </.link>
         {render_body(assigns)}
       </div>
     </Layouts.app>
     """
   end
+
+  defp back_label("/inbox"), do: gettext("Inbox")
+  defp back_label("/capture"), do: gettext("Back to chat")
+  defp back_label(_), do: gettext("Back")
 
   defp render_body(%{state: :needs_user} = assigns) do
     ~H"""
@@ -136,6 +173,17 @@ defmodule ToreWeb.RunReviewLive do
     </p>
 
     <.error_banner :if={@error} code={@error} />
+
+    <figure :if={@has_photo?} class="mb-5">
+      <img
+        src={~p"/images/runs/#{@stream_id}"}
+        alt={gettext("Original photo")}
+        class="w-full max-h-[60vh] object-contain rounded-2xl border border-[color:var(--border)] bg-[color:var(--accent-soft)]/30"
+      />
+      <figcaption class="mt-1 text-xs text-[color:var(--muted)] text-center">
+        {gettext("What you uploaded")}
+      </figcaption>
+    </figure>
 
     <form phx-change="update" phx-submit="confirm" class="space-y-4">
       <div class="grid grid-cols-2 gap-3">
@@ -229,12 +277,40 @@ defmodule ToreWeb.RunReviewLive do
         </button>
       </section>
 
-      <button
-        type="submit"
-        class="w-full rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
-      >
-        {gettext("Save receipt")}
-      </button>
+      <%= if @confirming_discard? do %>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            phx-click="cancel_discard"
+            class="flex-1 rounded-xl border border-[color:var(--border)] bg-[var(--surface)] text-[color:var(--text)] py-3 font-semibold"
+          >
+            {gettext("Cancel")}
+          </button>
+          <button
+            type="button"
+            phx-click="confirm_discard"
+            class="flex-1 rounded-xl bg-red-600 text-white py-3 font-semibold"
+          >
+            {gettext("Discard")}
+          </button>
+        </div>
+      <% else %>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            phx-click="ask_discard"
+            class="shrink-0 rounded-xl border border-[color:var(--border)] bg-[var(--surface)] text-[color:var(--muted)] px-4 py-3 font-semibold"
+          >
+            {gettext("Discard")}
+          </button>
+          <button
+            type="submit"
+            class="flex-1 rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+          >
+            {gettext("Save receipt")}
+          </button>
+        </div>
+      <% end %>
     </form>
     """
   end
@@ -242,6 +318,12 @@ defmodule ToreWeb.RunReviewLive do
   defp render_body(%{state: :applied} = assigns) do
     ~H"""
     <p class="text-[color:var(--accent)] font-semibold">{gettext("Receipt already saved.")}</p>
+    """
+  end
+
+  defp render_body(%{state: :discarded} = assigns) do
+    ~H"""
+    <p class="text-[color:var(--muted)] font-semibold">{gettext("This receipt was discarded.")}</p>
     """
   end
 
