@@ -64,7 +64,7 @@ defmodule Tore.Harness.Projector do
         {_, %State.NeedsUser{} = s} -> [s]
         _ -> []
       end)
-      |> Enum.sort_by(& &1.opened_at, {:desc, DateTime})
+      |> Enum.sort_by(&sort_key(&1.opened_at), :desc)
     else
       _ -> []
     end
@@ -155,4 +155,12 @@ defmodule Tore.Harness.Projector do
       {:ok, state} -> state
     end
   end
+
+  # `opened_at` should always be a %DateTime{} after Run.rehydrate/1, but a
+  # projector cached *before* the rehydrate landing might still hold the raw
+  # ISO-8601 string. Both sort lexicographically newest-first in ISO-8601, so
+  # we coerce to a comparable form rather than crash.
+  defp sort_key(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp sort_key(s) when is_binary(s), do: s
+  defp sort_key(_), do: ""
 end
