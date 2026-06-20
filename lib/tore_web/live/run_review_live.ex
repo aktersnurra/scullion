@@ -20,6 +20,7 @@ defmodule ToreWeb.RunReviewLive do
       socket
       |> assign(:return_to, return_to_from_params(params))
       |> assign(:confirming_discard?, false)
+      |> assign(:lightbox?, false)
 
     case Run.load(stream_id) do
       {:ok, %State.NeedsUser{input: input} = state} ->
@@ -82,6 +83,12 @@ defmodule ToreWeb.RunReviewLive do
     items = socket.assigns.form_data.line_items ++ [blank_line_item()]
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
   end
+
+  def handle_event("open_lightbox", _params, socket),
+    do: {:noreply, assign(socket, :lightbox?, true)}
+
+  def handle_event("close_lightbox", _params, socket),
+    do: {:noreply, assign(socket, :lightbox?, false)}
 
   def handle_event("ask_discard", _params, socket),
     do: {:noreply, assign(socket, :confirming_discard?, true)}
@@ -175,15 +182,48 @@ defmodule ToreWeb.RunReviewLive do
     <.error_banner :if={@error} code={@error} />
 
     <figure :if={@has_photo?} class="mb-5">
+      <button
+        type="button"
+        phx-click="open_lightbox"
+        aria-label={gettext("Open photo")}
+        class="block w-full focus:outline-none"
+      >
+        <img
+          src={~p"/images/runs/#{@stream_id}"}
+          alt={gettext("Original photo")}
+          class="w-full max-h-[60vh] object-contain rounded-2xl border border-[color:var(--border)] bg-[color:var(--accent-soft)]/30 cursor-zoom-in"
+        />
+      </button>
+      <figcaption class="mt-1 text-xs text-[color:var(--muted)] text-center">
+        {gettext("Tap to enlarge")}
+      </figcaption>
+    </figure>
+
+    <%!-- Fullscreen lightbox. Backdrop click + Esc close. The image is at its
+         natural size with overflow-auto on the container so the browser's
+         own pan/pinch/scroll-zoom take over once it exceeds the viewport. --%>
+    <div
+      :if={@lightbox?}
+      phx-click="close_lightbox"
+      phx-window-keyup="close_lightbox"
+      phx-key="Escape"
+      class="fixed inset-0 z-50 bg-black/90 overflow-auto cursor-zoom-out"
+    >
+      <button
+        type="button"
+        phx-click="close_lightbox"
+        aria-label={gettext("Close")}
+        class="fixed top-4 right-4 z-10 size-10 rounded-full bg-white/10 text-white inline-flex items-center justify-center hover:bg-white/20"
+      >
+        <.icon name="hero-x-mark" class="size-5" />
+      </button>
+
       <img
         src={~p"/images/runs/#{@stream_id}"}
         alt={gettext("Original photo")}
-        class="w-full max-h-[60vh] object-contain rounded-2xl border border-[color:var(--border)] bg-[color:var(--accent-soft)]/30"
+        class="mx-auto my-8 max-w-none"
       />
-      <figcaption class="mt-1 text-xs text-[color:var(--muted)] text-center">
-        {gettext("What you uploaded")}
-      </figcaption>
-    </figure>
+    </div>
 
     <form phx-change="update" phx-submit="confirm" class="space-y-4">
       <div class="grid grid-cols-2 gap-3">
