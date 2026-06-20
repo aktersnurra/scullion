@@ -49,7 +49,11 @@ defmodule Tore.PhotoPipeline do
   """
 
   defp classify_image(binary) do
-    case Tore.LLM.vision([{:image, binary}], @classifier_system, "Classify this image.", []) do
+    # Classification is a 5-way one-token decision — no need for the heavy
+    # OCR vision model. Use the dedicated cheap classifier tier.
+    opts = [model: classifier_model()]
+
+    case Tore.LLM.vision([{:image, binary}], @classifier_system, "Classify this image.", opts) do
       {:ok, %{"class" => cls, "confidence" => conf}, _usage} ->
         {:ok, %{class: parse_image_class(cls), confidence: conf}}
 
@@ -60,6 +64,9 @@ defmodule Tore.PhotoPipeline do
         err
     end
   end
+
+  defp classifier_model,
+    do: Application.get_env(:tore, :openrouter_classifier_model, "google/gemini-3.1-flash-lite")
 
   defp parse_image_class("receipt"), do: :receipt
   defp parse_image_class("recipe"), do: :recipe

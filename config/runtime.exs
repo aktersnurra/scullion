@@ -33,7 +33,7 @@ if config_env() == :prod do
 
   config :tore,
          :openrouter_vision_model,
-         System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-3.1-flash-lite")
+         System.get_env("OPENROUTER_VISION_MODEL", "google/gemini-3.5-flash")
 
   config :tore,
          :openrouter_classifier_model,
