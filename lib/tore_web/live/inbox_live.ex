@@ -12,7 +12,6 @@ defmodule ToreWeb.InboxLive do
 
   alias Tore.Harness.{Projector, ProjectorSupervisor}
   alias Tore.Harness.Run.State
-  alias Tore.Storage.RunPhotos
 
   @impl true
   def mount(_params, _session, socket) do
@@ -77,7 +76,7 @@ defmodule ToreWeb.InboxLive do
                 navigate={~p"/runs/#{run.stream_id}"}
                 class="flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-3 hover:bg-[color:var(--accent-soft)]/40 transition-colors"
               >
-                <.thumbnail image_path={image_path_of(run)} />
+                <.thumbnail stream_id={run.stream_id} has_photo?={has_photo?(run)} />
 
                 <div class="flex-1 min-w-0">
                   <p class="text-[color:var(--text)] font-medium truncate">
@@ -101,7 +100,7 @@ defmodule ToreWeb.InboxLive do
     """
   end
 
-  defp thumbnail(%{image_path: nil} = assigns) do
+  defp thumbnail(%{has_photo?: false} = assigns) do
     ~H"""
     <div class="size-12 rounded-lg bg-[color:var(--accent-soft)] inline-flex items-center justify-center shrink-0">
       <.icon name="hero-document-text" class="size-5 text-[color:var(--accent-ink)]" />
@@ -110,11 +109,9 @@ defmodule ToreWeb.InboxLive do
   end
 
   defp thumbnail(assigns) do
-    assigns = assign(assigns, :url, RunPhotos.url(assigns.image_path))
-
     ~H"""
     <img
-      src={@url}
+      src={~p"/images/runs/#{@stream_id}"}
       alt=""
       class="size-12 rounded-lg object-cover bg-[color:var(--accent-soft)] shrink-0"
       loading="lazy"
@@ -122,8 +119,13 @@ defmodule ToreWeb.InboxLive do
     """
   end
 
-  defp image_path_of(%State.NeedsUser{input: %{image_path: path}}) when is_binary(path), do: path
-  defp image_path_of(_), do: nil
+  defp has_photo?(%State.NeedsUser{input: %{image_path: p}}) when is_binary(p) and p != "",
+    do: true
+
+  defp has_photo?(%State.NeedsUser{input: %{"image_path" => p}}) when is_binary(p) and p != "",
+    do: true
+
+  defp has_photo?(_), do: false
 
   defp label_for(%State.NeedsUser{kind: "receipt_ingestion_run"} = run) do
     case Enum.find(run.artifacts, &match?(%Tore.Harness.Artifact.CostEntry{}, &1)) do
