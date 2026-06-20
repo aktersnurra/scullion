@@ -82,7 +82,17 @@ defmodule Tore.LLM.Prompts do
 
   @recipe_json_schema %{
     type: "object",
-    required: ["title", "ingredients", "steps", "tags"],
+    required: [
+      "title",
+      "description",
+      "prep_time_minutes",
+      "cook_time_minutes",
+      "base_servings",
+      "image_url",
+      "tags",
+      "ingredients",
+      "steps"
+    ],
     additionalProperties: false,
     properties: %{
       title: %{type: "string"},
@@ -96,7 +106,7 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["item"],
+          required: ["item", "quantity", "unit"],
           additionalProperties: false,
           properties: %{
             item: %{type: "string"},
@@ -109,7 +119,7 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["phase", "order", "action", "ingredients"],
+          required: ["phase", "order", "action", "ingredients", "duration_minutes"],
           additionalProperties: false,
           properties: %{
             phase: %{type: "string"},
@@ -206,7 +216,7 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["product_name", "category"],
+          required: ["product_name", "quantity", "unit_price", "total_price", "category"],
           additionalProperties: false,
           properties: %{
             product_name: %{type: "string"},
@@ -259,7 +269,7 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["name"],
+          required: ["name", "quantity", "unit", "category"],
           additionalProperties: false,
           properties: %{
             name: %{type: "string"},
@@ -310,7 +320,7 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["name"],
+          required: ["name", "quantity", "unit", "category"],
           additionalProperties: false,
           properties: %{
             name: %{type: "string"},
@@ -468,7 +478,20 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["chain", "product_name", "store"],
+          required: [
+            "chain",
+            "store",
+            "product_name",
+            "brand",
+            "size",
+            "price",
+            "price_unit",
+            "offer_condition",
+            "regular_price",
+            "comparison_price",
+            "valid_from",
+            "valid_until"
+          ],
           additionalProperties: false,
           properties: %{
             chain: %{type: "string"},
