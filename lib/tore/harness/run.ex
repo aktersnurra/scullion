@@ -66,21 +66,47 @@ defmodule Tore.Harness.Run do
   defp rehydrate(%Events.PhaseEntered{phase: phase} = event) when is_binary(phase),
     do: %Events.PhaseEntered{event | phase: phase_atom(phase)}
 
-  defp rehydrate(%Events.Opened{surface: s} = event) when is_binary(s),
-    do: %Events.Opened{event | surface: surface_atom(s)}
+  defp rehydrate(%Events.Opened{} = event) do
+    %Events.Opened{
+      event
+      | surface: surface_to_atom(event.surface),
+        opened_at: parse_datetime(event.opened_at)
+    }
+  end
+
+  defp surface_to_atom(s) when is_atom(s), do: s
+  defp surface_to_atom(s) when is_binary(s), do: surface_atom(s)
+  defp surface_to_atom(nil), do: nil
+
+  defp rehydrate(%Events.PhaseEntered{at: at} = event),
+    do: %Events.PhaseEntered{event | at: parse_datetime(at)}
+
+  defp rehydrate(%Events.QuestionRaised{at: at} = event),
+    do: %Events.QuestionRaised{event | at: parse_datetime(at)}
+
+  defp rehydrate(%Events.QuestionAnswered{at: at} = event),
+    do: %Events.QuestionAnswered{event | at: parse_datetime(at)}
+
+  defp rehydrate(%Events.Committed{at: at} = event),
+    do: %Events.Committed{event | at: parse_datetime(at)}
+
+  defp rehydrate(%Events.Reverted{at: at} = event),
+    do: %Events.Reverted{event | at: parse_datetime(at)}
+
+  defp rehydrate(%Events.FailureRecorded{at: at} = event),
+    do:
+      %Events.FailureRecorded{
+        event
+        | code: failure_code_atom(event.code),
+          repair_action: decode_repair(event.repair_action),
+          at: parse_datetime(at)
+      }
 
   defp rehydrate(%Events.ToolStepRecorded{step_kind: sk} = event) when is_binary(sk),
     do: %Events.ToolStepRecorded{event | step_kind: step_kind_atom(sk)}
 
-  defp rehydrate(%Events.FailureRecorded{} = event),
-    do: %Events.FailureRecorded{
-      event
-      | code: failure_code_atom(event.code),
-        repair_action: decode_repair(event.repair_action)
-    }
-
-  defp rehydrate(%Events.RunDiscarded{reason: r} = event) when is_binary(r),
-    do: %Events.RunDiscarded{event | reason: discard_reason_atom(r)}
+  defp rehydrate(%Events.RunDiscarded{reason: r, at: at} = event) when is_binary(r),
+    do: %Events.RunDiscarded{event | reason: discard_reason_atom(r), at: parse_datetime(at)}
 
   defp rehydrate(event), do: event
 
@@ -150,6 +176,18 @@ defmodule Tore.Harness.Run do
   defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
   defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
   defp to_decimal(s) when is_binary(s), do: Decimal.new(s)
+
+  # Events store timestamps as ISO-8601 strings via Jason. On the warm
+  # write path they're %DateTime{}; on cold reload they're strings.
+  defp parse_datetime(nil), do: nil
+  defp parse_datetime(%DateTime{} = dt), do: dt
+
+  defp parse_datetime(s) when is_binary(s) do
+    case DateTime.from_iso8601(s) do
+      {:ok, dt, _offset} -> dt
+      _ -> nil
+    end
+  end
 
   defp rehydrate_artifact(payload) do
     kind = Map.get(payload, :__kind__) || Map.get(payload, "__kind__")
