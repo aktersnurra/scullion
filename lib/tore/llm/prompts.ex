@@ -385,11 +385,11 @@ defmodule Tore.LLM.Prompts do
         type: "array",
         items: %{
           type: "object",
-          required: ["raw_name", "display_name", "category", "default_unit", "matched_key"],
+          required: ["raw_name", "catalogue_name", "category", "default_unit", "matched_key"],
           additionalProperties: false,
           properties: %{
             raw_name: %{type: "string"},
-            display_name: %{type: "string"},
+            catalogue_name: %{type: "string"},
             category: %{type: ["string", "null"]},
             default_unit: %{type: ["string", "null"]},
             matched_key: %{type: ["string", "null"]}
@@ -421,27 +421,31 @@ defmodule Tore.LLM.Prompts do
 
     locale_phrase =
       if locale_name,
-        do: "The items are in #{locale_name}; expand local abbreviations confidently.",
+        do:
+          "The items are in #{locale_name}. Use that knowledge to expand " <>
+            "common abbreviations, restore missing diacritics, and repair OCR " <>
+            "misspellings of well-known grocery terms confidently.",
         else: ""
 
     system = """
-    You normalise raw grocery item names (often abbreviated/all-caps OCR output)
-    into clean display names and resolve them to a canonical ingredient catalogue.
+    You normalise raw grocery item names (often abbreviated/all-caps OCR
+    output) into a canonical ingredient catalogue.
 
     For each raw item, emit:
     - raw_name: the input, unchanged.
-    - display_name: the cleaned, human-readable form in the original language.
-      Expand common abbreviations using domain knowledge (e.g. "LF" → "laktosfri"
-      in Swedish, "ekol." → "ekologisk", "K-FRI" → "kornfri"). Capitalise
-      naturally. Keep diacritics correct. Preserve brand-specific terms.
+    - catalogue_name: the ingredient-level name a cookbook or recipe would
+      use, NOT the product variant. Strip brand, pack size, size grade, fat
+      percentage, packaging, supplier or organic-certification qualifiers.
+      Use the locale's natural orthography (diacritics, capitalisation, word
+      boundaries) — the OCR is unreliable, you are not. Be confident.
     - category: one of dairy, meat, produce, frozen, dry_goods, canned,
       herbs_spices, condiments, other. Null only if truly unknowable.
-    - default_unit: the most natural single-purchase unit for this product
-      (e.g. "kg" for raw meat sold by weight, "st" for eggs, "l" for milk).
-    - matched_key: if this item refers to the same product as an existing
-      catalogue key, emit that key. Otherwise null (we'll create a new entry).
-      Match liberally on meaning, not surface form — "KYCKLINGLA FILE",
-      "Kycklinglårfilé", "chicken thigh fillet" all match the same key.
+    - default_unit: the most natural single-purchase unit for this ingredient
+      in the locale's conventions.
+    - matched_key: if this catalogue_name maps to an existing catalogue key,
+      emit that key. Otherwise null (a new ingredient will be created).
+      Match at the INGREDIENT level, not the product variant — different
+      brands, pack sizes, fat percentages, or grades all map to one key.
 
     #{locale_phrase}
 

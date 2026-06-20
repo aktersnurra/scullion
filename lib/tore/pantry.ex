@@ -52,7 +52,7 @@ defmodule Tore.Pantry do
 
   @doc """
   Send raw pantry items through the LLM canonicaliser. Returns a list of
-  `{raw_name, display_name, category, default_unit, matched_key}` maps.
+  `{raw_name, catalogue_name, category, default_unit, matched_key}` maps.
   """
   @spec canonicalise([map()], String.t() | nil) :: {:ok, [map()]} | {:error, term()}
   def canonicalise(items, locale) do
@@ -64,7 +64,7 @@ defmodule Tore.Pantry do
          Enum.map(norm, fn it ->
            %{
              raw_name: it["raw_name"],
-             display_name: it["display_name"],
+             catalogue_name: it["catalogue_name"],
              category: it["category"],
              default_unit: it["default_unit"],
              matched_key: it["matched_key"]
@@ -82,10 +82,11 @@ defmodule Tore.Pantry do
   @doc """
   Upsert a single canonicalised pantry belief.
 
-  Expects an attrs map with `display_name`, optional `matched_key`, plus
+  Expects an attrs map with `catalogue_name`, optional `matched_key`, plus
   `quantity`, `unit`, `category`, `default_unit`, `provenance`, `last_seen_at`.
   Resolves the ingredient by key (find-or-create), then bumps an existing
-  pantry row keyed on ingredient_id, or inserts a new one.
+  pantry row keyed on ingredient_id, or inserts a new one. The pantry row
+  always shows the catalogue name — never the receipt's product variant.
 
   Returns `{:ok, %PantryItem{}, :added | :bumped}`.
   """
@@ -119,7 +120,7 @@ defmodule Tore.Pantry do
     key =
       case attrs[:matched_key] do
         k when is_binary(k) and k != "" -> k
-        _ -> Ingredient.to_key(attrs[:display_name] || attrs[:name] || "")
+        _ -> Ingredient.to_key(attrs[:catalogue_name] || attrs[:name] || "")
       end
 
     case Repo.get_by(Ingredient, key: key) do
@@ -127,7 +128,7 @@ defmodule Tore.Pantry do
         {:ok, ing} =
           %Ingredient{}
           |> Ingredient.changeset(%{
-            name: attrs[:display_name] || attrs[:name],
+            name: attrs[:catalogue_name] || attrs[:name],
             key: key,
             category: attrs[:category],
             default_unit: attrs[:default_unit] || attrs[:unit]
@@ -141,9 +142,12 @@ defmodule Tore.Pantry do
     end
   end
 
+  # Pantry row always shows the ingredient's catalogue name — receipt-specific
+  # variants (brand, pack size, fat percentage) live on the cost ledger, not
+  # in the pantry.
   defp base_pantry_attrs(attrs, ingredient) do
     %{
-      name: attrs[:display_name] || ingredient.name,
+      name: ingredient.name,
       unit: attrs[:unit] || ingredient.default_unit,
       category: attrs[:category] || ingredient.category,
       provenance: attrs[:provenance] || "manual",

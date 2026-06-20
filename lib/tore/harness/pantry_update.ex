@@ -91,7 +91,7 @@ defmodule Tore.Harness.PantryUpdate do
 
   defp merge_norm(it, n) do
     it
-    |> Map.put(:display_name, n.display_name || it.name)
+    |> Map.put(:catalogue_name, n.catalogue_name || it.name)
     |> Map.put(:matched_key, n.matched_key)
     |> Map.put(:category, it[:category] || n.category)
     |> Map.put(:default_unit, n.default_unit)
