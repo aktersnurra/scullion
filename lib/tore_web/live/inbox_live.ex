@@ -10,24 +10,32 @@ defmodule ToreWeb.InboxLive do
 
   use ToreWeb, :live_view
 
-  alias Tore.Harness.Projector
+  alias Tore.Harness.{Projector, ProjectorSupervisor}
   alias Tore.Harness.Run.State
   alias Tore.Storage.RunPhotos
 
   @impl true
   def mount(_params, _session, socket) do
-    household_id = household_id(socket)
+    household_id = Tore.Household.get_household!().id
+
+    # Projectors are spawned lazily on first dispatch. If the inbox is the
+    # first surface the user visits this boot we need to start one ourselves,
+    # otherwise list_pending/1 silently returns [].
+    {:ok, _pid} = ProjectorSupervisor.start_or_lookup(household_id)
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tore.PubSub, "harness:household:#{household_id}")
     end
 
-    {:ok, assign(socket, runs: Projector.list_pending(household_id))}
+    {:ok,
+     socket
+     |> assign(:household_id, household_id)
+     |> assign(:runs, Projector.list_pending(household_id))}
   end
 
   @impl true
   def handle_info({:run_state_changed, _stream_id, _state}, socket) do
-    {:noreply, assign(socket, runs: Projector.list_pending(household_id(socket)))}
+    {:noreply, assign(socket, runs: Projector.list_pending(socket.assigns.household_id))}
   end
 
   # Toast hook is attached by Live.Auth — ignore non-toast harness events here.
@@ -154,6 +162,4 @@ defmodule ToreWeb.InboxLive do
   end
 
   defp time_ago(_), do: ""
-
-  defp household_id(socket), do: socket.assigns.current_user.household_id || 1
 end
