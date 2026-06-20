@@ -143,6 +143,7 @@ defmodule Tore.Harness.Projector do
   defp surface_of(%State.Applied{surface: s}), do: to_atom(s)
   defp surface_of(%State.Failed{surface: s}), do: to_atom(s)
   defp surface_of(%State.Reverted{surface: s}), do: to_atom(s)
+  defp surface_of(%State.Discarded{surface: s}), do: to_atom(s)
   defp surface_of(_), do: nil
 
   defp to_atom(s) when is_atom(s), do: s

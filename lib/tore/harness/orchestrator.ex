@@ -211,14 +211,61 @@ defmodule Tore.Harness.Orchestrator do
            apply_command(state.stream_id, %Commands.AddArtifact{artifact: pantry}, state, metadata),
          run_summary = RunSummary.from_artifacts([cost, pantry], :applied),
          {:ok, state} <-
-           apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata) do
-      apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+           apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata),
+         {:ok, final_state} <- apply_command(state.stream_id, %Commands.Commit{}, state, metadata) do
+      delete_run_photo_async(state)
+      {:ok, final_state}
     else
       %State.Running{} -> {:error, :not_awaiting_user}
       %State.Applied{} -> {:error, :already_applied}
       %State.Failed{} -> {:error, :already_failed}
       {:fail, code, repair} -> {:error, {:verifier_failed, code, repair}}
       other -> {:error, other}
+    end
+  end
+
+  @doc """
+  Discard a `:needs_user` run. Used by the user (`reason: :user_discarded`)
+  and by the TTL sweep (`reason: :ttl_expired`). Records a `RunDiscarded`
+  event and fire-and-forgets the photo cleanup.
+  """
+  @spec discard_run(String.t(), keyword()) :: {:ok, State.t()} | {:error, term()}
+  def discard_run(stream_id, opts \\ []) do
+    reason = Keyword.get(opts, :reason, :user_discarded)
+
+    case Run.load(stream_id) do
+      {:ok, %State.NeedsUser{} = state} ->
+        metadata = %{household_id: state.household_id}
+
+        case apply_command(state.stream_id, %Commands.Discard{reason: reason}, state, metadata) do
+          {:ok, new_state} ->
+            delete_run_photo_async(state)
+            {:ok, new_state}
+
+          {:error, _} = err ->
+            err
+        end
+
+      {:ok, %State.Discarded{}} ->
+        {:error, :already_discarded}
+
+      {:ok, %State.Applied{}} ->
+        {:error, :already_applied}
+
+      {:ok, _other} ->
+        {:error, :not_discardable}
+    end
+  end
+
+  # Fire-and-forget cleanup of the photo stashed at upload time. We don't
+  # block the commit/discard on S3; the weekly orphan sweep is the safety net.
+  defp delete_run_photo_async(state) do
+    case state.input do
+      %{image_path: path} when is_binary(path) and path != "" ->
+        Tore.Storage.RunPhotos.delete_async(path)
+
+      _ ->
+        :ok
     end
   end
 

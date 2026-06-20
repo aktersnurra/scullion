@@ -83,6 +83,17 @@ defmodule Tore.Harness.Run.Decider do
   def decide(%Commands.Revert{}, %State.Applied{}),
     do: {:ok, [%Events.Reverted{at: DateTime.utc_now()}]}
 
+  # Discard is legal from NeedsUser (user-initiated) or Running (TTL sweep on
+  # a run that never reached NeedsUser — defensive; the normal path is
+  # NeedsUser-only).
+  def decide(%Commands.Discard{reason: reason}, %State.NeedsUser{})
+      when reason in [:user_discarded, :ttl_expired],
+      do: {:ok, [%Events.RunDiscarded{reason: reason, at: DateTime.utc_now()}]}
+
+  def decide(%Commands.Discard{reason: reason}, %State.Running{})
+      when reason in [:user_discarded, :ttl_expired],
+      do: {:ok, [%Events.RunDiscarded{reason: reason, at: DateTime.utc_now()}]}
+
   def decide(command, state),
     do: {:error, {:invalid_for_state, command.__struct__, state.__struct__}}
 
@@ -138,6 +149,12 @@ defmodule Tore.Harness.Run.Decider do
 
   def evolve(%State.Applied{} = s, %Events.Reverted{at: at}),
     do: to_reverted(s, at)
+
+  def evolve(%State.NeedsUser{} = s, %Events.RunDiscarded{} = e),
+    do: to_discarded(s, e)
+
+  def evolve(%State.Running{} = s, %Events.RunDiscarded{} = e),
+    do: to_discarded(s, e)
 
   defp step_entry(%Events.ToolStepRecorded{} = e) do
     %{
@@ -233,6 +250,29 @@ defmodule Tore.Harness.Run.Decider do
       tool_trace: s.tool_trace,
       artifacts: s.artifacts,
       model_usage: s.model_usage
+    }
+  end
+
+  defp to_discarded(s, %Events.RunDiscarded{reason: reason, at: at}) do
+    %State.Discarded{
+      stream_id: s.stream_id,
+      household_id: s.household_id,
+      kind: s.kind,
+      surface: s.surface,
+      started_by: s.started_by,
+      user_id: s.user_id,
+      input: s.input,
+      opened_at: s.opened_at,
+      discarded_at: at,
+      discard_reason: reason,
+      tool_trace: s.tool_trace,
+      artifacts: Map.get(s, :artifacts, []),
+      model_usage:
+        Map.get(s, :model_usage, %{
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          cost_usd: Decimal.new(0)
+        })
     }
   end
 end

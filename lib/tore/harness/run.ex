@@ -79,7 +79,13 @@ defmodule Tore.Harness.Run do
         repair_action: decode_repair(event.repair_action)
     }
 
+  defp rehydrate(%Events.RunDiscarded{reason: r} = event) when is_binary(r),
+    do: %Events.RunDiscarded{event | reason: discard_reason_atom(r)}
+
   defp rehydrate(event), do: event
+
+  defp discard_reason_atom("user_discarded"), do: :user_discarded
+  defp discard_reason_atom("ttl_expired"), do: :ttl_expired
 
   # Closed enums coerced via explicit maps so rehydration never depends on the
   # defining module being loaded — the Projector replays open runs at boot,

@@ -61,10 +61,6 @@ defmodule ToreWeb.RunReviewLive do
     {:noreply, assign(socket, :form_data, %{socket.assigns.form_data | line_items: items})}
   end
 
-  defp blank_line_item do
-    %{name: "", quantity: "", total_price: "", unit: "", category: nil}
-  end
-
   def handle_event("confirm", _params, socket) do
     cost = build_cost(socket.assigns.cost, socket.assigns.form_data)
     pantry = build_pantry(socket.assigns.pantry, socket.assigns.form_data)
@@ -96,6 +92,10 @@ defmodule ToreWeb.RunReviewLive do
 
   defp broadcast_toast(user_id, kind, message) do
     Phoenix.PubSub.broadcast(Tore.PubSub, "toasts:user:#{user_id}", {:toast, kind, message})
+  end
+
+  defp blank_line_item do
+    %{name: "", quantity: "", total_price: "", unit: "", category: nil}
   end
 
   @impl true

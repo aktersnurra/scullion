@@ -7,7 +7,8 @@ set -eu
 #     (0 = unassigned; >=1 = applied) — the guard below matches >=1
 GARAGE="docker compose exec -T garage /garage"
 KEY_NAME="tore-dev"
-BUCKET="tore-recipes"   # only bucket with a live writer (see spec Image storage policy)
+# Buckets the dev environment serves. Keep in sync with Tore.Storage.Buckets.
+BUCKETS="tore-recipes tore-runs"
 
 : "${GARAGE_ACCESS_KEY_ID:?set GARAGE_ACCESS_KEY_ID in .env}"
 : "${GARAGE_SECRET_ACCESS_KEY:?set GARAGE_SECRET_ACCESS_KEY in .env}"
@@ -24,8 +25,10 @@ if ! $GARAGE key list 2>/dev/null | grep -q "$KEY_NAME"; then
   $GARAGE key import --yes -n "$KEY_NAME" "$GARAGE_ACCESS_KEY_ID" "$GARAGE_SECRET_ACCESS_KEY"
 fi
 
-# 3. Bucket — create + grant (guarded; create is a no-op if it already exists).
-$GARAGE bucket create "$BUCKET" 2>/dev/null || true
-$GARAGE bucket allow --read --write "$BUCKET" --key "$KEY_NAME" 2>/dev/null || true
+# 3. Buckets — create + grant (guarded; create is a no-op if it already exists).
+for BUCKET in $BUCKETS; do
+  $GARAGE bucket create "$BUCKET" 2>/dev/null || true
+  $GARAGE bucket allow --read --write "$BUCKET" --key "$KEY_NAME" 2>/dev/null || true
+done
 
 echo "Garage bootstrap complete."

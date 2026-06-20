@@ -39,6 +39,15 @@ defmodule Tore.Harness.Run.Commands do
     defstruct []
   end
 
+  defmodule Discard do
+    @moduledoc """
+    Terminate a run without applying its artifacts. `reason` is a closed-enum
+    atom — `:user_discarded` for explicit user action, `:ttl_expired` for the
+    weekly sweep.
+    """
+    defstruct [:reason]
+  end
+
   @type t ::
           %Open{}
           | %EnterPhase{}
@@ -50,4 +59,5 @@ defmodule Tore.Harness.Run.Commands do
           | %Commit{}
           | %RecordFailure{}
           | %Revert{}
+          | %Discard{}
 end

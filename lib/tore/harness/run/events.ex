@@ -48,6 +48,15 @@ defmodule Tore.Harness.Run.Events do
     defstruct [:at]
   end
 
+  defmodule RunDiscarded do
+    @moduledoc """
+    User chose not to act on a `:needs_user` run, or the TTL sweep auto-
+    discarded a stale one. The event is permanent (immutable audit); the
+    photo bytes attached to the run get deleted out-of-band.
+    """
+    defstruct [:reason, :at]
+  end
+
   @type t ::
           %Opened{}
           | %PhaseEntered{}
@@ -59,4 +68,5 @@ defmodule Tore.Harness.Run.Events do
           | %Committed{}
           | %FailureRecorded{}
           | %Reverted{}
+          | %RunDiscarded{}
 end
