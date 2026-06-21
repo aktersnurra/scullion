@@ -43,11 +43,17 @@ defmodule Tore.Capture.Router do
   call `report_unrecognised_image` with a helpful suggestion.
 
   When the user asks to plan a meal:
+    - You can — and should — call multiple tools in one turn. Tool results
+      come back to you before you reply, so chain freely.
     - To slot a known recipe on a day, call `set_plan_slot` with an ISO date
       (use today's date plus the day-of-week math; do not guess).
-    - If the user names a recipe by phrase (e.g. "pizza"), first call
-      `find_recipe` with the query, then `set_plan_slot` using the returned
-      recipe id once it's confirmed.
+    - If the user's message contains BOTH a recipe phrase AND a slotting
+      verb ("add", "lägg", "put", "schedule", "plan"), call `find_recipe`
+      AND `set_plan_slot` in the same turn — use the top result. Do not
+      stop after `find_recipe` to confirm; the user already committed.
+    - Only pause to ask the user when `find_recipe` returns no match, or
+      when the user's phrasing is genuinely browsing ("what pizzas do I
+      have?") rather than committing.
     - To clear a day, call `clear_plan_slot` with an ISO date.
     - When the user asks what to cook, call `suggest_meals_from_pantry`.
 
@@ -57,7 +63,7 @@ defmodule Tore.Capture.Router do
   When there is nothing actionable, reply with plain text.
   """
 
-  @max_tool_loop_iterations 2
+  @max_tool_loop_iterations 5
 
   @type ctx :: %{
           required(:household_id) => integer(),
@@ -83,59 +89,69 @@ defmodule Tore.Capture.Router do
 
     user_message = build_multimodal_user(text, images)
 
-    loop(system, [user_message], images, ctx, correlation_id, 0)
+    loop(system, [user_message], [], images, ctx, correlation_id, 0)
   end
 
   # ── tool-loop ──────────────────────────────────────────────────────────
+  #
+  # `bubbles_acc` accumulates user-facing bubbles across iterations so that
+  # when the model finally replies in plain text we can show the full
+  # tool-call trail (e.g. "I found X" + "Added X to Friday" + final reply).
 
-  defp loop(_system, _messages, _images, _ctx, _cid, iter)
+  defp loop(_system, _messages, bubbles_acc, _images, _ctx, _cid, iter)
        when iter > @max_tool_loop_iterations do
-    {:ok, [%{role: :assistant, text: fallback_text()}]}
+    {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}]}
   end
 
-  defp loop(system, messages, images, ctx, correlation_id, iter) do
-    case Tore.LLM.chat_with_tools(system, messages, tool_catalogue(), tool_choice: tool_choice(images)) do
+  defp loop(system, messages, bubbles_acc, images, ctx, correlation_id, iter) do
+    # tool_choice is "auto" after the first turn: once the model has tool
+    # results it must be free to reply in plain text, otherwise it would
+    # be forced to keep calling tools forever.
+    choice = if iter == 0, do: tool_choice(images), else: "auto"
+
+    case Tore.LLM.chat_with_tools(system, messages, tool_catalogue(), tool_choice: choice) do
       {:ok, {:message, text}, _usage} ->
-        {:ok, [%{role: :assistant, text: text}]}
+        {:ok, bubbles_acc ++ [%{role: :assistant, text: text}]}
 
       {:ok, {:tool_calls, calls}, _usage} ->
-        {bubbles, failures} = dispatch_calls(calls, images, ctx)
+        results = dispatch_calls_with_results(calls, images, ctx)
+        new_bubbles = Enum.map(results, & &1.bubble)
 
-        cond do
-          failures == [] ->
-            {:ok, bubbles}
-
-          iter == @max_tool_loop_iterations ->
-            {:ok, bubbles}
-
-          true ->
-            assistant_msg = %{role: "assistant", content: nil, tool_calls: raw_tool_calls(calls)}
-            tool_msgs = Enum.map(failures, &tool_error_message/1)
-            loop(system, messages ++ [assistant_msg] ++ tool_msgs, images, ctx, correlation_id, iter + 1)
+        if iter == @max_tool_loop_iterations do
+          {:ok, bubbles_acc ++ new_bubbles}
+        else
+          assistant_msg = %{role: "assistant", content: nil, tool_calls: raw_tool_calls(calls)}
+          tool_msgs = Enum.map(results, &tool_result_message/1)
+          loop(system, messages ++ [assistant_msg] ++ tool_msgs, bubbles_acc ++ new_bubbles, images, ctx, correlation_id, iter + 1)
         end
 
       {:error, reason} ->
         require Logger
         Logger.warning("Capture.Router LLM call failed: #{inspect(reason)}")
-        {:ok, [%{role: :assistant, text: fallback_text()}]}
+        {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}]}
     end
   end
 
   # ── tool dispatch ──────────────────────────────────────────────────────
 
-  defp dispatch_calls(calls, images, ctx) do
+  defp dispatch_calls_with_results(calls, images, ctx) do
     image_count = length(images)
 
-    Enum.reduce(calls, {[], []}, fn call, {bubbles, failures} ->
+    Enum.map(calls, fn call ->
       case run_call(call, images, image_count, ctx) do
         {:ok, more_bubbles} ->
-          {bubbles ++ more_bubbles, failures}
+          %{tool_call: call, status: :ok, bubble: List.first(more_bubbles) || empty_bubble()}
 
         {:error, reason} ->
-          failure = %{tool_call: call, reason: reason}
-          {bubbles, failures ++ [failure]}
+          %{tool_call: call, status: :error, reason: reason, bubble: error_bubble_from_reason(reason)}
       end
     end)
+  end
+
+  defp empty_bubble, do: %{role: :assistant, text: ""}
+
+  defp error_bubble_from_reason(reason) do
+    %{role: :assistant, text: "Tool failed: #{inspect(reason)}"}
   end
 
   defp run_call(%{name: "ingest_receipt", args: args}, images, image_count, ctx) do
@@ -387,13 +403,39 @@ defmodule Tore.Capture.Router do
     end)
   end
 
-  defp tool_error_message(%{tool_call: %{id: id, name: name}, reason: reason}) do
+  defp tool_result_message(%{tool_call: %{id: id, name: name}, status: :ok, bubble: bubble}) do
+    %{
+      role: "tool",
+      tool_call_id: id,
+      name: name,
+      content: Jason.encode!(tool_result_payload(name, bubble))
+    }
+  end
+
+  defp tool_result_message(%{tool_call: %{id: id, name: name}, status: :error, reason: reason}) do
     %{
       role: "tool",
       tool_call_id: id,
       name: name,
       content: "error: #{inspect(reason)}. Try a different tool or reply in plain text."
     }
+  end
+
+  # Strip the user-facing bubble fields down to what the *model* needs to
+  # see. For tools that return data the model must thread (find_recipe →
+  # set_plan_slot), surface ids & titles. For mutations, confirm success.
+  defp tool_result_payload("find_recipe", bubble) do
+    %{
+      status: "ok",
+      top_recipe_id: bubble[:top_recipe_id],
+      top_title: bubble[:top_title],
+      candidate_ids: bubble[:candidate_ids] || [],
+      message: bubble[:text]
+    }
+  end
+
+  defp tool_result_payload(_name, bubble) do
+    %{status: "ok", message: bubble[:text] || ""}
   end
 
   # ── helpers ────────────────────────────────────────────────────────────
