@@ -14,5 +14,8 @@ defmodule Tore.Storage do
 
   @callback delete_object(bucket :: String.t(), key :: String.t()) :: :ok | {:error, term()}
 
+  @callback list_object_keys(bucket :: String.t(), prefix :: String.t()) ::
+              {:ok, [String.t()]} | {:error, term()}
+
   def client, do: Application.fetch_env!(:tore, :storage_client)
 end

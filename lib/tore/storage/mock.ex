@@ -32,6 +32,16 @@ defmodule Tore.Storage.Mock do
     :ok
   end
 
+  @impl true
+  def list_object_keys(bucket, prefix \\ "") do
+    keys =
+      Agent.get(__MODULE__, fn store ->
+        for {{b, k}, _body} <- store, b == bucket, String.starts_with?(k, prefix), do: k
+      end)
+
+    {:ok, keys}
+  end
+
   def get(bucket, key) do
     Agent.get(__MODULE__, &Map.get(&1, {bucket, key}))
   end

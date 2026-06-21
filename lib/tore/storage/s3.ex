@@ -45,6 +45,17 @@ defmodule Tore.Storage.S3 do
     end
   end
 
+  @impl true
+  def list_object_keys(bucket, prefix \\ "") do
+    bucket
+    |> ExAws.S3.list_objects(prefix: prefix)
+    |> ExAws.request()
+    |> case do
+      {:ok, %{body: %{contents: contents}}} -> {:ok, Enum.map(contents, & &1.key)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @spec ensure_buckets_exist() :: :ok
   def ensure_buckets_exist do
     # Single-attempt probe so a stopped Garage doesn't spam 10 retries at boot
