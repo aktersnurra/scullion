@@ -1,17 +1,13 @@
 defmodule ToreWeb.CaptureLive do
   use ToreWeb, :live_view
 
-  alias Tore.Capture.Conversation
+  alias Tore.Capture.Router
 
   @impl true
   def mount(_params, _session, socket) do
-    if :ets.whereis(:chat_reviews) == :undefined do
-      :ets.new(:chat_reviews, [:set, :public, :named_table])
-    end
-
     socket =
       socket
-      |> assign(messages: [], input: "", loading: false, processing_photos: false)
+      |> assign(messages: [], input: "", loading: false)
       |> allow_upload(:chat_photos, accept: ~w(.jpg .jpeg .png), max_entries: 5)
 
     {:ok, socket}
@@ -24,199 +20,56 @@ defmodule ToreWeb.CaptureLive do
   def handle_event("send_message", %{"message" => text}, socket) do
     text = String.trim(text)
 
-    photo_binaries =
+    images =
       consume_uploaded_entries(socket, :chat_photos, fn %{path: path}, _entry ->
         {:ok, File.read!(path)}
       end)
 
-    cond do
-      photo_binaries != [] ->
-        ctx = %{
-          household_id: Tore.Household.get_household!().id,
-          user_id: socket.assigns.current_user && socket.assigns.current_user.id
-        }
+    if text == "" and images == [] do
+      {:noreply, socket}
+    else
+      user_bubble = user_bubble_for(text, images)
+      messages = socket.assigns.messages ++ [user_bubble]
 
-        pid = self()
+      ctx = %{
+        household_id: Tore.Household.get_household!().id,
+        user_id: socket.assigns.current_user && socket.assigns.current_user.id,
+        locale: socket.assigns.current_user && socket.assigns.current_user.locale
+      }
 
-        Task.start(fn ->
-          result = Tore.PhotoPipeline.process_uploads(photo_binaries, ctx)
-          send(pid, {:pipeline_complete, result})
-        end)
+      pid = self()
 
-        {:noreply, assign(socket, :processing_photos, true)}
+      Task.start(fn ->
+        result = Router.route(text, images, ctx)
+        send(pid, {:route_complete, result})
+      end)
 
-      url = extract_url(text) ->
-        # Single input surface: pasting a URL is a scrape, not a chat turn.
-        # Echo the URL as the user's message; the scrape runs off-process and
-        # the assistant reply ({:scrape_complete, ...}) lands when done.
-        messages =
-          socket.assigns.messages ++
-            [%{role: :user, text: text}, %{role: :assistant, text: gettext("Importing recipe…")}]
-
-        pid = self()
-        locale = socket.assigns.current_user && socket.assigns.current_user.locale
-
-        Task.start(fn ->
-          result = Tore.Recipes.scrape_from_url(url, locale)
-          send(pid, {:scrape_complete, result})
-        end)
-
-        {:noreply, assign(socket, messages: messages, input: "")}
-
-      text != "" ->
-        messages = socket.assigns.messages ++ [%{role: :user, text: text}]
-        send(self(), {:chat, text})
-        {:noreply, assign(socket, messages: messages, input: "", loading: true)}
-
-      true ->
-        {:noreply, socket}
+      {:noreply, assign(socket, messages: messages, input: "", loading: true)}
     end
   end
 
-  # Pull the first http(s) token out of the input. Returns the URL string or
-  # nil. Whitespace and surrounding punctuation are tolerated; one URL per
-  # message — multi-URL pastes would need explicit batching the user opts
-  # into, otherwise paste-spam becomes auto-scrape-spam.
-  defp extract_url(text) when is_binary(text) do
-    case Regex.run(~r{(https?://[^\s]+)}, text) do
-      [_, url] -> String.trim_trailing(url, ".,;:!?\"'")
-      _ -> nil
-    end
-  end
+  defp user_bubble_for("", images), do: %{role: :user, text: photo_label(length(images))}
+  defp user_bubble_for(text, []), do: %{role: :user, text: text}
+  defp user_bubble_for(text, images), do: %{role: :user, text: "#{text} (#{photo_label(length(images))})"}
 
-  defp extract_url(_), do: nil
+  defp photo_label(1), do: gettext("1 photo")
+  defp photo_label(n), do: gettext("%{n} photos", n: n)
 
   @impl true
-  def handle_info({:scrape_complete, {:ok, recipe}}, socket) do
-    # Replace the "Importing recipe…" placeholder (last message) with the result.
-    bubble = %{role: :assistant, recipe_card: true, recipe_id: recipe.id, title: recipe.title}
-    {:noreply, replace_last_message(socket, bubble)}
+  def handle_info({:route_complete, {:ok, bubbles}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:loading, false)
+     |> update(:messages, &(&1 ++ bubbles))}
   end
 
-  def handle_info({:scrape_complete, {:error, reason}}, socket) do
-    text =
-      case reason do
-        :not_a_recipe -> gettext("That page doesn't look like a recipe.")
-        :timeout -> gettext("The site didn't respond. Try again in a moment.")
-        _ -> gettext("Couldn't import that URL.")
-      end
-
-    {:noreply, replace_last_message(socket, %{role: :assistant, text: text})}
-  end
-
-  def handle_info({:chat, text}, socket) do
-    case Conversation.reply(text) do
-      {:ok, reply, _action} ->
-        messages = socket.assigns.messages ++ [%{role: :assistant, text: reply}]
-        {:noreply, assign(socket, messages: messages, loading: false)}
-
-      {:error, _reason} ->
-        messages =
-          socket.assigns.messages ++
-            [%{role: :assistant, text: "Sorry, I couldn't process that. Please try again."}]
-
-        {:noreply, assign(socket, messages: messages, loading: false)}
-    end
-  end
-
-  def handle_info({:pipeline_complete, {:ok, results}}, socket) do
-    # Pull out the receipt batch first so multi-receipt uploads collapse to
-    # one inbox-pointing reply instead of N "I parsed a receipt." bubbles.
-    {receipt_results, other_results} =
-      Enum.split_with(results, &match?(%{class: :receipt, status: :needs_review}, &1))
-
-    receipt_message = receipt_inbox_message(receipt_results)
-    other_messages = Enum.map(other_results, &message_for_result/1)
-
-    new_messages = Enum.reject([receipt_message | other_messages], &is_nil/1)
+  def handle_info({:route_complete, {:error, _reason}}, socket) do
+    bubble = %{role: :assistant, text: gettext("Sorry, I couldn't process that. Please try again.")}
 
     {:noreply,
      socket
-     |> assign(:processing_photos, false)
-     |> update(:messages, &(&1 ++ new_messages))}
-  end
-
-  def handle_info({:pipeline_complete, {:error, _}}, socket) do
-    {:noreply, assign(socket, :processing_photos, false)}
-  end
-
-  defp receipt_inbox_message([]), do: nil
-
-  defp receipt_inbox_message(receipts) do
-    count = length(receipts)
-
-    text =
-      case count do
-        1 -> gettext("I parsed a receipt. Review it in your inbox.")
-        n -> gettext("I parsed %{n} receipts. Review them in your inbox.", n: n)
-      end
-
-    %{role: :assistant, inbox_link: true, text: text}
-  end
-
-  defp message_for_result(%{class: :unknown, status: :ambiguous}) do
-    %{
-      role: :assistant,
-      text:
-        gettext(
-          "I wasn't sure what that photo showed. Could you tell me — is it a receipt, a recipe, or your fridge?"
-        )
-    }
-  end
-
-  defp message_for_result(%{class: :fridge, status: :ok, result: items}) do
-    names = items |> Enum.map(&(&1[:name] || &1["name"])) |> Enum.take(5) |> Enum.join(", ")
-
-    text =
-      if names == "",
-        do: gettext("I can see your fridge but it looks empty."),
-        else:
-          gettext("I can see %{names} in your fridge. Want me to suggest some recipes?",
-            names: names
-          )
-
-    %{role: :assistant, text: text}
-  end
-
-  defp message_for_result(%{class: :pantry_items, status: :needs_review, run_stream_id: _sid}) do
-    %{
-      role: :assistant,
-      inbox_link: true,
-      text: gettext("I parsed your shelf photo. Review it in your inbox.")
-    }
-  end
-
-  defp message_for_result(%{class: :pantry_items, status: :ok}) do
-    %{role: :assistant, text: gettext("Added the pantry items from your photo.")}
-  end
-
-  defp message_for_result(%{class: class, status: :ok, result: result}) do
-    review_id = Ecto.UUID.generate()
-    :ets.insert(:chat_reviews, {review_id, %{class: class, result: result}})
-
-    %{
-      role: :assistant,
-      review_card: true,
-      class: class,
-      review_id: review_id,
-      text: gettext("I found a %{class}.", class: class)
-    }
-  end
-
-  defp message_for_result(%{class: class, status: :error}) do
-    %{
-      role: :assistant,
-      text: gettext("Something went wrong processing the %{class} photo.", class: class)
-    }
-  end
-
-  defp replace_last_message(socket, message) do
-    update(socket, :messages, fn msgs ->
-      case Enum.reverse(msgs) do
-        [_last | rest] -> Enum.reverse([message | rest])
-        [] -> [message]
-      end
-    end)
+     |> assign(:loading, false)
+     |> update(:messages, &(&1 ++ [bubble]))}
   end
 
   @impl true
@@ -239,18 +92,6 @@ defmodule ToreWeb.CaptureLive do
             msg.role == :assistant && "justify-start"
           ]}
         >
-          <div
-            :if={Map.get(msg, :review_card)}
-            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
-          >
-            <p class="text-sm text-[color:var(--text)] mb-2">{gettext("I found a")} {msg.class}.</p>
-            <.link
-              navigate={"/review/#{msg.class}/#{msg.review_id}"}
-              class="text-sm text-[color:var(--accent)] font-semibold"
-            >
-              {gettext("Review")} →
-            </.link>
-          </div>
           <div
             :if={Map.get(msg, :inbox_link)}
             class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%]"
@@ -278,10 +119,7 @@ defmodule ToreWeb.CaptureLive do
             </.link>
           </div>
           <div
-            :if={
-              !Map.get(msg, :review_card) && !Map.get(msg, :inbox_link) &&
-                !Map.get(msg, :recipe_card)
-            }
+            :if={!Map.get(msg, :inbox_link) && !Map.get(msg, :recipe_card)}
             class={[
               "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               msg.role == :user && "bg-[color:var(--accent)] text-white",
@@ -295,11 +133,6 @@ defmodule ToreWeb.CaptureLive do
         <div :if={@loading} class="flex justify-start">
           <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-2.5">
             <span class="text-[color:var(--muted)] text-sm">{gettext("Thinking…")}</span>
-          </div>
-        </div>
-        <div :if={@processing_photos} class="flex justify-start">
-          <div class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-2.5">
-            <span class="text-[color:var(--muted)] text-sm">{gettext("Processing photo…")}</span>
           </div>
         </div>
       </div>
