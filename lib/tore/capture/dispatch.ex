@@ -12,7 +12,14 @@ defmodule Tore.Capture.Dispatch do
   alias Tore.Harness.Orchestrator
   alias Tore.Harness.Run
   alias Tore.Harness.Run.State
+  alias Tore.Planning
+  alias Tore.Recipes
   alias Tore.Storage.RunPhotos
+
+  @days ~w(mon tue wed thu fri sat sun)
+  @day_long ~w(Monday Tuesday Wednesday Thursday Friday Saturday Sunday)
+  @default_servings 4
+  @suggestion_limit 4
 
   @type ctx :: %{
           required(:household_id) => integer(),
@@ -147,6 +154,143 @@ defmodule Tore.Capture.Dispatch do
     end
   end
 
+  # ── recipe search ──────────────────────────────────────────────────────
+
+  @spec find_recipe(String.t()) :: bubble()
+  def find_recipe(query) when is_binary(query) do
+    case Recipes.search(query) do
+      [] ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "I couldn't find a recipe matching \"%{q}\". Want me to import one from a URL?",
+              q: query
+            )
+        }
+
+      [top | rest] ->
+        candidates = Enum.take(rest, 2)
+        titles = Enum.map_join([top | candidates], ", ", & &1.title)
+
+        %{
+          role: :assistant,
+          recipe_search: true,
+          top_recipe_id: top.id,
+          top_title: top.title,
+          candidate_ids: Enum.map(candidates, & &1.id),
+          text: Gettext.dgettext(ToreWeb.Gettext, "default", "I found: %{titles}.", titles: titles)
+        }
+    end
+  end
+
+  # ── plan slot mutation ─────────────────────────────────────────────────
+
+  @spec set_plan_slot(Date.t(), integer(), integer() | nil) :: bubble()
+  def set_plan_slot(%Date{} = date, recipe_id, servings) when is_integer(recipe_id) do
+    plan_id = plan_stream_id_for(date)
+    slot_key = slot_key_for(date)
+    servings = servings || @default_servings
+
+    case Recipes.get!(recipe_id) do
+      %{title: title} = _recipe ->
+        case Planning.assign_recipe(plan_id, slot_key, recipe_id, servings) do
+          {:ok, _events} ->
+            %{
+              role: :assistant,
+              text:
+                Gettext.dgettext(
+                  ToreWeb.Gettext,
+                  "default",
+                  "Added %{title} to %{day} %{date}.",
+                  title: title,
+                  day: long_day_for(date),
+                  date: Date.to_iso8601(date)
+                )
+            }
+
+          {:error, reason} ->
+            error_bubble(:plan, reason)
+        end
+
+      _ ->
+        error_bubble(:plan, :recipe_not_found)
+    end
+  rescue
+    Ecto.NoResultsError -> error_bubble(:plan, :recipe_not_found)
+  end
+
+  @spec clear_plan_slot(Date.t()) :: bubble()
+  def clear_plan_slot(%Date{} = date) do
+    plan_id = plan_stream_id_for(date)
+    slot_key = slot_key_for(date)
+
+    case Planning.remove_recipe(plan_id, slot_key) do
+      {:ok, _events} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Cleared %{day} %{date}.",
+              day: long_day_for(date),
+              date: Date.to_iso8601(date)
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:plan, reason)
+    end
+  end
+
+  # ── pantry-driven suggestions ──────────────────────────────────────────
+
+  @spec suggest_meals_from_pantry(pos_integer()) :: bubble()
+  def suggest_meals_from_pantry(count) when is_integer(count) and count > 0 do
+    today = Date.utc_today()
+    week_start = Date.add(today, -(Date.day_of_week(today) - 1))
+    plan_id = "plan:#{Date.to_iso8601(week_start)}"
+    next_empty = next_empty_slot_key(today)
+
+    case Planning.suggest_recipes_for_slot(plan_id, next_empty, limit: count) do
+      {:ok, []} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Your recipe library is empty. Import a recipe and I'll suggest from your pantry next time."
+            )
+        }
+
+      {:ok, ranked} ->
+        suggestions =
+          Enum.map(ranked, fn %{recipe: r, reasons: reasons} ->
+            %{recipe_id: r.id, title: r.title, reasons: Enum.take(reasons, 2)}
+          end)
+          |> Enum.take(min(count, @suggestion_limit))
+
+        %{
+          role: :assistant,
+          pantry_suggestions: true,
+          suggestions: suggestions,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Here's what works with what you have:"
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:suggest, reason)
+    end
+  end
+
   # ── unrecognised image ─────────────────────────────────────────────────
 
   @spec report_unrecognised_image(String.t() | nil) :: bubble()
@@ -188,6 +332,42 @@ defmodule Tore.Capture.Dispatch do
       inbox_link: true,
       text: Gettext.dgettext(ToreWeb.Gettext, "default", "I parsed your shelf photo. Review it in your inbox.")
     }
+  end
+
+  defp plan_stream_id_for(%Date{} = date) do
+    week_start = Date.add(date, -(Date.day_of_week(date) - 1))
+    "plan:#{Date.to_iso8601(week_start)}"
+  end
+
+  defp slot_key_for(%Date{} = date) do
+    day_abbrev = Enum.at(@days, Date.day_of_week(date) - 1)
+    "#{day_abbrev}_dinner"
+  end
+
+  defp long_day_for(%Date{} = date), do: Enum.at(@day_long, Date.day_of_week(date) - 1)
+
+  defp next_empty_slot_key(%Date{} = today) do
+    week_start = Date.add(today, -(Date.day_of_week(today) - 1))
+    plan_id = "plan:#{Date.to_iso8601(week_start)}"
+
+    case Planning.load_plan(plan_id) do
+      {:ok, state} ->
+        today_idx = Date.day_of_week(today) - 1
+
+        Enum.drop(@days, today_idx)
+        |> Enum.find_value(fn day ->
+          slot_key = "#{day}_dinner"
+
+          case Map.get(state.slots, slot_key) do
+            nil -> slot_key
+            %{recipe_id: nil} -> slot_key
+            _ -> nil
+          end
+        end) || "#{Enum.at(@days, today_idx)}_dinner"
+
+      _ ->
+        "#{Enum.at(@days, Date.day_of_week(today) - 1)}_dinner"
+    end
   end
 
   defp error_bubble(kind, reason) do

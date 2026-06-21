@@ -41,6 +41,19 @@ defmodule Tore.Capture.Router do
   page indices in `image_indices`. Receipts, shelves, and fridges are
   per-image — emit one tool call per image. If an image isn't recognisable,
   call `report_unrecognised_image` with a helpful suggestion.
+
+  When the user asks to plan a meal:
+    - To slot a known recipe on a day, call `set_plan_slot` with an ISO date
+      (use today's date plus the day-of-week math; do not guess).
+    - If the user names a recipe by phrase (e.g. "pizza"), first call
+      `find_recipe` with the query, then `set_plan_slot` using the returned
+      recipe id once it's confirmed.
+    - To clear a day, call `clear_plan_slot` with an ISO date.
+    - When the user asks what to cook, call `suggest_meals_from_pantry`.
+
+  Never claim a plan change happened without calling the tool. The tool result
+  is ground truth.
+
   When there is nothing actionable, reply with plain text.
   """
 
@@ -166,9 +179,44 @@ defmodule Tore.Capture.Router do
     {:ok, [Dispatch.report_unrecognised_image(args["suggestion"])]}
   end
 
+  defp run_call(%{name: "find_recipe", args: %{"query" => q}}, _images, _count, _ctx)
+       when is_binary(q) do
+    {:ok, [Dispatch.find_recipe(q)]}
+  end
+
+  defp run_call(%{name: "set_plan_slot", args: args}, _images, _count, _ctx) do
+    with {:ok, date} <- parse_iso_date(args["date"]),
+         {:ok, recipe_id} <- fetch_recipe_id(args) do
+      {:ok, [Dispatch.set_plan_slot(date, recipe_id, args["servings"])]}
+    end
+  end
+
+  defp run_call(%{name: "clear_plan_slot", args: %{"date" => date_str}}, _images, _count, _ctx) do
+    with {:ok, date} <- parse_iso_date(date_str) do
+      {:ok, [Dispatch.clear_plan_slot(date)]}
+    end
+  end
+
+  defp run_call(%{name: "suggest_meals_from_pantry", args: args}, _images, _count, _ctx) do
+    count = args["count"] || 4
+    {:ok, [Dispatch.suggest_meals_from_pantry(count)]}
+  end
+
   defp run_call(%{name: name}, _images, _count, _ctx) do
     {:error, {:unknown_tool, name}}
   end
+
+  defp parse_iso_date(str) when is_binary(str) do
+    case Date.from_iso8601(str) do
+      {:ok, date} -> {:ok, date}
+      _ -> {:error, {:invalid_date, str}}
+    end
+  end
+
+  defp parse_iso_date(_), do: {:error, :missing_date}
+
+  defp fetch_recipe_id(%{"recipe_id" => id}) when is_integer(id), do: {:ok, id}
+  defp fetch_recipe_id(_), do: {:error, :missing_recipe_id}
 
   defp fetch_indices(%{"image_indices" => indices}, image_count)
        when is_list(indices) and indices != [] do
@@ -226,6 +274,52 @@ defmodule Tore.Capture.Router do
             }
           },
           required: ["suggestion"],
+          additionalProperties: false
+        }
+      ),
+      tool("find_recipe",
+        "Search the recipe library by title or ingredient. Use this before set_plan_slot when the user names a recipe by phrase rather than id.",
+        %{
+          type: "object",
+          properties: %{
+            query: %{type: "string", description: "Free-text title or ingredient query."}
+          },
+          required: ["query"],
+          additionalProperties: false
+        }
+      ),
+      tool("set_plan_slot",
+        "Assign a known recipe to a specific date's dinner slot. Date must be ISO yyyy-mm-dd (compute it yourself from today's date and the day-of-week the user mentioned).",
+        %{
+          type: "object",
+          properties: %{
+            date: %{type: "string", description: "ISO 8601 date (yyyy-mm-dd)."},
+            recipe_id: %{type: "integer", description: "The recipe's numeric id from find_recipe."},
+            servings: %{type: "integer", description: "Optional servings; defaults to 4 if omitted."}
+          },
+          required: ["date", "recipe_id"],
+          additionalProperties: false
+        }
+      ),
+      tool("clear_plan_slot",
+        "Remove any recipe assigned to a specific date's dinner slot.",
+        %{
+          type: "object",
+          properties: %{
+            date: %{type: "string", description: "ISO 8601 date (yyyy-mm-dd)."}
+          },
+          required: ["date"],
+          additionalProperties: false
+        }
+      ),
+      tool("suggest_meals_from_pantry",
+        "Return up to `count` recipe suggestions ranked by what's in the pantry, on sale, and not recently cooked. Use when the user asks what to cook with no specific recipe in mind.",
+        %{
+          type: "object",
+          properties: %{
+            count: %{type: "integer", description: "How many suggestions (1-4)."}
+          },
+          required: ["count"],
           additionalProperties: false
         }
       )

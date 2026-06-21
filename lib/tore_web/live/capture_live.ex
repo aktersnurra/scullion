@@ -119,7 +119,32 @@ defmodule ToreWeb.CaptureLive do
             </.link>
           </div>
           <div
-            :if={!Map.get(msg, :inbox_link) && !Map.get(msg, :recipe_card)}
+            :if={Map.get(msg, :pantry_suggestions)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%] space-y-2"
+          >
+            <p class="text-sm text-[color:var(--text)]">{msg.text}</p>
+            <ul class="space-y-1.5">
+              <li :for={s <- msg.suggestions}>
+                <.link
+                  navigate={~p"/recipes"}
+                  class="block text-sm text-[color:var(--accent)] font-semibold"
+                >
+                  {s.title} →
+                </.link>
+                <p
+                  :if={s.reasons != []}
+                  class="text-xs text-[color:var(--muted)]"
+                >
+                  {Enum.join(s.reasons, " · ")}
+                </p>
+              </li>
+            </ul>
+          </div>
+          <div
+            :if={
+              !Map.get(msg, :inbox_link) && !Map.get(msg, :recipe_card) &&
+                !Map.get(msg, :pantry_suggestions)
+            }
             class={[
               "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
               msg.role == :user && "bg-[color:var(--accent)] text-white",

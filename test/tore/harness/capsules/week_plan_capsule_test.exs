@@ -42,8 +42,27 @@ defmodule Tore.Harness.Capsules.WeekPlanCapsuleTest do
 
     prompt = ctx |> Capsule.build() |> Capsule.to_prompt()
     assert prompt =~ "This week's dinner plan:"
-    assert prompt =~ "Monday 2026-06-08: empty"
-    assert prompt =~ "Sunday 2026-06-14: empty"
+    assert prompt =~ "Monday 2026-06-08 (mon_dinner): empty"
+    assert prompt =~ "Sunday 2026-06-14 (sun_dinner): empty"
+  end
+
+  test "to_prompt/1 renders the recipe title for assigned slots" do
+    week_start = ~D[2026-06-08]
+    ctx = ctx_for(week_start)
+
+    {:ok, recipe} =
+      Recipes.create(%{
+        title: "Pizza Margherita",
+        recipe_type: :meal,
+        base_servings: 4,
+        prep_time_minutes: 10,
+        cook_time_minutes: 15
+      })
+
+    Planning.assign_recipe(ctx.plan_stream_id, "fri_dinner", recipe.id, 4)
+
+    prompt = ctx |> Capsule.build() |> Capsule.to_prompt()
+    assert prompt =~ "Friday 2026-06-12 (fri_dinner): Pizza Margherita"
   end
 
   test "to_prompt/1 is nil when the plan cannot be loaded" do
