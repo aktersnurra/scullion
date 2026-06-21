@@ -118,6 +118,29 @@ defmodule ToreWeb.HomeLive do
     """
   end
 
+  def handle_event("prev_week", _params, socket) do
+    {:noreply, shift_week(socket, -7)}
+  end
+
+  def handle_event("next_week", _params, socket) do
+    {:noreply, shift_week(socket, 7)}
+  end
+
+  def handle_event("this_week", _params, socket) do
+    today = socket.assigns.today
+    {:noreply, load_week(socket, week_start(today))}
+  end
+
+  defp shift_week(socket, offset_days) do
+    load_week(socket, Date.add(socket.assigns.week_start, offset_days))
+  end
+
+  defp load_week(socket, week_start) do
+    plan_id = plan_id(week_start)
+    {:ok, plan_state} = Planning.load_plan(plan_id)
+    assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state)
+  end
+
   def handle_event("something_else", _params, socket) do
     %{plan_id: plan_id, today_key: today_key, recipes_by_id: recipes_by_id} = socket.assigns
     Planning.skip_meal(plan_id, today_key)
@@ -147,13 +170,44 @@ defmodule ToreWeb.HomeLive do
   defp week_strip(assigns) do
     days = ~w[mon tue wed thu fri sat sun]
     dates = Enum.with_index(days, fn day, i -> {day, Date.add(assigns.week_start, i)} end)
-    assigns = assign(assigns, :days_with_dates, dates)
+    week_end = Date.add(assigns.week_start, 6)
+    is_current? = Date.compare(assigns.week_start, week_start(assigns.today)) == :eq
+
+    assigns =
+      assigns
+      |> assign(:days_with_dates, dates)
+      |> assign(:week_end, week_end)
+      |> assign(:is_current_week?, is_current?)
 
     ~H"""
     <section>
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)] mb-3">
-        {gettext("This week")}
-      </h2>
+      <div class="flex items-center justify-between mb-3">
+        <button
+          phx-click="prev_week"
+          class="p-2 -ml-2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
+          aria-label={gettext("Previous week")}
+        >
+          <.icon name="hero-chevron-left" class="size-4" />
+        </button>
+        <div class="flex flex-col items-center">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+            <%= if @is_current_week? do %>
+              {gettext("This week")}
+            <% else %>
+              <button phx-click="this_week" class="underline decoration-dotted">
+                {Date.to_iso8601(@week_start)} – {Date.to_iso8601(@week_end)}
+              </button>
+            <% end %>
+          </span>
+        </div>
+        <button
+          phx-click="next_week"
+          class="p-2 -mr-2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
+          aria-label={gettext("Next week")}
+        >
+          <.icon name="hero-chevron-right" class="size-4" />
+        </button>
+      </div>
       <div class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
         <.link
           :for={{day, date} <- @days_with_dates}
