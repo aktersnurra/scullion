@@ -9,6 +9,7 @@ defmodule Tore.Capture.Dispatch do
   one per channel, lifted out so the router can call them directly.
   """
 
+  alias Tore.Capture.Uploads
   alias Tore.Harness.Orchestrator
   alias Tore.Harness.Run
   alias Tore.Harness.Run.State
@@ -31,60 +32,62 @@ defmodule Tore.Capture.Dispatch do
 
   @spec ingest_receipt(binary(), ctx()) :: bubble()
   def ingest_receipt(image, ctx) when is_binary(image) do
-    stream_id = Run.next_stream_id()
-    image_path = stash_photo(stream_id, image)
+    with_dedup(image, ctx, "receipt", fn stream_id ->
+      image_path = stash_photo(stream_id, image)
 
-    dispatch_ctx = %{
-      household_id: ctx.household_id,
-      user_id: ctx[:user_id],
-      stream_id: stream_id,
-      image_binary: image,
-      image_path: image_path
-    }
+      dispatch_ctx = %{
+        household_id: ctx.household_id,
+        user_id: ctx[:user_id],
+        stream_id: stream_id,
+        image_binary: image,
+        image_path: image_path
+      }
 
-    case Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
-      {:ok, %State.NeedsUser{stream_id: sid}} ->
-        inbox_bubble(:receipt, sid)
+      case Orchestrator.dispatch(:receipt_ingestion_run, dispatch_ctx) do
+        {:ok, %State.NeedsUser{stream_id: sid}} ->
+          inbox_bubble(:receipt, sid)
 
-      {:ok, %State.Failed{failure_code: code}} ->
-        if image_path, do: RunPhotos.delete_async(image_path)
-        error_bubble(:receipt, code)
+        {:ok, %State.Failed{failure_code: code}} ->
+          if image_path, do: RunPhotos.delete_async(image_path)
+          error_bubble(:receipt, code)
 
-      {:error, reason} ->
-        if image_path, do: RunPhotos.delete_async(image_path)
-        error_bubble(:receipt, reason)
-    end
+        {:error, reason} ->
+          if image_path, do: RunPhotos.delete_async(image_path)
+          error_bubble(:receipt, reason)
+      end
+    end)
   end
 
   # ── shelf → pantry update ──────────────────────────────────────────────
 
   @spec update_pantry_from_shelf(binary(), ctx()) :: bubble()
   def update_pantry_from_shelf(image, ctx) when is_binary(image) do
-    stream_id = Run.next_stream_id()
-    image_path = stash_photo(stream_id, image)
+    with_dedup(image, ctx, "shelf", fn stream_id ->
+      image_path = stash_photo(stream_id, image)
 
-    dispatch_ctx = %{
-      household_id: ctx.household_id,
-      user_id: ctx[:user_id],
-      stream_id: stream_id,
-      channel: :shelf_photo,
-      image_binary: image,
-      image_path: image_path
-    }
+      dispatch_ctx = %{
+        household_id: ctx.household_id,
+        user_id: ctx[:user_id],
+        stream_id: stream_id,
+        channel: :shelf_photo,
+        image_binary: image,
+        image_path: image_path
+      }
 
-    case Orchestrator.dispatch(:pantry_belief_update_run, dispatch_ctx) do
-      {:ok, %State.NeedsUser{stream_id: sid}} ->
-        inbox_bubble(:pantry, sid)
+      case Orchestrator.dispatch(:pantry_belief_update_run, dispatch_ctx) do
+        {:ok, %State.NeedsUser{stream_id: sid}} ->
+          inbox_bubble(:pantry, sid)
 
-      {:ok, %State.Applied{}} ->
-        %{role: :assistant, text: Gettext.dgettext(ToreWeb.Gettext, "default", "Added the pantry items from your photo.")}
+        {:ok, %State.Applied{}} ->
+          %{role: :assistant, text: Gettext.dgettext(ToreWeb.Gettext, "default", "Added the pantry items from your photo.")}
 
-      {:ok, %State.Failed{failure_code: code}} ->
-        error_bubble(:pantry, code)
+        {:ok, %State.Failed{failure_code: code}} ->
+          error_bubble(:pantry, code)
 
-      {:error, reason} ->
-        error_bubble(:pantry, reason)
-    end
+        {:error, reason} ->
+          error_bubble(:pantry, reason)
+      end
+    end)
   end
 
   # ── recipe (grouped: multi-page recipes stay together) ─────────────────
@@ -305,6 +308,32 @@ defmodule Tore.Capture.Dispatch do
   end
 
   # ── helpers ────────────────────────────────────────────────────────────
+
+  # Race-safe: reserve a stream_id, then try to record the hash. If the
+  # unique index trips, another upload already claimed these bytes — return
+  # the existing stream_id and never dispatch a duplicate run.
+  defp with_dedup(image, ctx, kind, run_fn) do
+    hash = Uploads.content_hash(image)
+    stream_id = Run.next_stream_id()
+
+    case Uploads.record(ctx.household_id, hash, stream_id, kind) do
+      {:ok, ^stream_id} -> run_fn.(stream_id)
+      {:duplicate, existing_stream_id} -> duplicate_bubble(kind, existing_stream_id)
+    end
+  end
+
+  defp duplicate_bubble(_kind, _stream_id) do
+    %{
+      role: :assistant,
+      inbox_link: true,
+      text:
+        Gettext.dgettext(
+          ToreWeb.Gettext,
+          "default",
+          "You've already uploaded this photo. Find it in your inbox."
+        )
+    }
+  end
 
   defp stash_photo(stream_id, image) do
     case RunPhotos.store(stream_id, image) do
