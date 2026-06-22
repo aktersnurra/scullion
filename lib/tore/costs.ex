@@ -169,10 +169,22 @@ defmodule Tore.Costs do
        %{
          total: receipt_to_decimal(data["total"]),
          store_name: data["store_name"],
+         purchase_date: parse_iso_date(data["purchase_date"]),
          items: items
        }}
     end
   end
+
+  defp parse_iso_date(nil), do: nil
+
+  defp parse_iso_date(str) when is_binary(str) do
+    case Date.from_iso8601(str) do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp parse_iso_date(_), do: nil
 
   def parse_and_log_receipt(image_binary, user_id) do
     image_path = store_receipt_image(image_binary)

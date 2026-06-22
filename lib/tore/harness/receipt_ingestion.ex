@@ -19,7 +19,13 @@ defmodule Tore.Harness.ReceiptIngestion do
 
   @spec build_artifacts(map(), keyword()) :: {CostEntry.t(), PantryBeliefUpdate.t()}
   def build_artifacts(parsed, opts \\ []) do
-    date = Keyword.get(opts, :date, Date.utc_today())
+    # Prefer the date the model extracted from the receipt itself. Fall
+    # back to the caller-supplied date (tests pin this) and finally today.
+    date =
+      parsed[:purchase_date] ||
+        Keyword.get(opts, :date) ||
+        Date.utc_today()
+
     image_path = Keyword.get(opts, :image_path)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 

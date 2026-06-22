@@ -346,11 +346,15 @@ defmodule Tore.LLM.Prompts do
 
   @receipt_pantry_json_schema %{
     type: "object",
-    required: ["total", "store_name", "items"],
+    required: ["total", "store_name", "purchase_date", "items"],
     additionalProperties: false,
     properties: %{
       total: %{type: ["number", "null"]},
       store_name: %{type: ["string", "null"]},
+      purchase_date: %{
+        type: ["string", "null"],
+        description: "ISO 8601 yyyy-mm-dd date printed on the receipt; null if not visible."
+      },
       items: %{
         type: "array",
         items: %{
@@ -396,7 +400,11 @@ defmodule Tore.LLM.Prompts do
     You are a receipt parser. Given a photo of a grocery receipt:
     1. Extract the store name (if visible).
     2. Extract the total amount paid (the final total).
-    3. Extract each purchased grocery item with name, quantity, and unit.
+    3. Extract the purchase date printed on the receipt, in ISO 8601
+       (yyyy-mm-dd). If the receipt shows a locale-specific format
+       (DD/MM/YYYY, MM-DD-YY, etc.), convert to ISO. If no date is
+       visible, return null — do not guess.
+    4. Extract each purchased grocery item with name, quantity, and unit.
        - Omit administrative line items: shopping bags, deposit/pant, returns,
          loyalty discounts, fees. These are not products.
        - Include food AND kitchen/cooking consumables a household would track
