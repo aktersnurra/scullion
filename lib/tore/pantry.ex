@@ -51,6 +51,27 @@ defmodule Tore.Pantry do
   end
 
   @doc """
+  Look up an ingredient in the catalogue by free-text name. Returns the
+  single matching row (with `default_unit`) when one row's name is a
+  bidirectional substring of the query, otherwise `nil`. Used by the
+  shopping-list "add milk" path to infer "1 L".
+  """
+  @spec lookup_catalogue_ingredient(String.t()) :: Ingredient.t() | nil
+  def lookup_catalogue_ingredient(query) when is_binary(query) do
+    needle = String.downcase(String.trim(query))
+
+    if needle == "" do
+      nil
+    else
+      Repo.all(Ingredient)
+      |> Enum.find(fn ing ->
+        name = String.downcase(ing.name)
+        String.contains?(name, needle) or String.contains?(needle, name)
+      end)
+    end
+  end
+
+  @doc """
   Send raw pantry items through the LLM canonicaliser. Returns a list of
   `{raw_name, catalogue_name, category, default_unit, matched_key}` maps.
   """
