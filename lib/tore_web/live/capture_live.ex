@@ -141,9 +141,33 @@ defmodule ToreWeb.CaptureLive do
             </ul>
           </div>
           <div
+            :if={Map.get(msg, :shop_link)}
+            class="bg-[var(--surface)] border border-[color:var(--border)] rounded-2xl px-4 py-3 max-w-[80%] space-y-2"
+          >
+            <p class="text-sm text-[color:var(--text)]">{msg.text}</p>
+            <ul :if={Map.get(msg, :shopping_items, []) != []} class="space-y-0.5">
+              <li
+                :for={it <- Map.get(msg, :shopping_items, [])}
+                class={[
+                  "text-xs",
+                  it.checked && "line-through text-[color:var(--muted)]",
+                  !it.checked && "text-[color:var(--text)]"
+                ]}
+              >
+                {it.name}<span :if={it.quantity}> · {it.quantity} {it.unit}</span>
+              </li>
+            </ul>
+            <.link
+              navigate={~p"/shop"}
+              class="text-sm text-[color:var(--accent)] font-semibold whitespace-nowrap"
+            >
+              {gettext("Open shopping list")} →
+            </.link>
+          </div>
+          <div
             :if={
               !Map.get(msg, :inbox_link) && !Map.get(msg, :recipe_card) &&
-                !Map.get(msg, :pantry_suggestions)
+                !Map.get(msg, :pantry_suggestions) && !Map.get(msg, :shop_link)
             }
             class={[
               "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",

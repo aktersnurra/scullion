@@ -42,9 +42,12 @@ defmodule Tore.Capture.Router do
   per-image — emit one tool call per image. If an image isn't recognisable,
   call `report_unrecognised_image` with a helpful suggestion.
 
-  When the user asks to plan a meal:
-    - You can — and should — call multiple tools in one turn. Tool results
-      come back to you before you reply, so chain freely.
+  You can — and should — call multiple tools in one turn. Tool results come
+  back to you before you reply, so chain freely. Never claim something
+  happened without calling the corresponding tool; the tool result is
+  ground truth.
+
+  Planning:
     - To slot a known recipe on a day, call `set_plan_slot` with an ISO date
       (use today's date plus the day-of-week math; do not guess).
     - If the user's message contains BOTH a recipe phrase AND a slotting
@@ -54,11 +57,25 @@ defmodule Tore.Capture.Router do
     - Only pause to ask the user when `find_recipe` returns no match, or
       when the user's phrasing is genuinely browsing ("what pizzas do I
       have?") rather than committing.
-    - To clear a day, call `clear_plan_slot` with an ISO date.
+    - To clear a day, call `clear_plan_slot`.
     - When the user asks what to cook, call `suggest_meals_from_pantry`.
+    - Adjust portions with `set_plan_servings`; pin/unpin with `pin_plan_slot`;
+      mark a day as eating-out with `skip_plan_meal`. Mark a recipe as
+      cooked tonight with `mark_recipe_cooked` (this is what teaches the
+      rotation to deprioritise it).
 
-  Never claim a plan change happened without calling the tool. The tool result
-  is ground truth.
+  Shopping list (always current week):
+    - "Add X to the shopping list" → `add_to_shopping_list`.
+    - "I bought X" / "got the milk" → `check_off_shopping_item`.
+    - "What's on the shopping list?" → `list_shopping_list`.
+    - "Make a shopping list for this week" → `generate_shopping_list_from_plan`.
+
+  Pantry:
+    - "I bought 2kg flour" / "we got more milk" → `add_to_pantry`.
+    - "We're out of X" / "finished the eggs" → `remove_from_pantry`.
+    - "Do I have X?" — the PantryBeliefs capsule already shows the pantry
+      in your system prompt, so answer from that. Only call `check_pantry`
+      if the capsule looks truncated.
 
   When there is nothing actionable, reply with plain text.
   """
@@ -218,6 +235,74 @@ defmodule Tore.Capture.Router do
     {:ok, [Dispatch.suggest_meals_from_pantry(count)]}
   end
 
+  defp run_call(%{name: "add_to_shopping_list", args: args}, _images, _count, ctx)
+       when is_binary(:erlang.map_get("name", args)) do
+    {:ok, [Dispatch.add_to_shopping_list(args["name"], args["quantity"], args["unit"], ctx)]}
+  end
+
+  defp run_call(%{name: "check_off_shopping_item", args: %{"name" => name}}, _images, _count, ctx)
+       when is_binary(name) do
+    {:ok, [Dispatch.check_off_shopping_item(name, ctx)]}
+  end
+
+  defp run_call(%{name: "list_shopping_list", args: args}, _images, _count, _ctx) do
+    {:ok, [Dispatch.list_shopping_list(args["unchecked_only"] == true)]}
+  end
+
+  defp run_call(%{name: "generate_shopping_list_from_plan", args: args}, _images, _count, _ctx) do
+    case args["date"] do
+      nil ->
+        {:ok, [Dispatch.generate_shopping_list_from_plan(nil)]}
+
+      str when is_binary(str) ->
+        with {:ok, date} <- parse_iso_date(str) do
+          {:ok, [Dispatch.generate_shopping_list_from_plan(date)]}
+        end
+    end
+  end
+
+  defp run_call(%{name: "add_to_pantry", args: args}, _images, _count, _ctx)
+       when is_binary(:erlang.map_get("name", args)) do
+    {:ok, [Dispatch.add_to_pantry(args["name"], args["quantity"], args["unit"])]}
+  end
+
+  defp run_call(%{name: "remove_from_pantry", args: %{"name" => name}}, _images, _count, _ctx)
+       when is_binary(name) do
+    {:ok, [Dispatch.remove_from_pantry(name)]}
+  end
+
+  defp run_call(%{name: "check_pantry", args: %{"name" => name}}, _images, _count, _ctx)
+       when is_binary(name) do
+    {:ok, [Dispatch.check_pantry(name)]}
+  end
+
+  defp run_call(%{name: "mark_recipe_cooked", args: %{"recipe_id" => id}}, _images, _count, _ctx)
+       when is_integer(id) do
+    {:ok, [Dispatch.mark_recipe_cooked(id)]}
+  end
+
+  defp run_call(%{name: "set_plan_servings", args: args}, _images, _count, _ctx) do
+    with {:ok, date} <- parse_iso_date(args["date"]),
+         servings when is_integer(servings) and servings > 0 <- args["servings"] do
+      {:ok, [Dispatch.set_plan_servings(date, servings)]}
+    else
+      _ -> {:error, :invalid_servings}
+    end
+  end
+
+  defp run_call(%{name: "pin_plan_slot", args: args}, _images, _count, _ctx) do
+    with {:ok, date} <- parse_iso_date(args["date"]) do
+      pinned? = args["pinned"] != false
+      {:ok, [Dispatch.pin_plan_slot(date, pinned?)]}
+    end
+  end
+
+  defp run_call(%{name: "skip_plan_meal", args: %{"date" => date_str}}, _images, _count, _ctx) do
+    with {:ok, date} <- parse_iso_date(date_str) do
+      {:ok, [Dispatch.skip_plan_meal(date)]}
+    end
+  end
+
   defp run_call(%{name: name}, _images, _count, _ctx) do
     {:error, {:unknown_tool, name}}
   end
@@ -338,6 +423,145 @@ defmodule Tore.Capture.Router do
           required: ["count"],
           additionalProperties: false
         }
+      ),
+
+      # ── Shopping list ───────────────────────────────────────────────
+      tool("add_to_shopping_list",
+        "Add a single ad-hoc item to the current week's shopping list. Use when the user says 'add X to the shopping list' or similar.",
+        %{
+          type: "object",
+          properties: %{
+            name: %{type: "string", description: "Item name as the user said it."},
+            quantity: %{type: ["number", "null"], description: "Optional quantity."},
+            unit: %{type: ["string", "null"], description: "Optional unit (l, kg, st, pcs…)."}
+          },
+          required: ["name"],
+          additionalProperties: false
+        }
+      ),
+      tool("check_off_shopping_item",
+        "Check an item off the current week's shopping list by fuzzy name match. Use when the user says 'I got the milk' / 'I bought eggs'.",
+        %{
+          type: "object",
+          properties: %{
+            name: %{type: "string", description: "Item to check off (free text)."}
+          },
+          required: ["name"],
+          additionalProperties: false
+        }
+      ),
+      tool("list_shopping_list",
+        "Return the current week's shopping list. Use when the user asks 'what's on the shopping list?' or 'what do I still need to buy?'.",
+        %{
+          type: "object",
+          properties: %{
+            unchecked_only: %{
+              type: "boolean",
+              description: "True to show only items still to buy; false for the whole list."
+            }
+          },
+          required: ["unchecked_only"],
+          additionalProperties: false
+        }
+      ),
+      tool("generate_shopping_list_from_plan",
+        "Build a shopping list for the week from the planned recipes. Overwrites any existing list for that week. Use when the user says 'make a shopping list for this week'.",
+        %{
+          type: "object",
+          properties: %{
+            date: %{
+              type: ["string", "null"],
+              description: "Any ISO 8601 date in the target week. Null means current week."
+            }
+          },
+          required: ["date"],
+          additionalProperties: false
+        }
+      ),
+
+      # ── Pantry ──────────────────────────────────────────────────────
+      tool("add_to_pantry",
+        "Add (or bump) an item in the pantry. Use when the user says 'I just bought 2kg flour' or 'we got more milk'.",
+        %{
+          type: "object",
+          properties: %{
+            name: %{type: "string", description: "Item name."},
+            quantity: %{type: ["number", "null"], description: "Optional quantity."},
+            unit: %{type: ["string", "null"], description: "Optional unit."}
+          },
+          required: ["name"],
+          additionalProperties: false
+        }
+      ),
+      tool("remove_from_pantry",
+        "Remove an item from the pantry by fuzzy name match. Use when the user says 'we're out of X' or 'finished the milk'.",
+        %{
+          type: "object",
+          properties: %{
+            name: %{type: "string", description: "Item to remove (free text)."}
+          },
+          required: ["name"],
+          additionalProperties: false
+        }
+      ),
+      tool("check_pantry",
+        "Check whether an item is in the pantry. Use only when the PantryBeliefs capsule in the system prompt doesn't already make this obvious.",
+        %{
+          type: "object",
+          properties: %{
+            name: %{type: "string", description: "Item to check (free text)."}
+          },
+          required: ["name"],
+          additionalProperties: false
+        }
+      ),
+
+      # ── Plan adjustments ───────────────────────────────────────────
+      tool("mark_recipe_cooked",
+        "Mark a recipe as cooked tonight (bumps last_used_at so rotation deprioritises it). Use when the user says 'we made the chili tonight'.",
+        %{
+          type: "object",
+          properties: %{
+            recipe_id: %{type: "integer", description: "Recipe id from find_recipe or the plan."}
+          },
+          required: ["recipe_id"],
+          additionalProperties: false
+        }
+      ),
+      tool("set_plan_servings",
+        "Adjust servings on a specific date's dinner slot.",
+        %{
+          type: "object",
+          properties: %{
+            date: %{type: "string", description: "ISO 8601 date (yyyy-mm-dd)."},
+            servings: %{type: "integer", description: "Desired servings (>= 1)."}
+          },
+          required: ["date", "servings"],
+          additionalProperties: false
+        }
+      ),
+      tool("pin_plan_slot",
+        "Pin or unpin a slot so re-planning won't change it. Use when the user says 'don't change Friday'.",
+        %{
+          type: "object",
+          properties: %{
+            date: %{type: "string", description: "ISO 8601 date (yyyy-mm-dd)."},
+            pinned: %{type: "boolean", description: "True to pin, false to unpin."}
+          },
+          required: ["date", "pinned"],
+          additionalProperties: false
+        }
+      ),
+      tool("skip_plan_meal",
+        "Mark a day's dinner slot as skipped. Use when the user says 'eating out Tuesday'.",
+        %{
+          type: "object",
+          properties: %{
+            date: %{type: "string", description: "ISO 8601 date (yyyy-mm-dd)."}
+          },
+          required: ["date"],
+          additionalProperties: false
+        }
       )
     ]
   end
@@ -430,6 +654,14 @@ defmodule Tore.Capture.Router do
       top_recipe_id: bubble[:top_recipe_id],
       top_title: bubble[:top_title],
       candidate_ids: bubble[:candidate_ids] || [],
+      message: bubble[:text]
+    }
+  end
+
+  defp tool_result_payload("list_shopping_list", bubble) do
+    %{
+      status: "ok",
+      items: bubble[:shopping_items] || [],
       message: bubble[:text]
     }
   end

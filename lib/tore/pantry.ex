@@ -214,6 +214,37 @@ defmodule Tore.Pantry do
     Repo.all(from p in PantryItem, order_by: p.name)
   end
 
+  @doc """
+  Resolve a free-text name to a single pantry item by case-insensitive
+  bidirectional substring match. Returns the item if exactly one row
+  matches, otherwise `{:ambiguous, candidates}` or `{:error, :not_found}`.
+
+  Used by the agent's tool path so "we're out of milk" can find the
+  pantry row without the agent needing to know item ids.
+  """
+  @spec find_by_name_fuzzy(String.t()) ::
+          {:ok, PantryItem.t()} | {:ambiguous, [PantryItem.t()]} | {:error, :not_found}
+  def find_by_name_fuzzy(query) when is_binary(query) do
+    needle = String.downcase(String.trim(query))
+
+    if needle == "" do
+      {:error, :not_found}
+    else
+      matches =
+        list_inventory()
+        |> Enum.filter(fn item ->
+          name = String.downcase(item.name)
+          String.contains?(name, needle) or String.contains?(needle, name)
+        end)
+
+      case matches do
+        [] -> {:error, :not_found}
+        [one] -> {:ok, one}
+        many -> {:ambiguous, many}
+      end
+    end
+  end
+
   @spec list_inventory_grouped() :: [{atom() | nil, [PantryItem.t()]}]
   def list_inventory_grouped do
     items = Repo.all(from p in PantryItem, order_by: p.name)

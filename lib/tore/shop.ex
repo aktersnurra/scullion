@@ -143,6 +143,38 @@ defmodule Tore.Shop do
   end
 
   @doc """
+  Resolve a free-text item name to a single uncheckéd item on `list_id`
+  by case-insensitive bidirectional substring match.
+  """
+  @spec find_item_fuzzy(String.t(), String.t()) ::
+          {:ok, {String.t(), map()}}
+          | {:ambiguous, [{String.t(), map()}]}
+          | {:error, :not_found}
+  def find_item_fuzzy(list_id, query) when is_binary(query) do
+    needle = String.downcase(String.trim(query))
+
+    case load_list(list_id) do
+      {:ok, %{items: items}} when map_size(items) > 0 ->
+        matches =
+          items
+          |> Enum.reject(fn {_id, it} -> it.checked end)
+          |> Enum.filter(fn {_id, it} ->
+            name = String.downcase(it.name)
+            String.contains?(name, needle) or String.contains?(needle, name)
+          end)
+
+        case matches do
+          [] -> {:error, :not_found}
+          [one] -> {:ok, one}
+          many -> {:ambiguous, many}
+        end
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
   Cross-reference receipt items against an active shopping list and check
   off matches. Returns `{:ok, [%{item_id, name}]}` listing the items
   that were checked off; never raises.

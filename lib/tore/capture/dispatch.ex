@@ -13,8 +13,10 @@ defmodule Tore.Capture.Dispatch do
   alias Tore.Harness.Orchestrator
   alias Tore.Harness.Run
   alias Tore.Harness.Run.State
+  alias Tore.Pantry
   alias Tore.Planning
   alias Tore.Recipes
+  alias Tore.Shop
   alias Tore.Storage.RunPhotos
 
   @days ~w(mon tue wed thu fri sat sun)
@@ -294,6 +296,389 @@ defmodule Tore.Capture.Dispatch do
     end
   end
 
+  # ── shopping list ──────────────────────────────────────────────────────
+
+  @spec add_to_shopping_list(String.t(), number() | nil, String.t() | nil, ctx()) :: bubble()
+  def add_to_shopping_list(name, quantity, unit, ctx) when is_binary(name) do
+    list_id = current_shop_list_id()
+    qty = to_decimal(quantity)
+
+    case Shop.add_item(list_id, name, qty, unit, ctx[:user_id]) do
+      {:ok, _events} ->
+        %{
+          role: :assistant,
+          shop_link: true,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Added %{name} to the shopping list.",
+              name: name
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:shop, reason)
+    end
+  end
+
+  @spec check_off_shopping_item(String.t(), ctx()) :: bubble()
+  def check_off_shopping_item(name, ctx) when is_binary(name) do
+    list_id = current_shop_list_id()
+
+    case Shop.find_item_fuzzy(list_id, name) do
+      {:ok, {id, item}} ->
+        case Shop.check_item(list_id, id, ctx[:user_id]) do
+          {:ok, _events} ->
+            %{
+              role: :assistant,
+              text:
+                Gettext.dgettext(
+                  ToreWeb.Gettext,
+                  "default",
+                  "Checked off %{name}.",
+                  name: item.name
+                )
+            }
+
+          {:error, reason} ->
+            error_bubble(:shop, reason)
+        end
+
+      {:ambiguous, matches} ->
+        names = matches |> Enum.map(fn {_id, it} -> it.name end) |> Enum.join(", ")
+
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Multiple shopping items match \"%{q}\": %{names}. Which one?",
+              q: name,
+              names: names
+            )
+        }
+
+      {:error, :not_found} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "No shopping item matches \"%{q}\".",
+              q: name
+            )
+        }
+    end
+  end
+
+  @spec list_shopping_list(boolean()) :: bubble()
+  def list_shopping_list(unchecked_only?) when is_boolean(unchecked_only?) do
+    list_id = current_shop_list_id()
+
+    case Shop.load_list(list_id) do
+      {:ok, %{items: items}} when map_size(items) == 0 ->
+        %{
+          role: :assistant,
+          shop_link: true,
+          text: Gettext.dgettext(ToreWeb.Gettext, "default", "Your shopping list is empty.")
+        }
+
+      {:ok, %{items: items}} ->
+        relevant =
+          items
+          |> Map.values()
+          |> Enum.filter(fn it -> not unchecked_only? or not it.checked end)
+          |> Enum.sort_by(& &1.name)
+
+        rendered =
+          Enum.map(relevant, fn it ->
+            %{name: it.name, quantity: it.quantity, unit: it.unit, checked: it.checked}
+          end)
+
+        %{
+          role: :assistant,
+          shop_link: true,
+          shopping_items: rendered,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Shopping list (%{n} items):",
+              n: length(rendered)
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:shop, reason)
+    end
+  end
+
+  @spec generate_shopping_list_from_plan(Date.t() | nil) :: bubble()
+  def generate_shopping_list_from_plan(date \\ nil) do
+    target_date = date || Date.utc_today()
+    week_start = Date.add(target_date, -(Date.day_of_week(target_date) - 1))
+    list_id = "shop_list:#{Date.to_iso8601(week_start)}"
+    plan_id = "plan:#{Date.to_iso8601(week_start)}"
+
+    case Planning.load_plan(plan_id) do
+      {:ok, state} ->
+        recipe_ids =
+          state.slots
+          |> Map.values()
+          |> Enum.map(& &1[:recipe_id])
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq()
+
+        case Shop.build_list(list_id, week_start, recipe_ids) do
+          {:ok, _events} ->
+            %{
+              role: :assistant,
+              shop_link: true,
+              text:
+                Gettext.dgettext(
+                  ToreWeb.Gettext,
+                  "default",
+                  "Built a shopping list for the week of %{date} from %{n} planned recipes.",
+                  date: Date.to_iso8601(week_start),
+                  n: length(recipe_ids)
+                )
+            }
+
+          {:error, reason} ->
+            error_bubble(:shop, reason)
+        end
+
+      {:error, reason} ->
+        error_bubble(:plan, reason)
+    end
+  end
+
+  # ── pantry mutations ───────────────────────────────────────────────────
+
+  @spec add_to_pantry(String.t(), number() | nil, String.t() | nil) :: bubble()
+  def add_to_pantry(name, quantity, unit) when is_binary(name) do
+    attrs = %{
+      name: name,
+      quantity: to_decimal(quantity),
+      unit: unit,
+      provenance: "manual"
+    }
+
+    case Pantry.upsert_belief(attrs) do
+      {:ok, item, :added} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(ToreWeb.Gettext, "default", "Added %{name} to the pantry.",
+              name: item.name
+            )
+        }
+
+      {:ok, item, :bumped} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Bumped %{name} in the pantry.",
+              name: item.name
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:pantry, reason)
+    end
+  end
+
+  @spec remove_from_pantry(String.t()) :: bubble()
+  def remove_from_pantry(name) when is_binary(name) do
+    case Pantry.find_by_name_fuzzy(name) do
+      {:ok, item} ->
+        case Pantry.remove_item(item.id) do
+          :ok ->
+            %{
+              role: :assistant,
+              text:
+                Gettext.dgettext(ToreWeb.Gettext, "default", "Removed %{name} from the pantry.",
+                  name: item.name
+                )
+            }
+
+          {:error, reason} ->
+            error_bubble(:pantry, reason)
+        end
+
+      {:ambiguous, matches} ->
+        names = matches |> Enum.map(& &1.name) |> Enum.join(", ")
+
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Multiple pantry items match \"%{q}\": %{names}. Which one?",
+              q: name,
+              names: names
+            )
+        }
+
+      {:error, :not_found} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Nothing in the pantry matches \"%{q}\".",
+              q: name
+            )
+        }
+    end
+  end
+
+  @spec check_pantry(String.t()) :: bubble()
+  def check_pantry(name) when is_binary(name) do
+    case Pantry.find_by_name_fuzzy(name) do
+      {:ok, item} ->
+        qty_str =
+          case {item.quantity, item.unit} do
+            {nil, _} -> ""
+            {q, nil} -> " (#{q})"
+            {q, u} -> " (#{q} #{u})"
+          end
+
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(ToreWeb.Gettext, "default", "Yes — %{name}%{qty} is in the pantry.",
+              name: item.name,
+              qty: qty_str
+            )
+        }
+
+      {:ambiguous, matches} ->
+        names = matches |> Enum.map(& &1.name) |> Enum.join(", ")
+
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Several pantry items match: %{names}.",
+              names: names
+            )
+        }
+
+      {:error, :not_found} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(ToreWeb.Gettext, "default", "No, %{name} isn't in the pantry.",
+              name: name
+            )
+        }
+    end
+  end
+
+  # ── plan-slot adjustments ──────────────────────────────────────────────
+
+  @spec mark_recipe_cooked(integer()) :: bubble()
+  def mark_recipe_cooked(recipe_id) when is_integer(recipe_id) do
+    :ok = Recipes.record_used(recipe_id)
+
+    %{
+      role: :assistant,
+      text: Gettext.dgettext(ToreWeb.Gettext, "default", "Marked the recipe as cooked tonight.")
+    }
+  end
+
+  @spec set_plan_servings(Date.t(), pos_integer()) :: bubble()
+  def set_plan_servings(%Date{} = date, servings)
+      when is_integer(servings) and servings > 0 do
+    plan_id = plan_stream_id_for(date)
+    slot_key = slot_key_for(date)
+
+    case Planning.set_servings(plan_id, slot_key, servings) do
+      {:ok, _events} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(
+              ToreWeb.Gettext,
+              "default",
+              "Set servings on %{day} %{date} to %{n}.",
+              day: long_day_for(date),
+              date: Date.to_iso8601(date),
+              n: servings
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:plan, reason)
+    end
+  end
+
+  @spec pin_plan_slot(Date.t(), boolean()) :: bubble()
+  def pin_plan_slot(%Date{} = date, pinned?) when is_boolean(pinned?) do
+    plan_id = plan_stream_id_for(date)
+    slot_key = slot_key_for(date)
+
+    result =
+      if pinned? do
+        Planning.pin_slot(plan_id, slot_key, true)
+      else
+        Planning.unpin_slot(plan_id, slot_key)
+      end
+
+    case result do
+      {:ok, _events} ->
+        text =
+          if pinned?,
+            do:
+              Gettext.dgettext(ToreWeb.Gettext, "default", "Pinned %{day} %{date}.",
+                day: long_day_for(date),
+                date: Date.to_iso8601(date)
+              ),
+            else:
+              Gettext.dgettext(ToreWeb.Gettext, "default", "Unpinned %{day} %{date}.",
+                day: long_day_for(date),
+                date: Date.to_iso8601(date)
+              )
+
+        %{role: :assistant, text: text}
+
+      {:error, reason} ->
+        error_bubble(:plan, reason)
+    end
+  end
+
+  @spec skip_plan_meal(Date.t()) :: bubble()
+  def skip_plan_meal(%Date{} = date) do
+    plan_id = plan_stream_id_for(date)
+    slot_key = slot_key_for(date)
+
+    case Planning.skip_meal(plan_id, slot_key) do
+      {:ok, _events} ->
+        %{
+          role: :assistant,
+          text:
+            Gettext.dgettext(ToreWeb.Gettext, "default", "Marked %{day} %{date} as skipped.",
+              day: long_day_for(date),
+              date: Date.to_iso8601(date)
+            )
+        }
+
+      {:error, reason} ->
+        error_bubble(:plan, reason)
+    end
+  end
+
   # ── unrecognised image ─────────────────────────────────────────────────
 
   @spec report_unrecognised_image(String.t() | nil) :: bubble()
@@ -361,6 +746,24 @@ defmodule Tore.Capture.Dispatch do
       inbox_link: true,
       text: Gettext.dgettext(ToreWeb.Gettext, "default", "I parsed your shelf photo. Review it in your inbox.")
     }
+  end
+
+  defp current_shop_list_id do
+    today = Date.utc_today()
+    week_start = Date.add(today, -(Date.day_of_week(today) - 1))
+    "shop_list:#{Date.to_iso8601(week_start)}"
+  end
+
+  defp to_decimal(nil), do: nil
+  defp to_decimal(%Decimal{} = d), do: d
+  defp to_decimal(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal(n) when is_float(n), do: Decimal.from_float(n)
+
+  defp to_decimal(s) when is_binary(s) do
+    case Decimal.parse(s) do
+      {d, _} -> d
+      :error -> nil
+    end
   end
 
   defp plan_stream_id_for(%Date{} = date) do
