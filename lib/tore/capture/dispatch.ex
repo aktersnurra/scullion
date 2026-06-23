@@ -312,8 +312,8 @@ defmodule Tore.Capture.Dispatch do
             Gettext.dgettext(
               ToreWeb.Gettext,
               "default",
-              "Added %{name} to the shopping list.",
-              name: name
+              "Added %{label} to the shopping list.",
+              label: shopping_label(name, qty, unit)
             )
         }
 
@@ -321,6 +321,13 @@ defmodule Tore.Capture.Dispatch do
         error_bubble(:shop, reason)
     end
   end
+
+  defp shopping_label(name, nil, _), do: name
+  defp shopping_label(name, qty, nil), do: "#{format_qty(qty)} #{name}"
+  defp shopping_label(name, qty, unit), do: "#{format_qty(qty)} #{unit} #{name}"
+
+  defp format_qty(%Decimal{} = d), do: Decimal.to_string(d, :normal)
+  defp format_qty(other), do: to_string(other)
 
   @spec check_off_shopping_item(String.t(), ctx()) :: bubble()
   def check_off_shopping_item(name, ctx) when is_binary(name) do
@@ -332,6 +339,7 @@ defmodule Tore.Capture.Dispatch do
           {:ok, _events} ->
             %{
               role: :assistant,
+              shop_link: true,
               text:
                 Gettext.dgettext(
                   ToreWeb.Gettext,
