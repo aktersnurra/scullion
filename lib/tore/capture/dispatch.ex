@@ -301,7 +301,7 @@ defmodule Tore.Capture.Dispatch do
   @spec add_to_shopping_list(String.t(), number() | nil, String.t() | nil, ctx()) :: bubble()
   def add_to_shopping_list(name, quantity, unit, ctx) when is_binary(name) do
     list_id = current_shop_list_id()
-    {qty, unit} = fill_shopping_defaults(name, quantity, unit)
+    qty = to_decimal(quantity)
 
     case Shop.add_item(list_id, name, qty, unit, ctx[:user_id]) do
       {:ok, _events} ->
@@ -754,26 +754,6 @@ defmodule Tore.Capture.Dispatch do
       inbox_link: true,
       text: Gettext.dgettext(ToreWeb.Gettext, "default", "I parsed your shelf photo. Review it in your inbox.")
     }
-  end
-
-  # When the agent calls add_to_shopping_list("mjölk", nil, nil), we want
-  # the row to show "1 L mjölk" rather than a bare name. Look the name up
-  # in the ingredient catalogue and fill default_unit + quantity 1; fall
-  # through to the raw nils if nothing matches (truly novel items show
-  # without quantity, which is honest).
-  defp fill_shopping_defaults(name, quantity, unit) do
-    cond do
-      not is_nil(quantity) and not is_nil(unit) ->
-        {to_decimal(quantity), unit}
-
-      ingredient = Pantry.lookup_catalogue_ingredient(name) ->
-        filled_unit = unit || ingredient.default_unit
-        filled_qty = to_decimal(quantity) || (filled_unit && Decimal.new(1))
-        {filled_qty, filled_unit}
-
-      true ->
-        {to_decimal(quantity), unit}
-    end
   end
 
   defp current_shop_list_id do
