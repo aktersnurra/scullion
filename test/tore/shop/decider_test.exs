@@ -100,9 +100,42 @@ defmodule Tore.Shop.DeciderTest do
                name: "Butter",
                quantity: nil,
                unit: "g",
-               section: nil,
+               # Section is normalised to :other when missing/unknown so the
+               # render's atom-keyed grouping always finds a bucket.
+               section: :other,
                checked: false
              }
+    end
+
+    test "ItemAdded normalises a string section to its atom form (rehydration)" do
+      # EventStore.load decodes JSON with keys: :atoms but leaves values
+      # untouched, so a rehydrated event's `section` arrives as a string.
+      # Render groups by atom keys, so string sections were silently dropped.
+      event = %Events.ItemAdded{
+        item_id: "z",
+        name: "Mjölk",
+        quantity: nil,
+        unit: nil,
+        section: "dairy",
+        added_by: 1
+      }
+
+      state = Decider.evolve(Decider.initial(), event)
+      assert state.items["z"].section == :dairy
+    end
+
+    test "ItemAdded normalises an unknown section to :other" do
+      event = %Events.ItemAdded{
+        item_id: "z",
+        name: "Mystery",
+        quantity: nil,
+        unit: nil,
+        section: "unknown_section_label",
+        added_by: 1
+      }
+
+      state = Decider.evolve(Decider.initial(), event)
+      assert state.items["z"].section == :other
     end
 
     test "ItemRemoved removes item" do

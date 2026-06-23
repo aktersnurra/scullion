@@ -58,6 +58,10 @@ defmodule Tore.Shop.Decider do
     end)
   end
 
+  defp to_section_atom(v) when is_atom(v) and not is_nil(v) do
+    if v in @section_atoms, do: v, else: :other
+  end
+
   defp to_section_atom(v) when is_binary(v) do
     atom = String.to_atom(v)
     if atom in @section_atoms, do: atom, else: :other
@@ -82,7 +86,11 @@ defmodule Tore.Shop.Decider do
       name: e.name,
       quantity: e.quantity,
       unit: e.unit,
-      section: e.section,
+      # Section needs to be the atom form regardless of whether this event
+      # was freshly decided (atom from add_item) or rehydrated from the
+      # event store (string from Jason). The render groups items by atom
+      # section keys, so a string here silently drops the item from view.
+      section: to_section_atom(e.section),
       checked: false
     }
 
