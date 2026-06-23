@@ -54,6 +54,11 @@ defmodule Tore.Capture.Router do
       verb ("add", "lägg", "put", "schedule", "plan"), call `find_recipe`
       AND `set_plan_slot` in the same turn — use the top result. Do not
       stop after `find_recipe` to confirm; the user already committed.
+    - Treat phrases like "the pork recipe" / "min pizza" / "that pasta dish"
+      as the same commitment — the user is naming a recipe, not asking you
+      to deliberate. Search and slot.
+    - "Tomorrow" / "imorgon" / "next Monday" are dates — compute them from
+      today's date in the system prompt; do not ask the user to clarify.
     - Only pause to ask the user when `find_recipe` returns no match, or
       when the user's phrasing is genuinely browsing ("what pizzas do I
       have?") rather than committing.
@@ -89,14 +94,15 @@ defmodule Tore.Capture.Router do
         }
   @type reply :: map()
 
-  @spec route(String.t(), [binary()], ctx()) :: {:ok, [reply()]} | {:error, term()}
-  def route(text, images, ctx) when is_binary(text) and is_list(images) and is_map(ctx) do
+  @spec route(String.t(), [binary()], ctx(), [map()]) :: {:ok, [reply()]} | {:error, term()}
+  def route(text, images, ctx, history \\ [])
+      when is_binary(text) and is_list(images) and is_map(ctx) and is_list(history) do
     correlation_id = :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
 
     AiOperations.log(%{
       run_stream_id: correlation_id,
       kind: "capture_route",
-      payload: %{"text" => text, "image_count" => length(images)}
+      payload: %{"text" => text, "image_count" => length(images), "history_turns" => length(history)}
     })
 
     system =
@@ -104,9 +110,26 @@ defmodule Tore.Capture.Router do
       |> Enum.reject(&(&1 == ""))
       |> Enum.join("\n\n")
 
+    history_messages = history_to_messages(history)
     user_message = build_multimodal_user(text, images)
 
-    loop(system, [user_message], [], images, ctx, correlation_id, 0)
+    loop(system, history_messages ++ [user_message], [], images, ctx, correlation_id, 0)
+  end
+
+  # Convert the LiveView's bubble list into OpenAI-shape chat turns. We
+  # only carry text — images from past turns are dropped (the bytes aren't
+  # in our state and weren't part of the persisted message either way).
+  defp history_to_messages(history) do
+    Enum.flat_map(history, fn
+      %{role: :user, text: t} when is_binary(t) and t != "" ->
+        [%{role: "user", content: t}]
+
+      %{role: :assistant, text: t} when is_binary(t) and t != "" ->
+        [%{role: "assistant", content: t}]
+
+      _ ->
+        []
+    end)
   end
 
   # ── tool-loop ──────────────────────────────────────────────────────────

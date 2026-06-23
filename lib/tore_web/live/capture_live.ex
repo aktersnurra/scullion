@@ -28,8 +28,9 @@ defmodule ToreWeb.CaptureLive do
     if text == "" and images == [] do
       {:noreply, socket}
     else
+      history = socket.assigns.messages
       user_bubble = user_bubble_for(text, images)
-      messages = socket.assigns.messages ++ [user_bubble]
+      messages = history ++ [user_bubble]
 
       ctx = %{
         household_id: Tore.Household.get_household!().id,
@@ -40,7 +41,7 @@ defmodule ToreWeb.CaptureLive do
       pid = self()
 
       Task.start(fn ->
-        result = Router.route(text, images, ctx)
+        result = Router.route(text, images, ctx, history)
         send(pid, {:route_complete, result})
       end)
 
