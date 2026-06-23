@@ -213,6 +213,7 @@ defmodule Tore.Harness.Orchestrator do
          {:ok, state} <-
            apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata),
          {:ok, final_state} <- apply_command(state.stream_id, %Commands.Commit{}, state, metadata) do
+      check_off_matching_shop_items(cost, pantry, user_id)
       delete_run_photo_async(state)
       {:ok, final_state}
     else
@@ -255,6 +256,30 @@ defmodule Tore.Harness.Orchestrator do
       {:ok, _other} ->
         {:error, :not_discardable}
     end
+  end
+
+  # Walk the active shopping list for the receipt's week and tick off any
+  # item whose name overlaps with what the user actually bought. Best-effort:
+  # never raises, logs and moves on if the shop list can't be loaded.
+  defp check_off_matching_shop_items(%CostEntry{date: date}, %PantryBeliefUpdate{items: items}, user_id) do
+    week_start = Date.add(date, -(Date.day_of_week(date) - 1))
+    list_id = "shop_list:#{Date.to_iso8601(week_start)}"
+
+    case Tore.Shop.match_receipt_to_list(list_id, items, user_id) do
+      {:ok, []} ->
+        :ok
+
+      {:ok, checked} ->
+        Logger.info(
+          "Receipt #{date} checked off #{length(checked)} shop items: #{Enum.map_join(checked, ", ", & &1.name)}"
+        )
+
+        :ok
+    end
+  rescue
+    e ->
+      Logger.warning("check_off_matching_shop_items raised: #{inspect(e)}")
+      :ok
   end
 
   # Fire-and-forget cleanup of the photo stashed at upload time. We don't
