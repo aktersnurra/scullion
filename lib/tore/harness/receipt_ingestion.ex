@@ -21,10 +21,14 @@ defmodule Tore.Harness.ReceiptIngestion do
   def build_artifacts(parsed, opts \\ []) do
     # Prefer the date the model extracted from the receipt itself. Fall
     # back to the caller-supplied date (tests pin this) and finally today.
-    date =
-      parsed[:purchase_date] ||
-        Keyword.get(opts, :date) ||
-        Date.utc_today()
+    parsed_date = parsed[:purchase_date]
+    supplied_date = Keyword.get(opts, :date)
+    date = parsed_date || supplied_date || Date.utc_today()
+
+    # The review card shows a "we couldn't read the date — please verify"
+    # hint when this is true. Only flag when neither the OCR nor the caller
+    # provided a real date.
+    date_inferred? = is_nil(parsed_date) and is_nil(supplied_date)
 
     image_path = Keyword.get(opts, :image_path)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -34,6 +38,7 @@ defmodule Tore.Harness.ReceiptIngestion do
     cost = %CostEntry{
       store_name: parsed.store_name || "",
       date: date,
+      date_inferred?: date_inferred?,
       total: parsed.total || Decimal.new(0),
       line_items:
         Enum.map(items, fn it ->

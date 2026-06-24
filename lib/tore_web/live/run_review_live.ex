@@ -242,8 +242,15 @@ defmodule ToreWeb.RunReviewLive do
             type="date"
             name="receipt[date]"
             value={@form_data.date}
-            class="w-full rounded-lg border border-[color:var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+            class={[
+              "w-full rounded-lg border bg-[var(--surface)] px-3 py-2 text-sm",
+              @form_data.date_inferred? && "border-amber-500",
+              !@form_data.date_inferred? && "border-[color:var(--border)]"
+            ]}
           />
+          <p :if={@form_data.date_inferred?} class="text-xs text-amber-600 mt-1">
+            {gettext("Couldn't read the date from the receipt — please verify.")}
+          </p>
         </label>
       </div>
       <label class="block">
@@ -391,6 +398,7 @@ defmodule ToreWeb.RunReviewLive do
     %{
       store_name: c.store_name || "",
       date: Date.to_iso8601(c.date),
+      date_inferred?: c.date_inferred? || false,
       total: decimal_to_str(c.total),
       line_items:
         Enum.map(c.line_items, fn it ->
@@ -429,9 +437,21 @@ defmodule ToreWeb.RunReviewLive do
           end)
       end
 
+    # User-supplied date overrides the inferred flag — once they touch the
+    # field we trust it and drop the warning.
+    new_date = params["date"] || current.date
+
+    date_inferred? =
+      cond do
+        is_nil(params["date"]) -> Map.get(current, :date_inferred?, false)
+        new_date != current.date -> false
+        true -> Map.get(current, :date_inferred?, false)
+      end
+
     %{
       store_name: params["store_name"] || current.store_name,
-      date: params["date"] || current.date,
+      date: new_date,
+      date_inferred?: date_inferred?,
       total: params["total"] || current.total,
       line_items: items
     }

@@ -16,14 +16,19 @@ defmodule Tore.Harness.Artifact.CostEntry do
 
   @derive Jason.Encoder
   @enforce_keys [:store_name, :date, :total, :line_items]
-  defstruct [:store_name, :date, :total, :line_items, :image_path]
+  defstruct [:store_name, :date, :total, :line_items, :image_path, date_inferred?: false]
 
   @type t :: %__MODULE__{
           store_name: String.t(),
           date: Date.t(),
           total: Decimal.t(),
           line_items: [line_item()],
-          image_path: String.t() | nil
+          image_path: String.t() | nil,
+          # True when the parser couldn't read a date from the receipt and
+          # the orchestrator filled in today's date as a fallback. The
+          # review card uses this to flag "we couldn't read the date" so
+          # the user knows to verify it before committing.
+          date_inferred?: boolean()
         }
 
   @impl true
@@ -51,7 +56,8 @@ defmodule Tore.Harness.Artifact.CostEntry do
       "date" => Date.to_iso8601(c.date),
       "total" => decimal_to_string(c.total),
       "line_items" => Enum.map(c.line_items, &line_item_to_json/1),
-      "image_path" => c.image_path
+      "image_path" => c.image_path,
+      "date_inferred" => c.date_inferred?
     }
   end
 
@@ -62,7 +68,8 @@ defmodule Tore.Harness.Artifact.CostEntry do
       date: Date.from_iso8601!(d),
       total: to_decimal(t),
       line_items: Enum.map(items, &line_item_from_json/1),
-      image_path: Map.get(m, "image_path")
+      image_path: Map.get(m, "image_path"),
+      date_inferred?: m["date_inferred"] == true
     }
   end
 
