@@ -65,8 +65,8 @@ defmodule Tore.Harness.Run.Decider do
   def decide(%Commands.AnswerQuestion{answer: a}, %State.NeedsUser{}),
     do: {:ok, [%Events.QuestionAnswered{answer: a, at: DateTime.utc_now()}]}
 
-  def decide(%Commands.Commit{}, %State.Running{}),
-    do: {:ok, [%Events.Committed{at: DateTime.utc_now()}]}
+  def decide(%Commands.Commit{undo_payload: payload}, %State.Running{}),
+    do: {:ok, [%Events.Committed{at: DateTime.utc_now(), undo_payload: payload}]}
 
   def decide(%Commands.RecordFailure{} = c, %State.Running{}) do
     {:ok,
@@ -141,8 +141,8 @@ defmodule Tore.Harness.Run.Decider do
   def evolve(%State.NeedsUser{} = s, %Events.QuestionAnswered{}),
     do: to_running(s)
 
-  def evolve(%State.Running{} = s, %Events.Committed{at: at}),
-    do: to_applied(s, at)
+  def evolve(%State.Running{} = s, %Events.Committed{at: at, undo_payload: payload}),
+    do: to_applied(s, at, payload)
 
   def evolve(%State.Running{} = s, %Events.FailureRecorded{} = e),
     do: to_failed(s, e)
@@ -199,7 +199,7 @@ defmodule Tore.Harness.Run.Decider do
     }
   end
 
-  defp to_applied(%State.Running{} = s, at) do
+  defp to_applied(%State.Running{} = s, at, undo_payload) do
     %State.Applied{
       stream_id: s.stream_id,
       household_id: s.household_id,
@@ -212,7 +212,8 @@ defmodule Tore.Harness.Run.Decider do
       committed_at: at,
       tool_trace: s.tool_trace,
       artifacts: s.artifacts,
-      model_usage: s.model_usage
+      model_usage: s.model_usage,
+      undo_payload: undo_payload
     }
   end
 

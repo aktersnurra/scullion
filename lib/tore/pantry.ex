@@ -58,7 +58,9 @@ defmodule Tore.Pantry do
   def canonicalise(items, locale) do
     {system, user} = Tore.LLM.Prompts.canonicalise_pantry_items(items, locale, catalogue())
 
-    case Tore.LLM.text(system, user, response_format: Tore.LLM.Prompts.canonicalise_pantry_schema()) do
+    case Tore.LLM.text(system, user,
+           response_format: Tore.LLM.Prompts.canonicalise_pantry_schema()
+         ) do
       {:ok, %{"items" => norm}, _usage} when is_list(norm) ->
         {:ok,
          Enum.map(norm, fn it ->
@@ -197,6 +199,8 @@ defmodule Tore.Pantry do
       |> Map.put_new(:added_at, Date.utc_today())
       |> Map.put_new(:provenance, "manual")
       |> Map.put_new(:last_seen_at, now)
+
+    attrs = Map.put_new(attrs, :belief, PantryItem.derive_belief(attrs[:provenance]))
 
     %PantryItem{} |> PantryItem.changeset(attrs) |> Repo.insert()
   end

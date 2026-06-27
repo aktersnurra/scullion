@@ -1,7 +1,7 @@
 defmodule Tore.Harness.Run do
   import Ecto.Query
   alias Tore.Harness.Run.{Decider, Events, State}
-  alias Tore.Harness.Artifact
+  alias Tore.Harness.{Artifact, UndoPayload}
   alias Tore.EventStore
   alias Tore.EventStore.Event
   alias Tore.Repo
@@ -48,6 +48,9 @@ defmodule Tore.Harness.Run do
   defp prepare(%Events.FailureRecorded{repair_action: {:edit_plan, slots}} = ev),
     do: %Events.FailureRecorded{ev | repair_action: %{"action" => "edit_plan", "slots" => slots}}
 
+  defp prepare(%Events.Committed{undo_payload: %UndoPayload{} = p} = ev),
+    do: %Events.Committed{ev | undo_payload: UndoPayload.to_json(p)}
+
   defp prepare(event), do: event
 
   defp deserialize(event_type, data) do
@@ -87,20 +90,23 @@ defmodule Tore.Harness.Run do
   defp rehydrate(%Events.QuestionAnswered{at: at} = event),
     do: %Events.QuestionAnswered{event | at: parse_datetime(at)}
 
-  defp rehydrate(%Events.Committed{at: at} = event),
-    do: %Events.Committed{event | at: parse_datetime(at)}
+  defp rehydrate(%Events.Committed{at: at, undo_payload: payload} = event),
+    do: %Events.Committed{
+      event
+      | at: parse_datetime(at),
+        undo_payload: rehydrate_undo_payload(payload)
+    }
 
   defp rehydrate(%Events.Reverted{at: at} = event),
     do: %Events.Reverted{event | at: parse_datetime(at)}
 
   defp rehydrate(%Events.FailureRecorded{at: at} = event),
-    do:
-      %Events.FailureRecorded{
-        event
-        | code: failure_code_atom(event.code),
-          repair_action: decode_repair(event.repair_action),
-          at: parse_datetime(at)
-      }
+    do: %Events.FailureRecorded{
+      event
+      | code: failure_code_atom(event.code),
+        repair_action: decode_repair(event.repair_action),
+        at: parse_datetime(at)
+    }
 
   defp rehydrate(%Events.ToolStepRecorded{step_kind: sk} = event) when is_binary(sk),
     do: %Events.ToolStepRecorded{event | step_kind: step_kind_atom(sk)}
@@ -194,6 +200,12 @@ defmodule Tore.Harness.Run do
     {:ok, module} = Artifact.Registry.lookup(kind)
     module.from_json(stringify_keys(payload))
   end
+
+  defp rehydrate_undo_payload(nil), do: nil
+  defp rehydrate_undo_payload(%UndoPayload{} = p), do: p
+
+  defp rehydrate_undo_payload(payload) when is_map(payload),
+    do: payload |> stringify_keys() |> UndoPayload.from_json()
 
   defp stringify_keys(map) when is_map(map) do
     Map.new(map, fn

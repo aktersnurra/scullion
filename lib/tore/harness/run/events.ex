@@ -37,7 +37,7 @@ defmodule Tore.Harness.Run.Events do
   end
 
   defmodule Committed do
-    defstruct [:at]
+    defstruct [:at, :undo_payload]
   end
 
   defmodule FailureRecorded do

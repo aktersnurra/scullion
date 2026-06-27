@@ -299,4 +299,38 @@ defmodule Tore.Harness.RunTest do
     assert [%PlanDiff{plan_stream_id: "plan-1"} = reloaded] = state.artifacts
     assert reloaded.week_start == ~D[2026-06-01]
   end
+
+  test "load/1 rehydrates Committed.undo_payload back into an UndoPayload struct" do
+    alias Tore.Harness.UndoPayload
+
+    sid = Run.next_stream_id()
+
+    {:ok, [opened]} =
+      Run.decide(
+        %Commands.Open{
+          household_id: 1,
+          kind: "planner_command_run",
+          surface: :plan,
+          started_by: "user",
+          user_id: 1,
+          input: %{}
+        },
+        %State.Draft{stream_id: sid}
+      )
+
+    payload = %UndoPayload{
+      kind: :event_sourced,
+      data: %{stream_id: "plan-h1-w1", stream_type: "planning", event_types: ["RecipeAssigned"]}
+    }
+
+    committed = %Events.Committed{at: ~U[2026-06-28 12:00:00Z], undo_payload: payload}
+
+    :ok = Run.append(sid, [opened, committed])
+    {:ok, state} = Run.load(sid)
+
+    assert %State.Applied{undo_payload: %UndoPayload{kind: :event_sourced} = decoded} = state
+    assert decoded.data.stream_id == "plan-h1-w1"
+    assert decoded.data.stream_type == "planning"
+    assert decoded.data.event_types == ["RecipeAssigned"]
+  end
 end

@@ -15,12 +15,27 @@ defmodule Tore.Pantry.PantryItem do
   ]
 
   @provenances ~w[manual receipt vision belief grocery_checkoff]
+  @beliefs ~w[confirmed probable uncertain missing]
 
   def categories, do: @categories
 
   def category_values, do: Enum.map(@categories, &Atom.to_string/1)
 
   def provenances, do: @provenances
+
+  def beliefs, do: @beliefs
+
+  @doc """
+  Maps a provenance value to the belief we'd assign by default. Receipt and
+  grocery-checkoff items are downgraded to `probable` because they tell us
+  what was bought, not whether it's still in the cupboard.
+  """
+  def derive_belief("manual"), do: "confirmed"
+  def derive_belief("vision"), do: "confirmed"
+  def derive_belief("receipt"), do: "probable"
+  def derive_belief("grocery_checkoff"), do: "probable"
+  def derive_belief("belief"), do: "uncertain"
+  def derive_belief(_), do: "confirmed"
 
   schema "pantry_items" do
     field :name, :string
@@ -30,6 +45,7 @@ defmodule Tore.Pantry.PantryItem do
     field :added_at, :date
     field :expires_at, :date
     field :provenance, :string, default: "manual"
+    field :belief, :string, default: "confirmed"
     field :last_seen_at, :utc_datetime
     belongs_to :ingredient, Tore.Recipes.Ingredient
     timestamps()
@@ -46,12 +62,14 @@ defmodule Tore.Pantry.PantryItem do
       :added_at,
       :expires_at,
       :provenance,
+      :belief,
       :last_seen_at
     ])
     |> validate_required([:name, :added_at, :provenance])
     |> update_change(:name, &normalize_name/1)
     |> validate_inclusion(:category, category_values())
     |> validate_inclusion(:provenance, @provenances)
+    |> validate_inclusion(:belief, @beliefs)
   end
 
   defp normalize_name(name), do: name |> String.trim() |> String.downcase()

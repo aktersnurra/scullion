@@ -28,7 +28,7 @@ defmodule Tore.Harness.Run.Commands do
   end
 
   defmodule Commit do
-    defstruct []
+    defstruct [:undo_payload]
   end
 
   defmodule RecordFailure do

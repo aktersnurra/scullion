@@ -1,0 +1,193 @@
+defmodule Tore.Harness.RunReceipts do
+  @moduledoc """
+  The user-facing view over the harness Run aggregate. A receipt is derived
+  from an `Applied` (or `Reverted`) run by:
+
+    * reading the run's typed artifacts and projecting them into
+      cross-surface `DiffRow`s (UI_SPEC §16.4 alphabet);
+    * exposing the stored `UndoPayload` so the UI can decide whether the
+      Undo button is enabled.
+
+  No separate persistence: the Run event stream is the source of truth.
+
+  Phase 1 only ships the read facade and a `revert/1` that transitions the
+  Run aggregate. The actual aggregate compensation (appending compensating
+  events to the planning stream, restoring pantry snapshots) is Phase 3.
+  """
+
+  import Ecto.Query
+
+  alias Tore.EventStore.Event
+  alias Tore.Harness.{DiffRow, Run, UndoPayload}
+  alias Tore.Harness.Run.{Commands, State}
+  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, PlanDiff, RunSummary}
+  alias Tore.Repo
+
+  @type receipt :: %{
+          stream_id: String.t(),
+          household_id: term(),
+          user_id: term(),
+          trigger: atom(),
+          intent: String.t() | nil,
+          diff_rows: [DiffRow.t()],
+          undo_payload: UndoPayload.t() | nil,
+          applied_at: DateTime.t() | nil,
+          reverted_at: DateTime.t() | nil
+        }
+
+  @spec get(String.t()) :: {:ok, receipt()} | {:error, :not_applied | :not_found}
+  def get(stream_id) do
+    case Run.load(stream_id) do
+      {:ok, %State.Draft{}} -> {:error, :not_found}
+      {:ok, %State.Applied{} = s} -> {:ok, to_receipt(s)}
+      {:ok, %State.Reverted{} = s} -> {:ok, to_receipt(s)}
+      {:ok, _other} -> {:error, :not_applied}
+    end
+  end
+
+  @spec list_for_household(term()) :: [receipt()]
+  def list_for_household(household_id) do
+    from(e in Event,
+      where: e.stream_type == "run" and e.event_type == "Opened",
+      where: fragment("json_extract(?, '$.household_id') = ?", e.data, ^household_id),
+      select: e.stream_id,
+      order_by: [desc: e.id]
+    )
+    |> Repo.all()
+    |> Enum.flat_map(fn sid ->
+      case get(sid) do
+        {:ok, r} -> [r]
+        _ -> []
+      end
+    end)
+  end
+
+  @spec to_diff_rows([struct()]) :: [DiffRow.t()]
+  def to_diff_rows(artifacts) when is_list(artifacts),
+    do: Enum.flat_map(artifacts, &rows_for/1)
+
+  @spec revert(String.t()) :: :ok | {:error, :not_applied | :not_found | :irreversible}
+  def revert(stream_id) do
+    with {:ok, %State.Applied{undo_payload: payload} = applied} <- load_applied(stream_id),
+         :ok <- reversible?(payload),
+         :ok <- compensate(payload),
+         {:ok, events} <- Run.decide(%Commands.Revert{}, applied),
+         :ok <-
+           Run.append(stream_id, events, %{household_id: applied.household_id}) do
+      :ok
+    end
+  end
+
+  # ----- receipt projection ---------------------------------------------------
+
+  defp to_receipt(%State.Applied{} = s) do
+    %{
+      stream_id: s.stream_id,
+      household_id: s.household_id,
+      user_id: s.user_id,
+      trigger: s.started_by,
+      intent: intent_from_input(s.input),
+      diff_rows: to_diff_rows(s.artifacts),
+      undo_payload: s.undo_payload,
+      applied_at: s.committed_at,
+      reverted_at: nil
+    }
+  end
+
+  defp to_receipt(%State.Reverted{} = s) do
+    %{
+      stream_id: s.stream_id,
+      household_id: s.household_id,
+      user_id: s.user_id,
+      trigger: s.started_by,
+      intent: intent_from_input(s.input),
+      diff_rows: to_diff_rows(s.artifacts),
+      undo_payload: nil,
+      applied_at: nil,
+      reverted_at: s.reverted_at
+    }
+  end
+
+  defp intent_from_input(input) when is_map(input),
+    do: input[:command] || input["command"]
+
+  defp intent_from_input(_), do: nil
+
+  # ----- per-artifact row projection ------------------------------------------
+
+  defp rows_for(%PlanDiff{events: events}),
+    do: Enum.map(events, &plan_event_to_row/1)
+
+  defp rows_for(%PantryBeliefUpdate{items: items}),
+    do: Enum.map(items, &pantry_item_to_row/1)
+
+  defp rows_for(%CostEntry{} = entry) do
+    [
+      %DiffRow{
+        op: :added,
+        surface: :cost,
+        label: "Receipt from #{entry.store_name}",
+        reason: nil
+      }
+    ]
+  end
+
+  defp rows_for(%MemoryUpdate{}), do: []
+  defp rows_for(%RunSummary{}), do: []
+  defp rows_for(_other), do: []
+
+  defp plan_event_to_row(%{event_type: type, slot_key: slot, payload: payload, rationale: rat}) do
+    {op, verb} = plan_op(type)
+    label = payload["label"] || payload[:label] || slot
+
+    %DiffRow{
+      op: op,
+      surface: :plan,
+      label: "#{verb} #{label}",
+      reason: List.first(rat || [])
+    }
+  end
+
+  defp plan_op("RecipeAssigned"), do: {:added, "Added"}
+  defp plan_op("RecipeSwapped"), do: {:changed, "Swapped to"}
+  defp plan_op("RecipeRemoved"), do: {:removed, "Removed"}
+  defp plan_op("MealSkipped"), do: {:removed, "Skipped"}
+  defp plan_op("LeftoverMarked"), do: {:added, "Leftover for"}
+  defp plan_op("ServingsChanged"), do: {:changed, "Servings for"}
+  defp plan_op(_), do: {:changed, "Updated"}
+
+  defp pantry_item_to_row(%{change: change, name: name, provenance: prov}) do
+    {op, verb} =
+      case change do
+        :added -> {:added, "Added"}
+        :bumped -> {:changed, "Refreshed"}
+        :removed -> {:removed, "Removed"}
+      end
+
+    %DiffRow{
+      op: op,
+      surface: :pantry,
+      label: "#{verb} #{name}",
+      reason: "via #{prov}"
+    }
+  end
+
+  # ----- revert plumbing ------------------------------------------------------
+
+  defp load_applied(stream_id) do
+    case Run.load(stream_id) do
+      {:ok, %State.Draft{}} -> {:error, :not_found}
+      {:ok, %State.Applied{} = s} -> {:ok, s}
+      {:ok, _other} -> {:error, :not_applied}
+    end
+  end
+
+  defp reversible?(%UndoPayload{kind: :irreversible}), do: {:error, :irreversible}
+  defp reversible?(_), do: :ok
+
+  # Phase 1 stops here: the compensator dispatch is a no-op so the state
+  # transition still happens, but the affected aggregates are not actually
+  # rolled back. Phase 3 implements the per-aggregate compensators
+  # (planning compensating events, pantry snapshot restore).
+  defp compensate(_payload), do: :ok
+end

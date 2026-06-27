@@ -132,6 +132,13 @@ defmodule Tore.Harness.Run.DeciderTest do
       assert %Events.Committed{} = e
     end
 
+    test "Commit in Running propagates undo_payload onto the Committed event" do
+      s = opened_state()
+      payload = %Tore.Harness.UndoPayload{kind: :irreversible, data: %{reason: "test"}}
+      {:ok, [e]} = Decider.decide(%Commands.Commit{undo_payload: payload}, s)
+      assert %Events.Committed{undo_payload: ^payload} = e
+    end
+
     test "Commit in Draft is invalid" do
       assert {:error, {:invalid_for_state, Commands.Commit, State.Draft}} =
                Decider.decide(%Commands.Commit{}, %State.Draft{stream_id: "x"})
@@ -222,6 +229,16 @@ defmodule Tore.Harness.Run.DeciderTest do
       at = ~U[2026-06-02 13:00:00Z]
       applied = Decider.evolve(s, %Events.Committed{at: at})
       assert %State.Applied{committed_at: ^at} = applied
+    end
+
+    test "Running + Committed carries undo_payload through to Applied" do
+      s = opened_state()
+      payload = %Tore.Harness.UndoPayload{kind: :irreversible, data: %{reason: "test"}}
+
+      applied =
+        Decider.evolve(s, %Events.Committed{at: ~U[2026-06-02 13:00:00Z], undo_payload: payload})
+
+      assert %State.Applied{undo_payload: ^payload} = applied
     end
 
     test "Running + FailureRecorded transitions to Failed with code/message/repair" do

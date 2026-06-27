@@ -93,7 +93,8 @@ defmodule Tore.Harness.Run.State do
       :committed_at,
       :tool_trace,
       :artifacts,
-      :model_usage
+      :model_usage,
+      :undo_payload
     ]
   end
 

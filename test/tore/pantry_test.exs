@@ -78,4 +78,32 @@ defmodule Tore.PantryTest do
     assert :meat in cats
     assert :other in cats
   end
+
+  test "PantryItem.beliefs/0 returns the four belief values as strings" do
+    assert Tore.Pantry.PantryItem.beliefs() == ~w[confirmed probable uncertain missing]
+  end
+
+  test "add_item/1 defaults belief to confirmed for manual provenance" do
+    {:ok, item} = Pantry.add_item(%{name: "Salt"})
+    assert item.provenance == "manual"
+    assert item.belief == "confirmed"
+  end
+
+  test "add_item/1 accepts an explicit belief value" do
+    {:ok, item} = Pantry.add_item(%{name: "Mjöl", belief: "probable"})
+    assert item.belief == "probable"
+  end
+
+  test "add_item/1 rejects an invalid belief value" do
+    assert {:error, changeset} = Pantry.add_item(%{name: "Sirap", belief: "maybe"})
+    assert changeset.errors[:belief]
+  end
+
+  test "PantryItem.derive_belief/1 maps provenance to default belief" do
+    assert Tore.Pantry.PantryItem.derive_belief("manual") == "confirmed"
+    assert Tore.Pantry.PantryItem.derive_belief("vision") == "confirmed"
+    assert Tore.Pantry.PantryItem.derive_belief("receipt") == "probable"
+    assert Tore.Pantry.PantryItem.derive_belief("grocery_checkoff") == "probable"
+    assert Tore.Pantry.PantryItem.derive_belief("belief") == "uncertain"
+  end
 end
