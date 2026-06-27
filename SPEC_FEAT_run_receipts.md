@@ -28,7 +28,7 @@ Vocabulary alignment:
 |---|---|---|
 | `RunReceipt` | `KitchenRun` + `RunSummary` artifact | Receipt is the user-facing rendering; KitchenRun is the full audit row. As the harness lands, RunReceipt becomes a view over KitchenRun, not a separate table. |
 | `DiffRow` | `PlanDiff`, `GroceryDiff`, `PantryBeliefUpdate` (typed per-domain) | DiffRow is the simpler cross-surface shape that ships first. The typed per-domain artifacts come in later when verifiers need them. |
-| `UndoHandle` (sum type) | `KitchenRun.undo_ref` | Same idea; this spec names the encoding (`:event_sourced` / `:snapshot` / `:composite` / `:irreversible`). |
+| `UndoPayload` (sum type, stored on `Events.Committed`) | `KitchenRun.undo_ref` | Same idea; this spec names the encoding (`:event_sourced` / `:snapshot` / `:composite` / `:irreversible`). |
 | Belief state on PantryItem | `PantryBeliefsCapsule` framing (SPEC.md §4) | Same model. This spec lands the column; the capsule reads it. |
 | Plan-slot locks | `PlanVerifier` "no locked slot was changed" check | This spec adds the events + projection; the verifier consumes them when it lands. |
 | Tool classification (`:silent` / `:diff_row` / `:own_receipt`) | Run-kind declaration in `run_kinds.ex` | First pass at risk-tier-adjacent classification. Will fold into formal Tier 0–3 (SPEC.md §A.6.1) later. |
@@ -79,19 +79,25 @@ nothing in this spec contradicts them.
 ## 1. Why this spec exists
 
 UI_SPEC §16 says every agent-driven state change must produce a run receipt
-that the user can Undo. The current backend doesn't support this end-to-end:
+that the user can Undo. The harness already models the lifecycle for this
+(see Relationship section), but four concrete pieces are missing:
 
-- Agent tools in `Tore.Capture.Router` mutate plan/shop/pantry directly and
-  return prose. The Router emits Capture bubbles, not durable receipts.
-- There is no undo handle on most agent mutations. The reversible-diff idea
-  exists in SPEC.md (§Agent Harness, "reversible diff") but is not wired
-  through tool calls.
-- Pantry rows are quasi-boolean. There is no belief-state field the UI can
-  read to render `? probably at home`.
-- Plan slots have no `locked_by_user` field. The agent has no way to know
-  it must skip a user-pinned slot.
-- KitchenRun exists for some flows (receipt_ingestion, pantry_belief_update,
-  recipe_normalisation) but not for arbitrary capture-driven tool sequences.
+- **No undo payload on Committed events.** The `Reverted` event and state
+  transition exist on the Run aggregate, but `Committed` doesn't carry the
+  information needed to actually compensate the affected aggregates. There
+  is no caller of `Commands.Revert` anywhere in the codebase.
+- **No `belief` field on `PantryItem`.** Provenance and `last_seen_at`
+  exist, but there is no field the UI can read to render
+  `? probably at home` vs `+ confirmed`. Belief is a function of provenance
+  + recency + agent corrections, not provenance alone.
+- **No plan-slot lock events.** The agent has no way to know it must skip a
+  user-pinned slot. Planning's event stream does not yet model
+  `PlanSlotLocked` / `PlanSlotUnlocked`.
+- **No receipt-rendering facade.** The Run aggregate's typed artifacts
+  (`PlanDiff`, `PantryBeliefUpdate`, `CostEntry`, …) are the source of
+  truth, but there is no module that projects them into the unified
+  DiffRow shape UI_SPEC §16.4 specifies. Nothing in `lib/tore_web/` renders
+  runs as receipts today.
 
 Without these, the UI either lies (renders confidence it doesn't have),
 loses the user's intent (overwrites locks), or makes Undo impossible.
@@ -120,26 +126,29 @@ collapse into one receipt with grouped diff rows. Undo undoes the whole turn.
 
 ### 3.1 RunReceipt
 
-A durable record of one agent turn's mutations. Persisted (not just in
-LiveView assigns) so it can be re-rendered, listed in a future Needs-Review
-inbox, and undone after a page refresh.
+A **derived view** over an `Applied` (or `Reverted`) `Tore.Harness.Run`
+aggregate. Not a separate persisted table — the Run event stream is the
+source of truth. The receipt is constructed at read time by projecting
+the run's typed artifacts and state into the shape the UI consumes.
 
 ```
-RunReceipt
-  id                  uuid
-  household_id        fk
-  user_id             fk         (the user who triggered the turn)
-  trigger             enum       (:capture_text, :capture_photo,
-                                  :receipt_commit, :scheduled, :manual)
-  intent              string     (one-line summary, e.g. "Add 3 dinners")
-  diff_rows           [DiffRow]
-  assumptions         [string]   (e.g. "Assumed olive oil at home")
-  undo_handle         UndoHandle (nil if not reversible)
-  undo_expires_at     datetime   (nil if undo is unlimited)
-  applied_at          datetime
-  reverted_at         datetime?  (set when Undo is invoked)
-  correlation_id      string     (matches KitchenRun if applicable)
+RunReceipt                       Derived from
+  stream_id           string     Run.stream_id
+  household_id        fk         Run state
+  user_id             fk         Run state (the user who triggered the turn)
+  trigger             enum       Run.started_by + Run.surface
+  intent              string     Run.input (one-line summary)
+  diff_rows           [DiffRow]  to_diff_rows(Run.artifacts)
+  assumptions         [string]   collected from artifacts' rationale fields
+  undo_payload        UndoPayload Applied.undo_payload (nil if not reversible)
+  undo_expires_at     datetime   committed_at + TTL (see §4.4)
+  applied_at          datetime   Applied.committed_at
+  reverted_at         datetime?  Reverted.reverted_at (when state is Reverted)
 ```
+
+A future spec may introduce a flat projection table for query performance
+(e.g. a list-by-household index), but Phase 1 reads directly from the
+event stream.
 
 ### 3.2 DiffRow
 
@@ -157,39 +166,46 @@ DiffRow
 ```
 
 The DiffRow is what the UI renders. It does not carry ids or DB references;
-that's what UndoHandle is for.
+that's what UndoPayload is for.
 
-### 3.3 UndoHandle
+### 3.3 UndoPayload
 
-What the system needs to reverse the turn. Implementation depends on the
-target context:
+What the system needs to reverse the turn. Stored on the
+`Events.Committed` event (and therefore on `State.Applied`), so a
+rehydrated run carries everything needed to compensate without re-reading
+external aggregates.
 
 ```
-UndoHandle (sum type)
-  | :event_sourced   stream_id, event_ids[]  (Plan, Shop)
-  | :snapshot        table, row_id, before_attrs  (Pantry, Recipes)
-  | :composite       [UndoHandle]  (when a turn touches multiple)
-  | :irreversible    reason   (Undo button disabled, with explanation)
+UndoPayload (sum type)
+  | :event_sourced   %{stream_id, stream_type, event_ids[]}  (Plan, Shop)
+  | :snapshot        %{schema, row_id, before_attrs}  (Pantry, Recipes)
+  | :composite       [UndoPayload]  (when a turn touches multiple)
+  | :irreversible    %{reason}   (Undo button disabled, with explanation)
 ```
 
 Irreversible actions still produce a receipt; the Undo button is just
 greyed out and the row says why ("receipts committed cannot be undone here;
 edit the cost entry from /receipts").
 
+The payload is derived from the run's artifacts at commit time by
+`UndoPayload.from_artifacts/2`. Each artifact kind knows how to describe
+its own reversal (PlanDiff → event-sourced over `planning-<household>`;
+PantryBeliefUpdate → snapshot of touched rows; CostEntry → irreversible).
+
 ## 4. Lifecycle
 
 ### 4.1 Producing a receipt
 
-A tool call that mutates state must:
+A receipt is a derived view; "producing" it means committing a Run with
+enough information to project it. The Orchestrator already runs the
+verify→commit cycle. Phase 1 adds: at commit time, derive an
+`UndoPayload` from the run's typed artifacts and pass it into
+`Events.Committed`. The Run aggregate stores it on `State.Applied`.
 
-1. Capture **before-state** sufficient to reverse the change.
-2. Apply the mutation.
-3. Return `{:ok, %DiffRow{}, %UndoHandle{}}` to the Router instead of the
-   current ad-hoc prose+bubble shape.
-
-The Router accumulates DiffRows + UndoHandles across the turn and, on
-turn end (next assistant message), persists a single RunReceipt with the
-composite UndoHandle.
+The Capture Router does not need to change in Phase 1 — its current
+artifact-producing path is sufficient. Phase 2 wires Capture-driven
+ad-hoc tool calls (today bypassing the harness) into Runs of their own
+so that every state-changing tool path commits a Run.
 
 ### 4.2 Rendering
 
@@ -198,19 +214,25 @@ arrival, it renders a RunReceipt bubble (UI_SPEC §7.1) with:
 - intent line
 - grouped diff rows (by surface)
 - assumptions block (if any)
-- Undo button (disabled if `undo_handle == :irreversible`)
+- Undo button (disabled if `undo_payload` is `:irreversible`)
 
 After Undo, the bubble re-renders with `reverted_at` set ("Reverted — Apply again?").
 
 ### 4.3 Undoing
 
-`Tore.RunReceipts.undo(receipt_id, user_id)`:
-1. Loads receipt, checks `reverted_at` is nil and `undo_expires_at` not passed.
-2. Walks the UndoHandle and reverses each piece.
-   - Event-sourced: append compensating events.
-   - Snapshot: restore before_attrs.
-3. Sets `reverted_at`.
-4. Emits a follow-up RunReceipt for the undo itself (so the trail is honest).
+`Tore.Harness.RunReceipts.revert(stream_id)`:
+1. Loads the Run aggregate; checks state is `Applied` and
+   `undo_expires_at` not passed.
+2. Walks `Applied.undo_payload` and dispatches each piece to its
+   compensator:
+   - `:event_sourced` → append compensating events to the named stream.
+   - `:snapshot` → restore `before_attrs` via the schema's update path.
+   - `:composite` → recurse.
+   - `:irreversible` → refuse with a structured error.
+3. Dispatches `Commands.Revert` to the Run aggregate; the existing
+   `Reverted` event records the transition.
+4. (Phase 3) Optionally opens a small follow-up Run to record the undo
+   itself in the activity log. Phase 1 just transitions the original.
 
 ### 4.4 Expiration
 
@@ -262,6 +284,10 @@ a lock; the actual lock event records `locked_by_user_id` of the active user.
 
 ## 7. Tool classification
 
+> Applies to **Phase 2**, not Phase 1. Phase 1 works with the existing
+> Orchestrator's artifact-producing runs and does not touch
+> `Tore.Capture.Dispatch`.
+
 Every agent tool gets classified for receipt production:
 
 ```
@@ -302,45 +328,110 @@ Concrete classification of current `Tore.Capture.Dispatch` tools:
 
 Implement in checkpoints, one commit per phase, each independently shippable.
 
-### Phase 1 — Schema + module skeleton
+### Phase 1 — Substrate for receipts and undo
 
-Scaffolds `lib/tore/harness/` as the home of the future KitchenRun harness
-(see Relationship section above). Run receipts are its first occupant.
+**Existing harness state (as of 2026-06-27).** `lib/tore/harness/` already
+exists with an event-sourced `Run` aggregate (Decider pattern, stream
+type `"run"`), typed artifacts (`PlanDiff`, `PantryBeliefUpdate`,
+`CostEntry`, `MemoryUpdate`, `RunSummary`), six capsules, four verifiers,
+an Orchestrator, and projector machinery. The Run state machine already
+models the lifecycle this spec needs (`Draft → Running → Applied →
+Reverted` plus `NeedsUser`, `Failed`, `Discarded`). `pantry_items` already
+has `provenance` (with values `manual | receipt | vision | belief |
+grocery_checkoff`) and `last_seen_at`.
 
-- Migration: `run_receipts` and `run_receipt_diffs` tables.
-- Migration: `pantry_items.belief`, `pantry_items.last_seen_at`,
-  `pantry_items.provenance`.
-- Migration: plan-slot lock events (new event types, no schema change since
-  Planning is event-sourced).
-- Module: `Tore.Harness.RunReceipt` — Ecto schema.
-- Module: `Tore.Harness.RunReceiptDiff` — Ecto schema (the persisted form
-  of DiffRow).
-- Module: `Tore.Harness.UndoHandle` — sum-type encoding + serialiser.
-- Module: `Tore.Harness.RunReceipts` — context with `record/1`, `get/1`,
-  `list_for_household/2`, `undo/2`.
-- No behavior change yet; just the substrate.
+Phase 1 fills the four concrete gaps between what exists and what UI_SPEC
+§16 needs:
 
-### Phase 2 — Router emits receipts for diff_row tools
+1. **`belief` enum on `PantryItem`** — the column is missing. Provenance
+   tells you *how* an item entered the inventory; belief tells you *how
+   confident we are it is still there*. Migration adds the column with
+   values `:confirmed | :probable | :uncertain | :missing`; backfill
+   derives initial values from provenance:
+   - `manual` → `:confirmed`
+   - `receipt` → `:probable`
+   - `vision` → `:confirmed`
+   - `grocery_checkoff` → `:probable`
+   - `belief` → `:uncertain`
+2. **`UndoPayload` on `Events.Committed` and `Events.Reverted`** — the
+   `Reverted` event exists but carries no information about what to
+   compensate. Extend `Events.Committed{at, undo_payload}` where
+   `undo_payload` is the sum-type encoding from §3.3. The
+   `Run.Decider.evolve` for `Reverted` doesn't need the payload (state
+   already carries it via the prior `Committed` event); the compensation
+   caller reads it from the rehydrated `Applied` state.
+3. **`Tore.Harness.RunReceipts` context** — a thin facade for the UI.
+   Reads the Run aggregate and projects each `Applied` (or `Reverted`)
+   run into a `RunReceipt` view-struct (intent line, grouped DiffRows,
+   undo state, undo handle). Exposes `get/1`, `list_for_household/2`,
+   `revert/1`. `revert/1` dispatches `Commands.Revert` to the Run
+   aggregate AND walks the `undo_payload` to compensate the affected
+   aggregates (Phase 3 wires the actual compensators; Phase 1 just
+   defines the contract and a no-op compensator dispatcher).
+4. **`DiffRow` derivation from existing artifacts** — `RunReceipts`
+   derives the cross-surface DiffRow list from the typed artifacts the
+   run already produces (`PlanDiff` → plan-surface DiffRows;
+   `PantryBeliefUpdate` → pantry-surface DiffRows; `CostEntry` →
+   cost-surface DiffRows). DiffRow is a render-time shape, not stored;
+   the canonical record stays in the typed artifact on the event stream.
 
-- Refactor `Tore.Capture.Dispatch.dispatch_one/3` to return
-  `{:ok, diff_row, undo_handle}` instead of a bubble.
-- `Tore.Capture.Router` accumulates per-turn DiffRows and persists one
-  RunReceipt at turn end.
-- CaptureLive renders RunReceipt bubbles with Undo button (no-op wired yet).
+**What this phase explicitly does NOT do:**
+
+- No new `run_receipts` table. Receipts derive from the existing Run
+  event stream; persisting them separately would duplicate state.
+- No new `Tore.Harness.RunReceipt` Ecto schema for the same reason.
+- No `Tore.Harness.RunReceiptDiff` schema — DiffRow stays in-memory.
+- No plan-slot lock events yet. Phase 5 adds them; the spec's earlier
+  promise to land them in Phase 1 is dropped because the Orchestrator
+  doesn't yet consume them and emitting events with no reader is dead
+  code.
+- No tool refactor. `Capture.Dispatch` continues to return its current
+  shapes; Phase 2 changes it.
+
+**Phase 1 deliverables, concretely:**
+
+- Migration: add `belief` column to `pantry_items` + backfill from
+  provenance.
+- `Tore.Pantry.PantryItem` schema update (field + validation).
+- `Tore.Harness.UndoPayload` module — sum-type encoding
+  (`:event_sourced` / `:snapshot` / `:composite` / `:irreversible`),
+  with `from_artifacts/2` to derive the payload from a run's typed
+  artifacts at commit time.
+- Extend `Tore.Harness.Run.Events.Committed` with `undo_payload`; extend
+  `Run.State.Applied` to carry it; update `Decider.decide(Commit)` to
+  accept and propagate.
+- `Tore.Harness.RunReceipts` module — `get/1`, `list_for_household/2`,
+  `revert/1`, `to_diff_rows/1` (artifact → DiffRow projection).
+- Tests for: belief backfill, UndoPayload encoding round-trip,
+  RunReceipts.to_diff_rows projection, Decider Commit propagates
+  undo_payload to Applied state.
+
+### Phase 2 — Capture-driven mutations commit Runs
+
+- Today, `Tore.Capture.Dispatch` tools mutate plan/shop/pantry directly
+  outside any Run. Refactor each state-changing dispatch to open a Run,
+  produce its typed artifact, and commit — so every Capture-driven
+  mutation has a stream and an `Applied` state with an `UndoPayload`.
+- Multi-tool turns either (a) open one Run per tool call (per-step
+  receipts) or (b) open a parent Run that owns child commits as
+  composite artifacts. Decide when implementing — leaning (a).
+- CaptureLive renders Runs as receipt bubbles (Undo button still no-op
+  until Phase 3 lands).
 - Existing `shop_link` bubble becomes the rendering of a shop-surface
   DiffRow group; same component, fed by the receipt.
 
 ### Phase 3 — Undo wired
 
-- `Tore.RunReceipts.undo/2` actually reverses event-sourced and snapshot
-  handles.
+- `Tore.Harness.RunReceipts.revert/1` actually compensates
+  event-sourced and snapshot payloads (Phase 1 defines the contract;
+  Phase 3 implements the per-aggregate compensators).
 - CaptureLive Undo button calls it and shows the "Reverted" state.
 - Toast on Plan/Shop when an Undo affecting that surface lands (PubSub).
 
-### Phase 4 — Belief state on Pantry
+### Phase 4 — Belief state surfaces in the UI
 
-- Backfill `belief` from existing `provenance` field where possible.
-- `Pantry.upsert_belief/1` sets `belief` based on provenance.
+- (Schema change lands in Phase 1.) Phase 4 wires reads:
+- `Pantry.upsert_belief/1` sets `belief` based on provenance + recency.
 - Shop list rendering checks pantry belief for items in
   `:probable`/`:confirmed` state and renders the `?` prefix with copy.
 - Pantry list groups by belief, not just category.
@@ -355,7 +446,7 @@ Scaffolds `lib/tore/harness/` as the home of the future KitchenRun harness
 ### Phase 6 — Own-receipt flows + irreversible labelling
 
 - `:irreversible` receipts for receipt commits with explanation copy.
-- Recipe import becomes `:own_receipt` with a snapshot UndoHandle.
+- Recipe import opens its own Run with a snapshot UndoPayload.
 
 ## 9. Non-goals
 
@@ -397,3 +488,16 @@ Scaffolds `lib/tore/harness/` as the home of the future KitchenRun harness
   verifiers, resolver handles, formal risk tiers, and model routing
   are explicitly deferred to later phases — listed in the Relationship
   section.
+- **2026-06-27 (#2):** Reconciled with the existing harness implementation.
+  Code-reality check found that `lib/tore/harness/` is already built:
+  event-sourced `Run` aggregate with `Draft → Running → Applied →
+  Reverted` lifecycle, typed artifacts, capsules, verifiers, Orchestrator,
+  and projector. Also: `pantry_items` already has `provenance` and
+  `last_seen_at`. Phase 1 rewritten to (a) drop the proposed
+  `run_receipts` table — receipts derive from the existing event stream;
+  (b) drop standalone `RunReceipt` / `RunReceiptDiff` Ecto schemas; (c)
+  rename `UndoHandle` to `UndoPayload` and store it on `Events.Committed`
+  rather than as a separate handle; (d) move belief-state schema work
+  from Phase 4 into Phase 1 (only Phase 4 wires consumers); (e) move
+  plan-slot lock events from Phase 1 to Phase 5 where the consumer
+  lands. Net effect: Phase 1 is smaller and additive to existing code.
