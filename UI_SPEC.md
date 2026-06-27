@@ -1629,3 +1629,263 @@ That is how Tore gets the “agentic harness for food” feeling while still bei
 [7]: https://www.microsoft.com/en-us/research/blog/guidelines-for-human-ai-interaction-design/?utm_source=chatgpt.com "Guidelines for human-AI interaction design"
 [8]: https://pair.withgoogle.com/chapter/mental-models/ "Mental Models"
 [9]: https://www.w3.org/WAI/WCAG22/quickref/ "How to Meet WCAG (Quickref Reference)"
+
+---
+
+# 16. Enforcement (the Kole doctrine)
+
+This section is the non-negotiable checklist that turns the principles above into
+rules you can fail a PR on. The earlier sections explain *why*; this section
+states *what must be true* before UI work merges.
+
+Companion BE spec: `SPEC_FEAT_run_receipts.md` defines the artifact and undo
+machinery this section depends on.
+
+## 16.1 The product is not what people think it is
+
+Tore is not a recipe app, grocery app, pantry app, or AI chat app. The central
+object is **household food state**: tonight's plan, the week, what needs
+buying, what's already handled, what's uncertain, what the agent changed.
+
+The UI must answer these questions, in this order:
+
+```md
+What are we eating?
+What needs buying?
+What is already handled?
+What is uncertain?
+What did Tore change?
+```
+
+It must not answer:
+
+```md
+What are my recipes?
+What's in my pantry?
+What did Tore's pipeline do?
+```
+
+## 16.2 Top-level surfaces are operational, not entity-shaped
+
+Allowed top-level destinations:
+
+```md
+Today · Plan · Shop · Capture
+```
+
+Forbidden as top-level nav:
+
+```md
+Recipes
+Pantry
+Deals
+Receipts
+Costs
+KitchenRuns
+Ingredients
+```
+
+Those are system resources and must appear contextually inside an operational
+surface.
+
+## 16.3 Agent acts; user undoes
+
+Tore's model is **agent acts immediately; the user undoes if wrong** — not
+approval-gated proposals. This is a deliberate choice for trust through
+visibility + reversibility rather than friction.
+
+Therefore every agent-driven state change must:
+
+1. Produce a **run receipt** (see UI_SPEC §7.1 and `SPEC_FEAT_run_receipts.md`).
+2. Be reversible by a single Undo for at least a short window.
+3. Be visible in Capture as a structured diff, not prose.
+4. Respect user locks (see §16.6).
+
+A run receipt is mandatory. Prose-only confirmation ("I added milk to the
+shop list") is a UI bug.
+
+## 16.4 The diff alphabet
+
+Agent-driven changes render as structured rows with a single-character prefix:
+
+```md
++   added
+-   removed
+~   changed
+?   assumed / uncertain
+```
+
+Examples:
+
+```md
++ Grädde
+- Pasta
+~ Move tacos from Thursday to Friday
+? Assume olive oil at home
+```
+
+This alphabet is the canonical vocabulary across run receipts, Capture
+bubbles, and any other diff surface. Do not invent new prefixes.
+
+## 16.5 Belief state, not booleans
+
+Pantry rows must not render as "in pantry: yes/no". Use the belief vocabulary:
+
+```md
+Confirmed at home
+Probably at home
+Probably missing
+Unknown
+```
+
+Surface uncertainty inline, not in modals. The receipt review card's
+inferred-date amber border is the canonical pattern: a quiet visual hint
+beats a confident lie.
+
+In shop rows, items the agent thinks the user already has render with a `?`
+prefix and inline copy ("probably at home, last confirmed 12 days ago"). Do
+not silently omit them.
+
+## 16.6 User intent outranks the agent
+
+User-set state wears one of these labels:
+
+```md
+Locked by you
+Edited by you
+```
+
+Agent flows must not mutate locked slots/items. When the agent declines to
+change something because the user locked it, the run receipt says so
+explicitly:
+
+```md
+Tore left Friday unchanged because it is locked by you.
+```
+
+This is a trust-building detail. Do not omit it.
+
+## 16.7 Backend vocabulary stays out of the user UI
+
+Never expose these terms in any user-facing surface:
+
+```md
+KitchenRun
+Capsule
+Verifier
+Artifact
+Run
+Aggregate
+Decider
+Pipeline
+LLM
+Agent
+Tool call
+Inference
+```
+
+Allowed surfaces for these terms: developer/debug views under
+Settings → Developer (or dev-only routes). Nothing else.
+
+User-facing copy uses household language: dinner, tonight, leftovers,
+shopping list, probably have, already prepped.
+
+## 16.8 Chat is capture, not product
+
+Capture accepts messy input — text, photos, URLs, voice — and produces typed
+artifacts (a saved recipe, a run receipt with diffs, a parsed receipt review
+card). The agent's text reply is the *fallback*, not the *product*.
+
+If the agent calls tools, the user sees the resulting run receipt with diff
+rows. They should not need to read a paragraph to learn what changed.
+
+## 16.9 Uncertainty is visible; precision is honest
+
+Do not invent defaults to hide that the agent didn't know something. The
+inferred-date amber border on the receipt review card is the canonical
+pattern. The `add_to_shopping_list` tool deliberately does not impute
+default units for the same reason.
+
+When the agent is uncertain, render `?`. When it's confident, render no
+prefix. When it's wrong, the user undoes.
+
+## 16.10 One primary action per screen
+
+Every screen has exactly one primary action. Secondary actions render as
+plain/ghost. If a design has two primaries, one must be demoted before
+merge.
+
+Examples of the single primary action per surface:
+
+```md
+Today     Open dinner / Suggest dinner
+Plan      Improve plan
+Shop      Finish shopping
+Capture   Send
+Cook      Next step
+```
+
+## 16.11 Empty states are operational, not decorative
+
+Empty states must offer a useful next step, not an illustration. The
+template is:
+
+```md
+[State sentence]
+[One-line context]
+
+[Primary action]
+[Optional secondary action]
+```
+
+See UI_SPEC §8 for the canonical empty-state copy for each surface.
+
+## 16.12 Loading states name the work, not the system
+
+```md
+✅ Reading recipe
+✅ Checking pantry
+✅ Building grocery changes
+❌ Loading
+❌ Please wait
+❌ AI is thinking
+```
+
+No anthropomorphic copy. No fake precision (no progress bars unless the work
+actually has a measurable length).
+
+## 16.13 Errors explain consequence and recovery
+
+Every error must answer: what failed, what state is the system in now, and
+what can the user do next.
+
+```md
+Could not read the recipe
+The page may block scraping.
+Nothing was saved.
+
+[Paste text]
+[Try again]
+```
+
+The "nothing was saved" line — explicit consequence — is mandatory whenever
+true. Trust depends on knowing the system didn't half-apply something.
+
+## 16.14 PR checklist (must be true before merge)
+
+```md
+□ One primary action on this screen
+□ Agent-driven changes produce a run receipt with Undo
+□ No backend vocabulary in user-facing copy
+□ Pantry/shop uncertainty rendered inline with `?` or belief labels
+□ User-locked items are visibly labeled and respected
+□ Empty state is operational, not decorative
+□ Loading copy names the work, not the system
+□ Error copy explains consequence and recovery
+□ Touch targets ≥ 44×44px
+□ Focus visible without color alone
+□ No new top-level nav for backend entities
+```
+
+If any line is false, the work is not ready.
+
