@@ -10,7 +10,8 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
   alias Tore.Harness.Capsules
   alias Tore.Harness.{KitchenMemorySynthesis, PantryUpdate, ReceiptIngestion, UndoPayload}
-  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, RunBundle}
+  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, PlanDiff, RunBundle}
+  alias Tore.Recipes
 
   alias Tore.Harness.Capsules.{
     HouseholdPreferencesCapsule,
@@ -240,6 +241,103 @@ defmodule Tore.Harness.Orchestrator do
       %State.Applied{} = s -> {:ok, s}
       other -> {:error, other}
     end
+  end
+
+  @doc """
+  Open a child Run for a single `set_plan_slot` tool call, assign the recipe
+  in the planning aggregate, attach a `PlanDiff` artifact, and commit. The
+  Router collects the returned stream id and passes it to `end_turn/2`.
+  """
+  @spec apply_set_plan_slot(map()) ::
+          {:ok, %{stream_id: String.t(), recipe: map()}}
+          | {:error, :recipe_not_found | term()}
+  def apply_set_plan_slot(%{
+        household_id: hh,
+        user_id: uid,
+        date: %Date{} = date,
+        recipe_id: recipe_id,
+        servings: servings
+      }) do
+    sid = Run.next_stream_id()
+    metadata = %{household_id: hh}
+    plan_id = plan_stream_id_for_date(date)
+    slot_key = slot_key_for_date(date)
+
+    open_cmd = %Commands.Open{
+      household_id: hh,
+      kind: "set_plan_slot_run",
+      surface: :plan,
+      started_by: "user",
+      user_id: uid,
+      input: %{
+        date: Date.to_iso8601(date),
+        recipe_id: recipe_id,
+        servings: servings,
+        plan_stream_id: plan_id,
+        slot_key: slot_key
+      }
+    }
+
+    run_dispatch(sid, metadata, "set_plan_slot_run", fn ->
+      with {:ok, recipe} <- fetch_recipe(recipe_id),
+           {:ok, events} <-
+             Planning.assign_recipe(plan_id, slot_key, recipe_id, servings),
+           plan_diff = build_plan_diff(plan_id, date, slot_key, events, recipe),
+           {:ok, state} <- open_run(sid, open_cmd, metadata),
+           {:ok, state} <-
+             apply_command(
+               state.stream_id,
+               %Commands.AddArtifact{artifact: plan_diff},
+               state,
+               metadata
+             ),
+           {:ok, _state} <-
+             apply_command(state.stream_id, commit_command(state), state, metadata) do
+        {:ok, %{stream_id: sid, recipe: recipe}}
+      end
+    end)
+  end
+
+  defp fetch_recipe(recipe_id) do
+    case Recipes.get!(recipe_id) do
+      %{} = r -> {:ok, r}
+    end
+  rescue
+    Ecto.NoResultsError -> {:error, :recipe_not_found}
+  end
+
+  defp build_plan_diff(plan_id, date, slot_key, events, recipe) do
+    week_start = Date.add(date, -(Date.day_of_week(date) - 1))
+
+    diff_events =
+      Enum.map(events, fn evt ->
+        %{
+          slot_key: slot_key,
+          event_type: event_type_name(evt),
+          payload: event_payload(evt, recipe),
+          rationale: ["user requested"]
+        }
+      end)
+
+    %PlanDiff{plan_stream_id: plan_id, week_start: week_start, events: diff_events}
+  end
+
+  defp event_type_name(%mod{}), do: mod |> Module.split() |> List.last()
+
+  defp event_payload(%Tore.Planning.Events.RecipeAssigned{} = e, recipe) do
+    %{"recipe_id" => e.recipe_id, "servings" => e.servings, "label" => recipe.title}
+  end
+
+  defp event_payload(_other, _recipe), do: %{}
+
+  defp plan_stream_id_for_date(%Date{} = date) do
+    week_start = Date.add(date, -(Date.day_of_week(date) - 1))
+    "plan:#{Date.to_iso8601(week_start)}"
+  end
+
+  defp slot_key_for_date(%Date{} = date) do
+    day = Enum.at(~w(mon tue wed thu fri sat sun), Date.day_of_week(date) - 1)
+    "#{day}_dinner"
   end
 
   defp compose_children_payload(child_sids) do

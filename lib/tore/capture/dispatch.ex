@@ -193,38 +193,39 @@ defmodule Tore.Capture.Dispatch do
 
   # ── plan slot mutation ─────────────────────────────────────────────────
 
-  @spec set_plan_slot(Date.t(), integer(), integer() | nil) :: bubble()
-  def set_plan_slot(%Date{} = date, recipe_id, servings) when is_integer(recipe_id) do
-    plan_id = plan_stream_id_for(date)
-    slot_key = slot_key_for(date)
-    servings = servings || @default_servings
+  @spec set_plan_slot(Date.t(), integer(), integer() | nil, ctx()) ::
+          {bubble(), String.t() | nil}
+  def set_plan_slot(%Date{} = date, recipe_id, servings, ctx)
+      when is_integer(recipe_id) and is_map(ctx) do
+    orch_ctx = %{
+      household_id: ctx.household_id,
+      user_id: ctx[:user_id],
+      date: date,
+      recipe_id: recipe_id,
+      servings: servings || @default_servings
+    }
 
-    case Recipes.get!(recipe_id) do
-      %{title: title} = _recipe ->
-        case Planning.assign_recipe(plan_id, slot_key, recipe_id, servings) do
-          {:ok, _events} ->
-            %{
-              role: :assistant,
-              text:
-                Gettext.dgettext(
-                  ToreWeb.Gettext,
-                  "default",
-                  "Added %{title} to %{day} %{date}.",
-                  title: title,
-                  day: long_day_for(date),
-                  date: Date.to_iso8601(date)
-                )
-            }
+    case Orchestrator.apply_set_plan_slot(orch_ctx) do
+      {:ok, %{stream_id: sid, recipe: %{title: title}}} ->
+        {%{
+           role: :assistant,
+           text:
+             Gettext.dgettext(
+               ToreWeb.Gettext,
+               "default",
+               "Added %{title} to %{day} %{date}.",
+               title: title,
+               day: long_day_for(date),
+               date: Date.to_iso8601(date)
+             )
+         }, sid}
 
-          {:error, reason} ->
-            error_bubble(:plan, reason)
-        end
+      {:error, :recipe_not_found} ->
+        {error_bubble(:plan, :recipe_not_found), nil}
 
-      _ ->
-        error_bubble(:plan, :recipe_not_found)
+      {:error, reason} ->
+        {error_bubble(:plan, reason), nil}
     end
-  rescue
-    Ecto.NoResultsError -> error_bubble(:plan, :recipe_not_found)
   end
 
   @spec clear_plan_slot(Date.t()) :: bubble()

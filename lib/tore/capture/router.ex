@@ -16,6 +16,7 @@ defmodule Tore.Capture.Router do
   alias Tore.AiOperations
   alias Tore.Capture.Dispatch
   alias Tore.Harness.Capsules
+  alias Tore.Harness.Orchestrator
 
   alias Tore.Harness.Capsules.{
     HouseholdPreferencesCapsule,
@@ -113,8 +114,35 @@ defmodule Tore.Capture.Router do
     history_messages = history_to_messages(history)
     user_message = build_multimodal_user(text, images)
 
-    loop(system, history_messages ++ [user_message], [], images, ctx, correlation_id, 0)
+    {parent_sid, turn_ctx} = open_turn_run(ctx)
+
+    result =
+      loop(system, history_messages ++ [user_message], [], [], images, turn_ctx, correlation_id, 0)
+
+    close_turn_run(parent_sid, result)
   end
+
+  defp open_turn_run(ctx) do
+    case Orchestrator.start_turn(ctx) do
+      {:ok, sid} -> {sid, Map.put(ctx, :parent_stream_id, sid)}
+      _ -> {nil, ctx}
+    end
+  end
+
+  defp close_turn_run(nil, result), do: drop_sids(result)
+
+  defp close_turn_run(parent_sid, {:ok, bubbles, child_sids}) do
+    _ = Orchestrator.end_turn(parent_sid, child_sids)
+    {:ok, bubbles}
+  end
+
+  defp close_turn_run(parent_sid, {:error, _} = err) do
+    _ = Orchestrator.end_turn(parent_sid, [])
+    err
+  end
+
+  defp drop_sids({:ok, bubbles, _sids}), do: {:ok, bubbles}
+  defp drop_sids(other), do: other
 
   # Convert the LiveView's bubble list into OpenAI-shape chat turns. We
   # only carry text — images from past turns are dropped (the bytes aren't
@@ -138,12 +166,12 @@ defmodule Tore.Capture.Router do
   # when the model finally replies in plain text we can show the full
   # tool-call trail (e.g. "I found X" + "Added X to Friday" + final reply).
 
-  defp loop(_system, _messages, bubbles_acc, _images, _ctx, _cid, iter)
+  defp loop(_system, _messages, bubbles_acc, sids_acc, _images, _ctx, _cid, iter)
        when iter > @max_tool_loop_iterations do
-    {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}]}
+    {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}], sids_acc}
   end
 
-  defp loop(system, messages, bubbles_acc, images, ctx, correlation_id, iter) do
+  defp loop(system, messages, bubbles_acc, sids_acc, images, ctx, correlation_id, iter) do
     # tool_choice is "auto" after the first turn: once the model has tool
     # results it must be free to reply in plain text, otherwise it would
     # be forced to keep calling tools forever.
@@ -151,24 +179,35 @@ defmodule Tore.Capture.Router do
 
     case Tore.LLM.chat_with_tools(system, messages, tool_catalogue(), tool_choice: choice) do
       {:ok, {:message, text}, _usage} ->
-        {:ok, bubbles_acc ++ [%{role: :assistant, text: text}]}
+        {:ok, bubbles_acc ++ [%{role: :assistant, text: text}], sids_acc}
 
       {:ok, {:tool_calls, calls}, _usage} ->
         results = dispatch_calls_with_results(calls, images, ctx)
         new_bubbles = Enum.map(results, & &1.bubble)
+        new_sids = Enum.flat_map(results, &Map.get(&1, :child_sids, []))
 
         if iter == @max_tool_loop_iterations do
-          {:ok, bubbles_acc ++ new_bubbles}
+          {:ok, bubbles_acc ++ new_bubbles, sids_acc ++ new_sids}
         else
           assistant_msg = %{role: "assistant", content: nil, tool_calls: raw_tool_calls(calls)}
           tool_msgs = Enum.map(results, &tool_result_message/1)
-          loop(system, messages ++ [assistant_msg] ++ tool_msgs, bubbles_acc ++ new_bubbles, images, ctx, correlation_id, iter + 1)
+
+          loop(
+            system,
+            messages ++ [assistant_msg] ++ tool_msgs,
+            bubbles_acc ++ new_bubbles,
+            sids_acc ++ new_sids,
+            images,
+            ctx,
+            correlation_id,
+            iter + 1
+          )
         end
 
       {:error, reason} ->
         require Logger
         Logger.warning("Capture.Router LLM call failed: #{inspect(reason)}")
-        {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}]}
+        {:ok, bubbles_acc ++ [%{role: :assistant, text: fallback_text()}], sids_acc}
     end
   end
 
@@ -180,10 +219,29 @@ defmodule Tore.Capture.Router do
     Enum.map(calls, fn call ->
       case run_call(call, images, image_count, ctx) do
         {:ok, more_bubbles} ->
-          %{tool_call: call, status: :ok, bubble: List.first(more_bubbles) || empty_bubble()}
+          %{
+            tool_call: call,
+            status: :ok,
+            bubble: List.first(more_bubbles) || empty_bubble(),
+            child_sids: []
+          }
+
+        {:ok, more_bubbles, sids} ->
+          %{
+            tool_call: call,
+            status: :ok,
+            bubble: List.first(more_bubbles) || empty_bubble(),
+            child_sids: sids
+          }
 
         {:error, reason} ->
-          %{tool_call: call, status: :error, reason: reason, bubble: error_bubble_from_reason(reason)}
+          %{
+            tool_call: call,
+            status: :error,
+            reason: reason,
+            bubble: error_bubble_from_reason(reason),
+            child_sids: []
+          }
       end
     end)
   end
@@ -240,10 +298,12 @@ defmodule Tore.Capture.Router do
     {:ok, [Dispatch.find_recipe(q)]}
   end
 
-  defp run_call(%{name: "set_plan_slot", args: args}, _images, _count, _ctx) do
+  defp run_call(%{name: "set_plan_slot", args: args}, _images, _count, ctx) do
     with {:ok, date} <- parse_iso_date(args["date"]),
          {:ok, recipe_id} <- fetch_recipe_id(args) do
-      {:ok, [Dispatch.set_plan_slot(date, recipe_id, args["servings"])]}
+      {bubble, child_sid} = Dispatch.set_plan_slot(date, recipe_id, args["servings"], ctx)
+      sids = if child_sid, do: [child_sid], else: []
+      {:ok, [bubble], sids}
     end
   end
 

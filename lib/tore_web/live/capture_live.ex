@@ -73,6 +73,9 @@ defmodule ToreWeb.CaptureLive do
      |> update(:messages, &(&1 ++ [bubble]))}
   end
 
+  def handle_info({:run_event, _stream_id, _event}, socket), do: {:noreply, socket}
+  def handle_info({:run_state_changed, _stream_id, _state}, socket), do: {:noreply, socket}
+
   @impl true
   def render(assigns) do
     ~H"""

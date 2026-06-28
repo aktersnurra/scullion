@@ -318,6 +318,42 @@ defmodule Tore.Harness.OrchestratorTest do
       assert length(children) == 2
     end
 
+    test "apply_set_plan_slot/1 opens a child Run, assigns the recipe, commits with a PlanDiff" do
+      {:ok, recipe} =
+        %Tore.Recipes.Recipe{title: "Carbonara", recipe_type: :meal}
+        |> Tore.Repo.insert()
+
+      ctx = %{
+        household_id: 1,
+        user_id: 42,
+        date: ~D[2026-06-23],
+        recipe_id: recipe.id,
+        servings: 4
+      }
+
+      assert {:ok, %{stream_id: sid, recipe: %{title: "Carbonara"}}} =
+               Orchestrator.apply_set_plan_slot(ctx)
+
+      assert is_binary(sid)
+      {:ok, %State.Applied{} = state} = Run.load(sid)
+      assert state.kind == "set_plan_slot_run"
+      assert [%Tore.Harness.Artifact.PlanDiff{events: [%{event_type: "RecipeAssigned"}]}] =
+               state.artifacts
+      assert %Tore.Harness.UndoPayload{kind: :event_sourced} = state.undo_payload
+    end
+
+    test "apply_set_plan_slot/1 returns {:error, :recipe_not_found} when recipe does not exist" do
+      ctx = %{
+        household_id: 1,
+        user_id: 42,
+        date: ~D[2026-06-23],
+        recipe_id: 999_999,
+        servings: 4
+      }
+
+      assert {:error, :recipe_not_found} = Orchestrator.apply_set_plan_slot(ctx)
+    end
+
     defp seed_applied_child(household_id) do
       alias Tore.Harness.Run.{Commands, Events}
       alias Tore.Harness.Artifact.PlanDiff
