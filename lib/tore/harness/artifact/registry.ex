@@ -1,11 +1,19 @@
 defmodule Tore.Harness.Artifact.Registry do
-  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, PlanDiff, RunSummary}
+  alias Tore.Harness.Artifact.{
+    CostEntry,
+    MemoryUpdate,
+    PantryBeliefUpdate,
+    PlanDiff,
+    RunBundle,
+    RunSummary
+  }
 
   @registry %{
     "CostEntry" => CostEntry,
     "MemoryUpdate" => MemoryUpdate,
     "PantryBeliefUpdate" => PantryBeliefUpdate,
     "PlanDiff" => PlanDiff,
+    "RunBundle" => RunBundle,
     "RunSummary" => RunSummary
   }
 

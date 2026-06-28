@@ -136,6 +136,44 @@ defmodule Tore.Harness.UndoPayloadTest do
     end
   end
 
+  describe "compose/1" do
+    test "returns :irreversible when no child payloads given" do
+      assert %UndoPayload{kind: :irreversible} = UndoPayload.compose([])
+    end
+
+    test "returns the lone payload when given a single child" do
+      payload = %UndoPayload{kind: :irreversible, data: %{reason: "x"}}
+      assert UndoPayload.compose([payload]) == payload
+    end
+
+    test "wraps multiple reversible children in :composite" do
+      a = %UndoPayload{kind: :snapshot, data: %{schema: "X", changes: []}}
+
+      b = %UndoPayload{
+        kind: :event_sourced,
+        data: %{stream_id: "y", stream_type: "z", event_types: []}
+      }
+
+      assert %UndoPayload{kind: :composite, data: %{children: [^a, ^b]}} =
+               UndoPayload.compose([a, b])
+    end
+
+    test "becomes :irreversible if any child is :irreversible" do
+      a = %UndoPayload{kind: :snapshot, data: %{schema: "X", changes: []}}
+      b = %UndoPayload{kind: :irreversible, data: %{reason: "y"}}
+
+      assert %UndoPayload{kind: :irreversible, data: %{reason: reason}} =
+               UndoPayload.compose([a, b])
+
+      assert reason =~ "irreversible"
+    end
+
+    test "skips nil children (children that produced no reversible payload)" do
+      a = %UndoPayload{kind: :snapshot, data: %{schema: "X", changes: []}}
+      assert UndoPayload.compose([a, nil]) == a
+    end
+  end
+
   describe "json round-trip" do
     test "event_sourced encodes and decodes" do
       payload = %UndoPayload{

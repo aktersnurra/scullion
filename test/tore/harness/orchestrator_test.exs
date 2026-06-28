@@ -284,4 +284,82 @@ defmodule Tore.Harness.OrchestratorTest do
         select: e.stream_id
     )
   end
+
+  describe "dispatch(:capture_turn_run, ctx)" do
+    alias Tore.Harness.UndoPayload
+    alias Tore.Harness.Artifact.RunBundle
+
+    test "start_turn/1 returns {:ok, parent_stream_id}" do
+      assert {:ok, sid} = Orchestrator.start_turn(%{household_id: 1, user_id: 42})
+      assert is_binary(sid)
+
+      {:ok, %State.Running{kind: "capture_turn_run", household_id: 1}} = Run.load(sid)
+    end
+
+    test "end_turn/2 with no children produces an irreversible RunBundle and commits" do
+      {:ok, sid} = Orchestrator.start_turn(%{household_id: 1, user_id: 42})
+
+      assert {:ok, %State.Applied{} = state} = Orchestrator.end_turn(sid, [])
+      assert [%RunBundle{child_stream_ids: []}] = state.artifacts
+      assert %UndoPayload{kind: :irreversible} = state.undo_payload
+    end
+
+    test "end_turn/2 composes the children's undo_payloads into the parent's" do
+      {:ok, parent} = Orchestrator.start_turn(%{household_id: 1, user_id: 42})
+
+      child_a = seed_applied_child(1)
+      child_b = seed_applied_child(1)
+
+      assert {:ok, %State.Applied{} = state} =
+               Orchestrator.end_turn(parent, [child_a, child_b])
+
+      assert [%RunBundle{child_stream_ids: [^child_a, ^child_b]}] = state.artifacts
+      assert %UndoPayload{kind: :composite, data: %{children: children}} = state.undo_payload
+      assert length(children) == 2
+    end
+
+    defp seed_applied_child(household_id) do
+      alias Tore.Harness.Run.{Commands, Events}
+      alias Tore.Harness.Artifact.PlanDiff
+
+      sid = Run.next_stream_id()
+
+      {:ok, [opened]} =
+        Run.decide(
+          %Commands.Open{
+            household_id: household_id,
+            kind: "test_child_run",
+            surface: :plan,
+            started_by: "user",
+            user_id: 42,
+            input: %{}
+          },
+          %State.Draft{stream_id: sid}
+        )
+
+      diff = %PlanDiff{
+        plan_stream_id: "plan-x",
+        week_start: ~D[2026-06-22],
+        events: [
+          %{
+            slot_key: "2026-06-23-dinner",
+            event_type: "RecipeAssigned",
+            payload: %{},
+            rationale: ["x"]
+          }
+        ]
+      }
+
+      payload = UndoPayload.from_artifacts([diff])
+
+      :ok =
+        Run.append(sid, [
+          opened,
+          %Events.ArtifactAdded{artifact: diff},
+          %Events.Committed{at: DateTime.utc_now(), undo_payload: payload}
+        ])
+
+      sid
+    end
+  end
 end

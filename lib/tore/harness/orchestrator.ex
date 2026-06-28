@@ -10,7 +10,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
   alias Tore.Harness.Capsules
   alias Tore.Harness.{KitchenMemorySynthesis, PantryUpdate, ReceiptIngestion, UndoPayload}
-  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate}
+  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, RunBundle}
 
   alias Tore.Harness.Capsules.{
     HouseholdPreferencesCapsule,
@@ -185,6 +185,72 @@ defmodule Tore.Harness.Orchestrator do
         {:error, reason} -> {:error, {:step_failed, reason}}
       end
     end)
+  end
+
+  @doc """
+  Open a parent `:capture_turn_run` for a Capture turn. The router calls
+  this at the start of `Router.route/4`, threads the returned stream id
+  into the dispatch ctx for each tool call, then calls `end_turn/2` with
+  the child stream ids the turn produced.
+
+  The parent Run produces a single `RunBundle` artifact and commits a
+  composite UndoPayload synthesised from its children's payloads — so
+  one Capture turn = one receipt = one Undo.
+  """
+  @spec start_turn(map()) :: {:ok, String.t()} | {:error, term()}
+  def start_turn(%{household_id: hh} = ctx) do
+    sid = Run.next_stream_id()
+    metadata = %{household_id: hh}
+
+    cmd = %Commands.Open{
+      household_id: hh,
+      kind: "capture_turn_run",
+      surface: :plan,
+      started_by: Map.get(ctx, :started_by, "user"),
+      user_id: Map.get(ctx, :user_id),
+      input: %{}
+    }
+
+    case open_run(sid, cmd, metadata) do
+      {:ok, _state} -> {:ok, sid}
+      err -> err
+    end
+  end
+
+  @doc """
+  Close a parent `:capture_turn_run`. Walks the child Runs to collect
+  their undo payloads, composes them, attaches a `RunBundle` artifact,
+  and commits the parent.
+  """
+  @spec end_turn(String.t(), [String.t()]) :: {:ok, State.t()} | {:error, term()}
+  def end_turn(parent_sid, child_sids) when is_list(child_sids) do
+    {:ok, state} = Run.load(parent_sid)
+    metadata = %{household_id: state.household_id}
+
+    bundle = %RunBundle{child_stream_ids: child_sids}
+    payload = compose_children_payload(child_sids)
+
+    with %State.Running{} <- state,
+         {:ok, state} <-
+           apply_command(parent_sid, %Commands.AddArtifact{artifact: bundle}, state, metadata),
+         {:ok, state} <-
+           apply_command(parent_sid, %Commands.Commit{undo_payload: payload}, state, metadata) do
+      {:ok, state}
+    else
+      %State.Applied{} = s -> {:ok, s}
+      other -> {:error, other}
+    end
+  end
+
+  defp compose_children_payload(child_sids) do
+    child_sids
+    |> Enum.map(fn sid ->
+      case Run.load(sid) do
+        {:ok, %State.Applied{undo_payload: p}} -> p
+        _ -> nil
+      end
+    end)
+    |> UndoPayload.compose()
   end
 
   @doc """

@@ -33,6 +33,30 @@ defmodule Tore.Harness.UndoPayload do
 
   def kinds, do: @kinds
 
+  @doc """
+  Compose a list of already-built child payloads (e.g. from each child Run
+  of a turn-Run) into a single payload. Mirrors `from_artifacts/1`'s
+  composition rules but works on payloads, not artifacts — needed when the
+  children live in separate Run streams.
+  """
+  @spec compose([t() | nil]) :: t()
+  def compose(payloads) when is_list(payloads) do
+    case Enum.reject(payloads, &is_nil/1) do
+      [] ->
+        irreversible("no child payloads")
+
+      [single] ->
+        single
+
+      multiple ->
+        if Enum.any?(multiple, &(&1.kind == :irreversible)) do
+          irreversible("bundle contains an irreversible child")
+        else
+          %__MODULE__{kind: :composite, data: %{children: multiple}}
+        end
+    end
+  end
+
   @spec from_artifacts([struct()]) :: t()
   def from_artifacts([]),
     do: irreversible("run produced no reversible artifacts")
