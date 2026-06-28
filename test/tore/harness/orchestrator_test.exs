@@ -26,6 +26,17 @@ defmodule Tore.Harness.OrchestratorTest do
     assert state.household_id == 1
   end
 
+  test "Applied state carries an undo_payload derived from the run's artifacts" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "ok"}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, %State.Applied{undo_payload: payload}} =
+      Orchestrator.dispatch(:planner_command_run, @ctx)
+
+    assert %Tore.Harness.UndoPayload{} = payload
+  end
+
   test "dispatch persists a 'run' event stream that can be replayed" do
     expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
       {:ok, {:message, "ok"}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}

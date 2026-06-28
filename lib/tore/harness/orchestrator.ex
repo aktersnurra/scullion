@@ -9,7 +9,7 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.Planning
   alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
   alias Tore.Harness.Capsules
-  alias Tore.Harness.{KitchenMemorySynthesis, PantryUpdate, ReceiptIngestion}
+  alias Tore.Harness.{KitchenMemorySynthesis, PantryUpdate, ReceiptIngestion, UndoPayload}
   alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate}
 
   alias Tore.Harness.Capsules.{
@@ -203,16 +203,32 @@ defmodule Tore.Harness.Orchestrator do
          :ok <- CostEntryVerifier.verify(cost, %{}),
          :ok <- PantryVerifier.verify(pantry, %{}),
          {:ok, state} <-
-           apply_command(state.stream_id, %Commands.AnswerQuestion{answer: "confirmed"}, state, metadata),
+           apply_command(
+             state.stream_id,
+             %Commands.AnswerQuestion{answer: "confirmed"},
+             state,
+             metadata
+           ),
          {:ok, _receipt} <- ReceiptIngestion.apply!(cost, pantry, user_id, household_locale()),
          {:ok, state} <-
            apply_command(state.stream_id, %Commands.AddArtifact{artifact: cost}, state, metadata),
          {:ok, state} <-
-           apply_command(state.stream_id, %Commands.AddArtifact{artifact: pantry}, state, metadata),
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: pantry},
+             state,
+             metadata
+           ),
          run_summary = RunSummary.from_artifacts([cost, pantry], :applied),
          {:ok, state} <-
-           apply_command(state.stream_id, %Commands.AddArtifact{artifact: run_summary}, state, metadata),
-         {:ok, final_state} <- apply_command(state.stream_id, %Commands.Commit{}, state, metadata) do
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: run_summary},
+             state,
+             metadata
+           ),
+         {:ok, final_state} <-
+           apply_command(state.stream_id, commit_command(state), state, metadata) do
       check_off_matching_shop_items(cost, pantry, user_id)
       delete_run_photo_async(state)
       {:ok, final_state}
@@ -261,7 +277,11 @@ defmodule Tore.Harness.Orchestrator do
   # Walk the active shopping list for the receipt's week and tick off any
   # item whose name overlaps with what the user actually bought. Best-effort:
   # never raises, logs and moves on if the shop list can't be loaded.
-  defp check_off_matching_shop_items(%CostEntry{date: date}, %PantryBeliefUpdate{items: items}, user_id) do
+  defp check_off_matching_shop_items(
+         %CostEntry{date: date},
+         %PantryBeliefUpdate{items: items},
+         user_id
+       ) do
     week_start = Date.add(date, -(Date.day_of_week(date) - 1))
     list_id = "shop_list:#{Date.to_iso8601(week_start)}"
 
@@ -415,7 +435,7 @@ defmodule Tore.Harness.Orchestrator do
                  state,
                  metadata
                ) do
-          apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+          apply_command(state.stream_id, commit_command(state), state, metadata)
         end
 
       {:fail, code, repair} ->
@@ -428,7 +448,12 @@ defmodule Tore.Harness.Orchestrator do
     end
   end
 
-  defp verify_and_surface_receipt(state, %CostEntry{} = cost, %PantryBeliefUpdate{} = pantry, metadata) do
+  defp verify_and_surface_receipt(
+         state,
+         %CostEntry{} = cost,
+         %PantryBeliefUpdate{} = pantry,
+         metadata
+       ) do
     # SPEC §A.5 atomic verifier set: any fail = the whole run fails. Per §A.6.1
     # vision-input runs always transition to NeedsUser when verifiers pass —
     # the user reviews on an editable card and commit_receipt/4 commits.
@@ -437,7 +462,12 @@ defmodule Tore.Harness.Orchestrator do
          {:ok, state} <-
            apply_command(state.stream_id, %Commands.AddArtifact{artifact: cost}, state, metadata),
          {:ok, state} <-
-           apply_command(state.stream_id, %Commands.AddArtifact{artifact: pantry}, state, metadata) do
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: pantry},
+             state,
+             metadata
+           ) do
       apply_command(
         state.stream_id,
         %Commands.RaiseQuestion{question: "Review the parsed receipt before saving."},
@@ -493,7 +523,7 @@ defmodule Tore.Harness.Orchestrator do
                  metadata
                ) do
           _ = ctx
-          apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+          apply_command(state.stream_id, commit_command(state), state, metadata)
         end
       end
     else
@@ -538,7 +568,7 @@ defmodule Tore.Harness.Orchestrator do
                  state,
                  metadata
                ) do
-          apply_command(state.stream_id, %Commands.Commit{}, state, metadata)
+          apply_command(state.stream_id, commit_command(state), state, metadata)
         end
 
       {:fail, code, repair} ->
@@ -585,6 +615,11 @@ defmodule Tore.Harness.Orchestrator do
       {:ok, new_state}
     end
   end
+
+  # Derive the UndoPayload from the run's artifacts at commit time so
+  # State.Applied carries everything Phase 3 compensators need.
+  defp commit_command(%{artifacts: artifacts}),
+    do: %Commands.Commit{undo_payload: UndoPayload.from_artifacts(artifacts)}
 
   defp log_ai_operation(stream_id, entry) do
     {:ok, op} =
