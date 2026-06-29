@@ -66,17 +66,42 @@ defmodule Tore.Harness.RunReceipts do
   def to_diff_rows(artifacts) when is_list(artifacts),
     do: Enum.flat_map(artifacts, &rows_for/1)
 
-  @spec revert(String.t()) :: :ok | {:error, :not_applied | :not_found | :irreversible}
+  @spec revert(String.t()) :: :ok | {:error, term()}
   def revert(stream_id) do
-    with {:ok, %State.Applied{undo_payload: payload} = applied} <- load_applied(stream_id),
-         :ok <- reversible?(payload),
-         :ok <- compensate(payload),
-         {:ok, events} <- Run.decide(%Commands.Revert{}, applied),
-         :ok <-
-           Run.append(stream_id, events, %{household_id: applied.household_id}) do
-      :ok
+    with {:ok, applied} <- load_applied(stream_id) do
+      revert_applied(applied)
     end
   end
+
+  @doc """
+  Atomically compensate an Applied run and append the Reverted event in
+  one DB transaction. If any compensator returns `{:error, _}`, the whole
+  transaction rolls back: planning event stream stays as it was, pantry
+  rows stay as they were, the Run remains `Applied`. The user sees an
+  error and can retry.
+
+  Exposed for tests that need to drive a doctored `%State.Applied{}`
+  through the revert path without round-tripping through `Run.load/1`.
+  """
+  @spec revert_applied(State.Applied.t()) :: :ok | {:error, term()}
+  def revert_applied(%State.Applied{undo_payload: payload} = applied) do
+    with :ok <- reversible?(payload) do
+      Repo.transaction(fn ->
+        with :ok <- compensate(payload),
+             {:ok, events} <- Run.decide(%Commands.Revert{}, applied),
+             :ok <- Run.append(applied.stream_id, events, %{household_id: applied.household_id}) do
+          :ok
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+      |> case do
+        {:ok, :ok} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
 
   # ----- receipt projection ---------------------------------------------------
 

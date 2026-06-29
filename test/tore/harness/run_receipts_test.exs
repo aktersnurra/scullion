@@ -261,5 +261,68 @@ defmodule Tore.Harness.RunReceiptsTest do
       assert Decimal.equal?(restored.quantity, Decimal.new("1"))
       assert restored.provenance == "manual"
     end
+
+    test "rolls back the planning compensator if a later snapshot compensator fails" do
+      {:ok, recipe} =
+        %Tore.Recipes.Recipe{title: "Soup", recipe_type: :meal}
+        |> Tore.Repo.insert()
+
+      date = ~D[2026-06-23]
+
+      {:ok, %{stream_id: sid}} =
+        Tore.Harness.Orchestrator.apply_set_plan_slot(%{
+          household_id: 1,
+          user_id: 1,
+          date: date,
+          recipe_id: recipe.id,
+          servings: 4
+        })
+
+      plan_id = "plan:2026-06-22"
+      {:ok, before_state} = Tore.Planning.load_plan(plan_id)
+      assert Map.has_key?(before_state.slots, "tue_dinner")
+
+      # Splice a failing snapshot child onto the existing payload so the
+      # composite has: child A (event_sourced planning, succeeds) and
+      # child B (snapshot with an invalid belief value, fails validation).
+      {:ok, ingredient} =
+        %Tore.Recipes.Ingredient{name: "rice", key: "rice"}
+        |> Tore.Repo.insert()
+
+      {:ok, item} =
+        Tore.Pantry.add_item(%{name: "rice", ingredient_id: ingredient.id, provenance: "manual"})
+
+      {:ok, %State.Applied{} = applied} = Run.load(sid)
+
+      bad_snapshot = %UndoPayload{
+        kind: :snapshot,
+        data: %{
+          schema: "Tore.Pantry.PantryItem",
+          changes: [
+            %{item_id: item.id, before: %{quantity: "1", belief: "not_a_real_belief"}}
+          ]
+        }
+      }
+
+      doctored =
+        case applied.undo_payload do
+          %UndoPayload{kind: :composite, data: %{children: children}} ->
+            %UndoPayload{kind: :composite, data: %{children: children ++ [bad_snapshot]}}
+
+          single ->
+            %UndoPayload{kind: :composite, data: %{children: [single, bad_snapshot]}}
+        end
+
+      doctored_applied = %{applied | undo_payload: doctored}
+
+      assert {:error, _} = RunReceipts.revert_applied(doctored_applied)
+
+      {:ok, after_state} = Tore.Planning.load_plan(plan_id)
+      assert Map.has_key?(after_state.slots, "tue_dinner"),
+             "planning slot was wiped despite a downstream compensator failure"
+
+      {:ok, state} = Run.load(sid)
+      assert %State.Applied{} = state
+    end
   end
 end
