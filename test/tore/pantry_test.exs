@@ -103,6 +103,72 @@ defmodule Tore.PantryTest do
     assert bumped.belief == "probable"
   end
 
+  test "upsert_belief/1 bump sums quantities when units match" do
+    {:ok, _, _, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Milk",
+        quantity: Decimal.new(1),
+        unit: "L",
+        provenance: "manual"
+      })
+
+    {:ok, bumped, :bumped, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Milk",
+        quantity: Decimal.new(2),
+        unit: "L",
+        provenance: "receipt"
+      })
+
+    assert Decimal.equal?(bumped.quantity, Decimal.new(3))
+    assert bumped.unit == "L"
+  end
+
+  test "upsert_belief/1 bump does NOT sum quantities when units conflict" do
+    {:ok, existing, _, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Milk",
+        quantity: Decimal.new(1),
+        unit: "L",
+        provenance: "manual"
+      })
+
+    {:ok, bumped, :bumped, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Milk",
+        quantity: Decimal.new(500),
+        unit: "ml",
+        provenance: "receipt"
+      })
+
+    # Existing quantity wins; the signal (we saw it again) still
+    # refreshes last_seen_at / provenance / belief.
+    assert Decimal.equal?(bumped.quantity, existing.quantity)
+    assert bumped.unit == "L"
+    assert bumped.provenance == "receipt"
+    assert DateTime.compare(bumped.last_seen_at, existing.last_seen_at) in [:gt, :eq]
+  end
+
+  test "upsert_belief/1 bump treats nil incoming unit as compatible" do
+    {:ok, _, _, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Eggs",
+        quantity: Decimal.new(6),
+        unit: "pcs",
+        provenance: "manual"
+      })
+
+    {:ok, bumped, :bumped, _} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Eggs",
+        quantity: Decimal.new(6),
+        provenance: "grocery_checkoff"
+      })
+
+    assert Decimal.equal?(bumped.quantity, Decimal.new(12))
+    assert bumped.unit == "pcs"
+  end
+
   test "upsert_belief/1 bump never weakens a confirmed belief" do
     {:ok, _item, :added, nil} =
       Pantry.upsert_belief(%{

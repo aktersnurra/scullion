@@ -171,25 +171,43 @@ defmodule Tore.Pantry do
   end
 
   defp bump_existing(%PantryItem{} = item, attrs) do
-    new_qty =
-      case {to_decimal(item.quantity), to_decimal(attrs[:quantity])} do
-        {nil, q} -> q
-        {q, nil} -> q
-        {a, b} -> Decimal.add(a, b)
-      end
+    {new_qty, new_unit} =
+      merge_quantity(item.quantity, item.unit, attrs[:quantity], attrs[:unit])
 
     next_provenance = attrs[:provenance] || item.provenance
 
     item
     |> PantryItem.changeset(%{
       quantity: new_qty,
-      unit: item.unit || attrs[:unit],
+      unit: new_unit,
       last_seen_at: attrs[:last_seen_at] || now(),
       provenance: next_provenance,
       belief: stronger_belief(item.belief, PantryItem.derive_belief(next_provenance))
     })
     |> Repo.update()
   end
+
+  # Sum only when units are compatible (equal, or one side nil). A conflict
+  # (existing "L", incoming "ml") would silently turn 1 L into 501 L —
+  # worse than refusing the new quantity. On conflict we keep the existing
+  # quantity & unit; the *signal* (we saw this thing again) still updates
+  # last_seen_at / provenance / belief upstream.
+  defp merge_quantity(existing_qty, existing_unit, incoming_qty, incoming_unit) do
+    case {to_decimal(existing_qty), to_decimal(incoming_qty)} do
+      {nil, q} -> {q, existing_unit || incoming_unit}
+      {q, nil} -> {q, existing_unit || incoming_unit}
+      {a, b} ->
+        if units_compatible?(existing_unit, incoming_unit) do
+          {Decimal.add(a, b), existing_unit || incoming_unit}
+        else
+          {existing_qty, existing_unit}
+        end
+    end
+  end
+
+  defp units_compatible?(nil, _), do: true
+  defp units_compatible?(_, nil), do: true
+  defp units_compatible?(a, b), do: String.downcase(a) == String.downcase(b)
 
   # Belief on bump never weakens: a confirmed row stays confirmed even when
   # a weaker signal (receipt → :probable) bumps the quantity.
