@@ -36,7 +36,8 @@ defmodule Tore.Harness.UndoPayload do
   @enforce_keys [:kind, :data]
   defstruct [:kind, :data]
 
-  @type t :: %__MODULE__{kind: atom(), data: map()}
+  @type kind :: :event_sourced | :snapshot | :composite | :irreversible
+  @type t :: %__MODULE__{kind: kind(), data: map()}
 
   def kinds, do: @kinds
 
@@ -79,9 +80,7 @@ defmodule Tore.Harness.UndoPayload do
         artifacts
       end
 
-    payloads = Enum.map(artifacts, &payload_for/1)
-
-    case Enum.reject(payloads, &(&1.kind == :noop)) do
+    case artifacts |> Enum.map(&payload_for/1) |> Enum.reject(&is_nil/1) do
       [] ->
         irreversible("run produced no reversible artifacts")
 
@@ -146,8 +145,8 @@ defmodule Tore.Harness.UndoPayload do
   defp payload_for(%MemoryUpdate{}),
     do: irreversible("memory updates are not reversible from the receipt")
 
-  defp payload_for(%RunSummary{}),
-    do: %__MODULE__{kind: :noop, data: %{}}
+  # RunSummary describes what happened; it has no state to reverse.
+  defp payload_for(%RunSummary{}), do: nil
 
   defp payload_for(_other),
     do: irreversible("unknown artifact kind")

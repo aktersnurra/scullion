@@ -2,7 +2,7 @@ defmodule Tore.Harness.UndoPayloadTest do
   use ExUnit.Case, async: true
 
   alias Tore.Harness.UndoPayload
-  alias Tore.Harness.Artifact.{CostEntry, PantryBeliefUpdate, PlanDiff}
+  alias Tore.Harness.Artifact.{CostEntry, PantryBeliefUpdate, PlanDiff, RunSummary}
 
   describe "from_artifacts/1" do
     test "returns :irreversible with reason when artifacts list is empty" do
@@ -106,6 +106,53 @@ defmodule Tore.Harness.UndoPayloadTest do
       assert length(children) == 2
       assert Enum.any?(children, &(&1.kind == :event_sourced))
       assert Enum.any?(children, &(&1.kind == :snapshot))
+    end
+
+    test "RunSummary alongside a reversible artifact does not appear as a child" do
+      diff = %PlanDiff{
+        plan_stream_id: "plan-h1-w1",
+        week_start: ~D[2026-06-22],
+        events: [
+          %{
+            slot_key: "2026-06-23-dinner",
+            event_type: "RecipeAssigned",
+            payload: %{},
+            rationale: []
+          }
+        ]
+      }
+
+      summary = %RunSummary{counts: %{}, outcome: :applied}
+
+      payload = UndoPayload.from_artifacts([diff, summary])
+
+      # The summary contributes no reversal; the payload should be the
+      # bare event_sourced child, not a composite with a noop sibling.
+      assert %UndoPayload{kind: :event_sourced} = payload
+      assert payload.kind in UndoPayload.kinds()
+    end
+
+    test "every payload kind a non-empty run can produce is declared in kinds/0" do
+      diff = %PlanDiff{
+        plan_stream_id: "p",
+        week_start: ~D[2026-06-22],
+        events: [%{slot_key: "s", event_type: "RecipeAssigned", payload: %{}, rationale: []}]
+      }
+
+      update = %PantryBeliefUpdate{
+        items: [
+          %{name: "x", change: :added, quantity: nil, unit: nil, category: nil,
+            provenance: "receipt", last_seen_at: ~U[2026-06-27 12:00:00Z]}
+        ]
+      }
+
+      cost = %CostEntry{store_name: "ICA", date: ~D[2026-06-27], total: Decimal.new("1"), line_items: []}
+      summary = %RunSummary{counts: %{}, outcome: :applied}
+
+      for artifacts <- [[diff], [update], [cost], [summary], [diff, update, summary], [diff, cost]] do
+        %UndoPayload{kind: k} = UndoPayload.from_artifacts(artifacts)
+        assert k in UndoPayload.kinds(), "kind #{inspect(k)} escaped from #{inspect(artifacts)}"
+      end
     end
 
     test "an irreversible child in a composite makes the composite irreversible" do
