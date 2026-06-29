@@ -5,13 +5,13 @@ defmodule ToreWeb.PantryLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, groups: Pantry.list_inventory_grouped())}
+    {:ok, assign(socket, groups: Pantry.list_inventory_by_belief())}
   end
 
   @impl true
   def handle_event("remove_item", %{"id" => id}, socket) do
     Pantry.remove_item(String.to_integer(id))
-    {:noreply, assign(socket, groups: Pantry.list_inventory_grouped())}
+    {:noreply, assign(socket, groups: Pantry.list_inventory_by_belief())}
   end
 
   @impl true
@@ -31,12 +31,12 @@ defmodule ToreWeb.PantryLive do
           </p>
         </header>
 
-        <div :for={{category, items} <- @groups} class="mb-6">
+        <div :for={{belief, items} <- @groups} class="mb-6">
           <h2 class="text-xs font-semibold uppercase tracking-widest text-stone-500 mb-2">
-            {category_label(category)}
+            {belief_label(belief)}
           </h2>
           <ul class="divide-y divide-stone-200 rounded-lg border border-stone-200 bg-white">
-            <li :for={item <- items} class="flex items-center justify-between p-3">
+            <li :for={item <- items} class={["flex items-center justify-between p-3", belief == :missing && "opacity-50"]}>
               <div>
                 <p class="text-stone-900">{String.capitalize(item.name)}</p>
                 <p :if={item.quantity} class="text-xs text-stone-500">
@@ -69,9 +69,10 @@ defmodule ToreWeb.PantryLive do
     """
   end
 
-  defp category_label(nil), do: gettext("Uncategorised")
-  defp category_label(cat) when is_atom(cat), do: cat |> Atom.to_string() |> String.capitalize()
-  defp category_label(cat) when is_binary(cat), do: String.capitalize(cat)
+  defp belief_label(:confirmed), do: gettext("Confirmed at home")
+  defp belief_label(:probable), do: gettext("Probably at home")
+  defp belief_label(:uncertain), do: gettext("Unknown")
+  defp belief_label(:missing), do: gettext("Probably missing")
 
   defp format_quantity(q, unit) when is_binary(unit) and unit != "" do
     "#{q} #{unit}"

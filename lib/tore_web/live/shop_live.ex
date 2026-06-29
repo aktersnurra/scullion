@@ -87,7 +87,11 @@ defmodule ToreWeb.ShopLive do
   def handle_info({:run_event, _sid, _event}, socket), do: {:noreply, socket}
 
   def render(assigns) do
-    items = sorted_items(assigns.grocery_state.items)
+    items =
+      assigns.grocery_state.items
+      |> sorted_items()
+      |> Shop.annotate_with_pantry_belief()
+
     {unchecked, checked} = Enum.split_with(items, &(!&1.checked))
     groups = group_by_section(unchecked)
 
@@ -232,8 +236,15 @@ defmodule ToreWeb.ShopLive do
           ]}
           style="font-size: var(--t-body);"
         >
-          {@item.name}
+          <span :if={Map.get(@item, :pantry_belief)} class="text-[color:var(--muted)] mr-1">?</span>{@item.name}
         </span>
+        <p
+          :if={Map.get(@item, :pantry_belief)}
+          class="text-[color:var(--subtle)] mt-0.5"
+          style="font-size: var(--t-micro);"
+        >
+          {pantry_belief_hint(@item.pantry_belief, @item.pantry_last_seen_at)}
+        </p>
       </button>
       <span
         :if={qty_label(@item) != ""}
@@ -319,4 +330,27 @@ defmodule ToreWeb.ShopLive do
   end
 
   defp shop_id(week_start), do: "shop_list:#{Date.to_iso8601(week_start)}"
+
+  defp pantry_belief_hint(:confirmed, last_seen),
+    do: gettext("confirmed at home%{when}", when: last_seen_suffix(last_seen))
+
+  defp pantry_belief_hint(:probable, last_seen),
+    do: gettext("probably at home%{when}", when: last_seen_suffix(last_seen))
+
+  defp pantry_belief_hint(:uncertain, last_seen),
+    do: gettext("unknown%{when}", when: last_seen_suffix(last_seen))
+
+  defp pantry_belief_hint(_, _), do: ""
+
+  defp last_seen_suffix(nil), do: ""
+
+  defp last_seen_suffix(%DateTime{} = ts) do
+    days = DateTime.diff(DateTime.utc_now(), ts, :day)
+
+    cond do
+      days < 1 -> gettext(", last confirmed today")
+      days == 1 -> gettext(", last confirmed yesterday")
+      true -> gettext(", last confirmed %{n} days ago", n: days)
+    end
+  end
 end

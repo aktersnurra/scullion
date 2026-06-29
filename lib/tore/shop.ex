@@ -99,6 +99,40 @@ defmodule Tore.Shop do
   defp to_section_atom(s) when is_binary(s) and s in @valid_sections, do: String.to_atom(s)
   defp to_section_atom(_), do: :other
 
+  @doc """
+  Annotate shop list items with the pantry's belief about whether they're
+  already at home. UI_SPEC §16.5: items the user probably already has
+  render with a `?` prefix and inline copy. `:missing` rows don't count
+  as "have it" and are ignored.
+
+  Adds two fields per item: `:pantry_belief` (`:confirmed | :probable |
+  :uncertain | nil`) and `:pantry_last_seen_at` (`DateTime.t() | nil`).
+  """
+  def annotate_with_pantry_belief(items) do
+    pantry =
+      Pantry.list_inventory()
+      |> Enum.reject(&(&1.belief == "missing"))
+
+    Enum.map(items, fn item ->
+      match = match_pantry_row(item.name, pantry)
+
+      item
+      |> Map.put(:pantry_belief, match && String.to_existing_atom(match.belief))
+      |> Map.put(:pantry_last_seen_at, match && match.last_seen_at)
+    end)
+  end
+
+  defp match_pantry_row(name, pantry) when is_binary(name) do
+    needle = String.downcase(String.trim(name))
+
+    Enum.find(pantry, fn row ->
+      hay = String.downcase(row.name)
+      String.contains?(hay, needle) or String.contains?(needle, hay)
+    end)
+  end
+
+  defp match_pantry_row(_, _), do: nil
+
   def remove_item(list_id, item_id, user_id) do
     run(list_id, %Commands.RemoveItem{item_id: item_id, removed_by: user_id})
   end

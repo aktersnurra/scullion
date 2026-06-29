@@ -125,4 +125,37 @@ defmodule Tore.ShopTest do
     assert item
     assert_receive {:events, [%Tore.Shop.Events.ListBuilt{}]}
   end
+
+  test "annotate_with_pantry_belief/1 tags items whose name matches a non-missing pantry row" do
+    {:ok, _, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Milk", provenance: "receipt"})
+
+    items = [
+      %{id: "a", name: "milk", quantity: nil, unit: nil, checked: false},
+      %{id: "b", name: "saffron", quantity: nil, unit: nil, checked: false}
+    ]
+
+    [milk, saffron] = Shop.annotate_with_pantry_belief(items)
+
+    assert milk.pantry_belief == :probable
+    assert %DateTime{} = milk.pantry_last_seen_at
+    assert saffron.pantry_belief == nil
+    assert saffron.pantry_last_seen_at == nil
+  end
+
+  test "annotate_with_pantry_belief/1 ignores pantry rows that are missing" do
+    {:ok, item, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Yeast", provenance: "manual"})
+
+    item
+    |> Ecto.Changeset.change(belief: "missing")
+    |> Tore.Repo.update!()
+
+    [annotated] =
+      Shop.annotate_with_pantry_belief([
+        %{id: "x", name: "yeast", quantity: nil, unit: nil, checked: false}
+      ])
+
+    assert annotated.pantry_belief == nil
+  end
 end

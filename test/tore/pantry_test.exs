@@ -46,30 +46,6 @@ defmodule Tore.PantryTest do
     assert changeset.errors[:category]
   end
 
-  test "list_inventory_grouped/0 groups items by category in enum order" do
-    Pantry.add_item(%{name: "Ost", category: "dairy"})
-    Pantry.add_item(%{name: "Kycklingfilé", category: "meat"})
-    Pantry.add_item(%{name: "Mjölk", category: "dairy"})
-
-    groups = Pantry.list_inventory_grouped()
-    keys = Enum.map(groups, &elem(&1, 0))
-
-    assert hd(keys) == :dairy
-    assert :meat in keys
-
-    {_, dairy_items} = Enum.find(groups, fn {k, _} -> k == :dairy end)
-    assert Enum.map(dairy_items, & &1.name) == ["mjölk", "ost"]
-  end
-
-  test "list_inventory_grouped/0 puts uncategorised items last under nil key" do
-    Pantry.add_item(%{name: "Mystisk sak"})
-    Pantry.add_item(%{name: "Ost", category: "dairy"})
-
-    groups = Pantry.list_inventory_grouped()
-    last_key = groups |> List.last() |> elem(0)
-    assert last_key == nil
-  end
-
   test "PantryItem.categories/0 returns ordered list of atoms" do
     cats = Tore.Pantry.PantryItem.categories()
     assert is_list(cats)
@@ -105,5 +81,61 @@ defmodule Tore.PantryTest do
     assert Tore.Pantry.PantryItem.derive_belief("receipt") == "probable"
     assert Tore.Pantry.PantryItem.derive_belief("grocery_checkoff") == "probable"
     assert Tore.Pantry.PantryItem.derive_belief("belief") == "uncertain"
+  end
+
+  test "upsert_belief/1 bump refreshes belief from incoming provenance" do
+    {:ok, _item, :added, nil} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Mjölk",
+        quantity: Decimal.new(1),
+        unit: "L",
+        provenance: "belief"
+      })
+
+    {:ok, bumped, :bumped, _before} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Mjölk",
+        quantity: Decimal.new(1),
+        unit: "L",
+        provenance: "receipt"
+      })
+
+    assert bumped.belief == "probable"
+  end
+
+  test "upsert_belief/1 bump never weakens a confirmed belief" do
+    {:ok, _item, :added, nil} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Smör",
+        quantity: Decimal.new(1),
+        unit: "kg",
+        provenance: "vision"
+      })
+
+    {:ok, bumped, :bumped, _before} =
+      Pantry.upsert_belief(%{
+        catalogue_name: "Smör",
+        quantity: Decimal.new(1),
+        unit: "kg",
+        provenance: "belief"
+      })
+
+    assert bumped.belief == "confirmed"
+  end
+
+  test "list_inventory_by_belief/0 groups items by belief in confidence order" do
+    {:ok, _, _, _} =
+      Pantry.upsert_belief(%{catalogue_name: "Mjölk", provenance: "receipt"})
+
+    {:ok, _, _, _} =
+      Pantry.upsert_belief(%{catalogue_name: "Salt", provenance: "manual"})
+
+    {:ok, _, _, _} =
+      Pantry.upsert_belief(%{catalogue_name: "Mjöl", provenance: "belief"})
+
+    groups = Pantry.list_inventory_by_belief()
+    keys = Enum.map(groups, &elem(&1, 0))
+
+    assert keys == [:confirmed, :probable, :uncertain]
   end
 end

@@ -178,14 +178,24 @@ defmodule Tore.Pantry do
         {a, b} -> Decimal.add(a, b)
       end
 
+    next_provenance = attrs[:provenance] || item.provenance
+
     item
     |> PantryItem.changeset(%{
       quantity: new_qty,
       unit: item.unit || attrs[:unit],
       last_seen_at: attrs[:last_seen_at] || now(),
-      provenance: attrs[:provenance] || item.provenance
+      provenance: next_provenance,
+      belief: stronger_belief(item.belief, PantryItem.derive_belief(next_provenance))
     })
     |> Repo.update()
+  end
+
+  # Belief on bump never weakens: a confirmed row stays confirmed even when
+  # a weaker signal (receipt → :probable) bumps the quantity.
+  @belief_strength %{"missing" => 0, "uncertain" => 1, "probable" => 2, "confirmed" => 3}
+  defp stronger_belief(a, b) do
+    if Map.get(@belief_strength, b, 0) >= Map.get(@belief_strength, a, 0), do: b, else: a
   end
 
   defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
@@ -261,25 +271,20 @@ defmodule Tore.Pantry do
     end
   end
 
-  @spec list_inventory_grouped() :: [{atom() | nil, [PantryItem.t()]}]
-  def list_inventory_grouped do
+  # Confidence order: most-certain bucket first, missing items last.
+  # UI_SPEC §16.5 — pantry rows render as belief, not category.
+  @belief_order ~w[confirmed probable uncertain missing]a
+
+  @spec list_inventory_by_belief() :: [{atom(), [PantryItem.t()]}]
+  def list_inventory_by_belief do
     items = Repo.all(from p in PantryItem, order_by: p.name)
+    grouped = Enum.group_by(items, &String.to_existing_atom(&1.belief || "uncertain"))
 
-    grouped = Enum.group_by(items, & &1.category)
-
-    PantryItem.categories()
+    @belief_order
     |> Enum.flat_map(fn key ->
-      str = Atom.to_string(key)
-
-      case Map.get(grouped, str) do
+      case Map.get(grouped, key) do
         nil -> []
         bucket -> [{key, bucket}]
-      end
-    end)
-    |> then(fn acc ->
-      case Map.get(grouped, nil) do
-        nil -> acc
-        uncategorised -> acc ++ [{nil, uncategorised}]
       end
     end)
   end
