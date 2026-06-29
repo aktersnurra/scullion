@@ -37,6 +37,37 @@ defmodule Tore.Pantry.PantryItem do
   def derive_belief("belief"), do: "uncertain"
   def derive_belief(_), do: "confirmed"
 
+  # Belief decays with recency: the longer since we last observed the
+  # item, the less confident we are it's still there. Pure read-side
+  # projection — the stored row keeps the strongest observation; the UI
+  # asks for the *effective* belief at render time.
+  @confirmed_max_age_days 14
+  @probable_max_age_days 30
+
+  @doc """
+  Decay the stored belief by `last_seen_at`. Returns the belief atom the
+  UI should render. Stored `:uncertain` / `:missing` are returned as-is;
+  rows with no `last_seen_at` (manual adds that bypassed the receipt
+  path) keep their stored belief.
+  """
+  @spec effective_belief(%__MODULE__{}, DateTime.t()) :: :confirmed | :probable | :uncertain | :missing
+  def effective_belief(%__MODULE__{belief: belief, last_seen_at: nil}, _now),
+    do: String.to_existing_atom(belief || "uncertain")
+
+  def effective_belief(%__MODULE__{belief: belief, last_seen_at: %DateTime{} = seen}, %DateTime{} = now) do
+    age_days = DateTime.diff(now, seen, :day)
+    decay(belief, age_days)
+  end
+
+  defp decay("confirmed", age) when age > @probable_max_age_days, do: :uncertain
+  defp decay("confirmed", age) when age > @confirmed_max_age_days, do: :probable
+  defp decay("confirmed", _), do: :confirmed
+  defp decay("probable", age) when age > @probable_max_age_days, do: :uncertain
+  defp decay("probable", _), do: :probable
+  defp decay("uncertain", _), do: :uncertain
+  defp decay("missing", _), do: :missing
+  defp decay(_, _), do: :uncertain
+
   schema "pantry_items" do
     field :name, :string
     field :quantity, :decimal

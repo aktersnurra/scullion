@@ -123,6 +123,56 @@ defmodule Tore.PantryTest do
     assert bumped.belief == "confirmed"
   end
 
+  test "PantryItem.effective_belief/2 decays confirmed → probable after 14 days" do
+    now = ~U[2026-06-29 12:00:00Z]
+    fresh = %Tore.Pantry.PantryItem{belief: "confirmed", last_seen_at: ~U[2026-06-20 12:00:00Z]}
+    stale = %Tore.Pantry.PantryItem{belief: "confirmed", last_seen_at: ~U[2026-06-10 12:00:00Z]}
+
+    assert Tore.Pantry.PantryItem.effective_belief(fresh, now) == :confirmed
+    assert Tore.Pantry.PantryItem.effective_belief(stale, now) == :probable
+  end
+
+  test "PantryItem.effective_belief/2 decays probable → uncertain after 30 days" do
+    now = ~U[2026-06-29 12:00:00Z]
+    fresh = %Tore.Pantry.PantryItem{belief: "probable", last_seen_at: ~U[2026-06-10 12:00:00Z]}
+    stale = %Tore.Pantry.PantryItem{belief: "probable", last_seen_at: ~U[2026-05-01 12:00:00Z]}
+
+    assert Tore.Pantry.PantryItem.effective_belief(fresh, now) == :probable
+    assert Tore.Pantry.PantryItem.effective_belief(stale, now) == :uncertain
+  end
+
+  test "PantryItem.effective_belief/2 leaves uncertain and missing untouched" do
+    now = ~U[2026-06-29 12:00:00Z]
+    ancient = ~U[2024-01-01 00:00:00Z]
+    uncertain = %Tore.Pantry.PantryItem{belief: "uncertain", last_seen_at: ancient}
+    missing = %Tore.Pantry.PantryItem{belief: "missing", last_seen_at: ancient}
+
+    assert Tore.Pantry.PantryItem.effective_belief(uncertain, now) == :uncertain
+    assert Tore.Pantry.PantryItem.effective_belief(missing, now) == :missing
+  end
+
+  test "PantryItem.effective_belief/2 with no last_seen_at returns stored belief" do
+    item = %Tore.Pantry.PantryItem{belief: "confirmed", last_seen_at: nil}
+    assert Tore.Pantry.PantryItem.effective_belief(item, ~U[2026-06-29 12:00:00Z]) == :confirmed
+  end
+
+  test "list_inventory_by_belief/0 groups by *effective* belief, not stored" do
+    {:ok, item, _, _} =
+      Pantry.upsert_belief(%{catalogue_name: "Old milk", provenance: "vision"})
+
+    # Backdate last_seen_at into the probable window (>14 days, <30 days)
+    # so the confirmed row should decay to probable at read time.
+    backdated = DateTime.utc_now() |> DateTime.add(-20, :day) |> DateTime.truncate(:second)
+
+    item
+    |> Ecto.Changeset.change(last_seen_at: backdated)
+    |> Tore.Repo.update!()
+
+    groups = Pantry.list_inventory_by_belief()
+    assert {:probable, [decayed]} = Enum.find(groups, fn {b, _} -> b == :probable end)
+    assert decayed.name == "old milk"
+  end
+
   test "list_inventory_by_belief/0 groups items by belief in confidence order" do
     {:ok, _, _, _} =
       Pantry.upsert_belief(%{catalogue_name: "Mjölk", provenance: "receipt"})

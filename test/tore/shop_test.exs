@@ -178,6 +178,24 @@ defmodule Tore.ShopTest do
     assert annotated.pantry_belief == :confirmed
   end
 
+  test "annotate_with_pantry_belief/1 surfaces decayed belief, not stored belief" do
+    {:ok, item, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Old milk", provenance: "vision"})
+
+    backdated = DateTime.utc_now() |> DateTime.add(-20, :day) |> DateTime.truncate(:second)
+
+    item
+    |> Ecto.Changeset.change(last_seen_at: backdated)
+    |> Tore.Repo.update!()
+
+    [annotated] =
+      Tore.Shop.annotate_with_pantry_belief([
+        %{id: "x", name: "old milk", quantity: nil, unit: nil, checked: false}
+      ])
+
+    assert annotated.pantry_belief == :probable
+  end
+
   test "annotate_with_pantry_belief/1 ignores pantry rows that are missing" do
     {:ok, item, _, _} =
       Tore.Pantry.upsert_belief(%{catalogue_name: "Yeast", provenance: "manual"})

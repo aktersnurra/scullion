@@ -109,25 +109,33 @@ defmodule Tore.Shop do
   :uncertain | nil`) and `:pantry_last_seen_at` (`DateTime.t() | nil`).
   """
   def annotate_with_pantry_belief(items) do
+    now = DateTime.utc_now()
+
     pantry =
       Pantry.list_inventory()
-      |> Enum.reject(&(&1.belief == "missing"))
-      |> Enum.map(fn row -> {row, name_tokens(row.name)} end)
+      |> Enum.map(fn row -> {row, Tore.Pantry.PantryItem.effective_belief(row, now), name_tokens(row.name)} end)
+      |> Enum.reject(fn {_row, eff, _tokens} -> eff == :missing end)
 
     Enum.map(items, fn item ->
-      match = match_pantry_row(item.name, pantry)
+      case match_pantry_row(item.name, pantry) do
+        {row, eff} ->
+          item
+          |> Map.put(:pantry_belief, eff)
+          |> Map.put(:pantry_last_seen_at, row.last_seen_at)
 
-      item
-      |> Map.put(:pantry_belief, match && String.to_existing_atom(match.belief))
-      |> Map.put(:pantry_last_seen_at, match && match.last_seen_at)
+        nil ->
+          item
+          |> Map.put(:pantry_belief, nil)
+          |> Map.put(:pantry_last_seen_at, nil)
+      end
     end)
   end
 
   defp match_pantry_row(name, pantry) when is_binary(name) do
     needle_tokens = name_tokens(name)
 
-    case Enum.find(pantry, fn {_row, row_tokens} -> tokens_overlap?(needle_tokens, row_tokens) end) do
-      {row, _} -> row
+    case Enum.find(pantry, fn {_row, _eff, row_tokens} -> tokens_overlap?(needle_tokens, row_tokens) end) do
+      {row, eff, _} -> {row, eff}
       nil -> nil
     end
   end

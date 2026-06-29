@@ -277,8 +277,9 @@ defmodule Tore.Pantry do
 
   @spec list_inventory_by_belief() :: [{atom(), [PantryItem.t()]}]
   def list_inventory_by_belief do
+    now = DateTime.utc_now()
     items = Repo.all(from p in PantryItem, order_by: p.name)
-    grouped = Enum.group_by(items, &String.to_existing_atom(&1.belief || "uncertain"))
+    grouped = Enum.group_by(items, &PantryItem.effective_belief(&1, now))
 
     @belief_order
     |> Enum.flat_map(fn key ->
