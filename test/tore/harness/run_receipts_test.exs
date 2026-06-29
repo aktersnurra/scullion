@@ -152,6 +152,35 @@ defmodule Tore.Harness.RunReceiptsTest do
       assert %State.Reverted{} = state
     end
 
+    test "compensates a real set_plan_slot Run by clearing the slot" do
+      {:ok, recipe} =
+        %Tore.Recipes.Recipe{title: "Pasta", recipe_type: :meal}
+        |> Tore.Repo.insert()
+
+      date = ~D[2026-06-23]
+
+      {:ok, %{stream_id: sid}} =
+        Tore.Harness.Orchestrator.apply_set_plan_slot(%{
+          household_id: 1,
+          user_id: 1,
+          date: date,
+          recipe_id: recipe.id,
+          servings: 4
+        })
+
+      plan_id = "plan:2026-06-22"
+      {:ok, before_revert} = Tore.Planning.load_plan(plan_id)
+      assert Map.has_key?(before_revert.slots, "tue_dinner")
+
+      assert :ok = RunReceipts.revert(sid)
+
+      {:ok, after_revert} = Tore.Planning.load_plan(plan_id)
+      refute Map.has_key?(after_revert.slots, "tue_dinner")
+
+      {:ok, state} = Run.load(sid)
+      assert %State.Reverted{} = state
+    end
+
     test "returns {:error, :irreversible} when undo_payload is irreversible" do
       cost = %Tore.Harness.Artifact.CostEntry{
         store_name: "ICA",
@@ -169,6 +198,68 @@ defmodule Tore.Harness.RunReceiptsTest do
 
     test "returns {:error, :not_applied} for a run that is not Applied" do
       assert {:error, :not_found} = RunReceipts.revert("run-never-seen")
+    end
+
+    test "compensates a PantrySnapshot by deleting newly-added rows" do
+      {:ok, ingredient} =
+        %Tore.Recipes.Ingredient{name: "salt", key: "salt"}
+        |> Tore.Repo.insert()
+
+      {:ok, item} =
+        Tore.Pantry.add_item(%{name: "salt", ingredient_id: ingredient.id, provenance: "manual"})
+
+      snapshot = %Tore.Harness.Artifact.PantrySnapshot{
+        items: [%{item_id: item.id, before: nil, after: %{quantity: nil}}]
+      }
+
+      sid = seed_applied_run(1, [snapshot])
+
+      assert :ok = RunReceipts.revert(sid)
+      assert Tore.Repo.get(Tore.Pantry.PantryItem, item.id) == nil
+    end
+
+    test "compensates a PantrySnapshot by restoring before-state on bumped rows" do
+      {:ok, ingredient} =
+        %Tore.Recipes.Ingredient{name: "olive oil", key: "olive_oil"}
+        |> Tore.Repo.insert()
+
+      {:ok, item} =
+        Tore.Pantry.add_item(%{
+          name: "olive oil",
+          ingredient_id: ingredient.id,
+          provenance: "manual",
+          quantity: Decimal.new("1"),
+          unit: "L"
+        })
+
+      # Simulate a bump that happened during the run.
+      {:ok, _} =
+        item
+        |> Tore.Pantry.PantryItem.changeset(%{quantity: Decimal.new("3"), provenance: "receipt"})
+        |> Tore.Repo.update()
+
+      snapshot = %Tore.Harness.Artifact.PantrySnapshot{
+        items: [
+          %{
+            item_id: item.id,
+            before: %{
+              quantity: "1",
+              unit: "L",
+              last_seen_at: nil,
+              provenance: "manual",
+              belief: nil
+            },
+            after: %{quantity: "3"}
+          }
+        ]
+      }
+
+      sid = seed_applied_run(1, [snapshot])
+
+      assert :ok = RunReceipts.revert(sid)
+      restored = Tore.Repo.get(Tore.Pantry.PantryItem, item.id)
+      assert Decimal.equal?(restored.quantity, Decimal.new("1"))
+      assert restored.provenance == "manual"
     end
   end
 end

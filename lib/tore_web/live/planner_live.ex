@@ -332,6 +332,7 @@ defmodule ToreWeb.PlannerLive do
 
   def handle_info({:run_state_changed, _stream_id, state}, socket) do
     current = socket.assigns[:current_run]
+    socket = maybe_toast_reverted(socket, state)
 
     if current && current.stream_id == state.stream_id do
       {:noreply, assign(socket, current_run: state)}
@@ -339,6 +340,11 @@ defmodule ToreWeb.PlannerLive do
       {:noreply, socket}
     end
   end
+
+  defp maybe_toast_reverted(socket, %Tore.Harness.Run.State.Reverted{surface: :plan}),
+    do: put_flash(socket, :info, gettext("Undone."))
+
+  defp maybe_toast_reverted(socket, _state), do: socket
 
   def handle_info({:run_event, _stream_id, _event}, socket), do: {:noreply, socket}
 

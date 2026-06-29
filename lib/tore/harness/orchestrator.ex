@@ -677,7 +677,15 @@ defmodule Tore.Harness.Orchestrator do
           metadata
         )
       else
-        with {:ok, counts} <- PantryUpdate.apply!(artifact, household_locale()),
+        with {:ok, counts, snaps} <- PantryUpdate.apply!(artifact, household_locale()),
+             snapshot = %Tore.Harness.Artifact.PantrySnapshot{items: snaps},
+             {:ok, state} <-
+               apply_command(
+                 state.stream_id,
+                 %Commands.AddArtifact{artifact: snapshot},
+                 state,
+                 metadata
+               ),
              run_summary = %RunSummary{counts: counts, outcome: :applied},
              {:ok, state} <-
                apply_command(

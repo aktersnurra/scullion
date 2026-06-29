@@ -155,7 +155,7 @@ defmodule Tore.Harness.ReceiptIngestion do
   defp upsert_pantry(items) do
     Enum.reduce_while(items, :ok, fn it, :ok ->
       case Pantry.upsert_belief(it) do
-        {:ok, _item, _change} -> {:cont, :ok}
+        {:ok, _item, _change, _before} -> {:cont, :ok}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)

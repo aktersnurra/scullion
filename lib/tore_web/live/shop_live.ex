@@ -80,6 +80,12 @@ defmodule ToreWeb.ShopLive do
     {:noreply, assign(socket, grocery_state: grocery_state)}
   end
 
+  def handle_info({:run_state_changed, _sid, %Tore.Harness.Run.State.Reverted{surface: :shop}}, socket),
+    do: {:noreply, put_flash(socket, :info, gettext("Undone."))}
+
+  def handle_info({:run_state_changed, _sid, _state}, socket), do: {:noreply, socket}
+  def handle_info({:run_event, _sid, _event}, socket), do: {:noreply, socket}
+
   def render(assigns) do
     items = sorted_items(assigns.grocery_state.items)
     {unchecked, checked} = Enum.split_with(items, &(!&1.checked))

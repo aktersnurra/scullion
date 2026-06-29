@@ -3,6 +3,7 @@ defmodule Tore.Harness.Artifact.Registry do
     CostEntry,
     MemoryUpdate,
     PantryBeliefUpdate,
+    PantrySnapshot,
     PlanDiff,
     RunBundle,
     RunSummary
@@ -12,6 +13,7 @@ defmodule Tore.Harness.Artifact.Registry do
     "CostEntry" => CostEntry,
     "MemoryUpdate" => MemoryUpdate,
     "PantryBeliefUpdate" => PantryBeliefUpdate,
+    "PantrySnapshot" => PantrySnapshot,
     "PlanDiff" => PlanDiff,
     "RunBundle" => RunBundle,
     "RunSummary" => RunSummary

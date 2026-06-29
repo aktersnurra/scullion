@@ -36,4 +36,52 @@ defmodule ToreWeb.CaptureLiveTest do
     html = render(lv)
     assert html =~ "Try making pasta tonight!"
   end
+
+  test "Undo on a set_plan_slot bubble reverts the run and marks the bubble", %{conn: conn} do
+    {:ok, recipe} =
+      %Tore.Recipes.Recipe{title: "Pizza", recipe_type: :meal}
+      |> Tore.Repo.insert()
+
+    tool_call = %{
+      id: "call_1",
+      name: "set_plan_slot",
+      args: %{"date" => "2026-06-23", "recipe_id" => recipe.id, "servings" => 4}
+    }
+
+    Tore.MockLLM
+    |> expect(:chat_with_tools, 2, fn _sys, _msgs, _tools, _opts ->
+      case Process.get(:turn_count, 0) do
+        0 ->
+          Process.put(:turn_count, 1)
+          {:ok, {:tool_calls, [tool_call]},
+           %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+
+        _ ->
+          {:ok, {:message, "Done."},
+           %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      end
+    end)
+
+    {:ok, lv, _html} = live(conn, "/capture")
+
+    lv
+    |> form("form", %{message: "plan pizza tuesday"})
+    |> render_submit()
+
+    :timer.sleep(300)
+    html = render(lv)
+    assert html =~ "Pizza"
+    assert html =~ "Undo"
+
+    {:ok, plan_state} = Tore.Planning.load_plan("plan:2026-06-22")
+    assert Map.has_key?(plan_state.slots, "tue_dinner")
+
+    lv |> element("button", "Undo") |> render_click()
+
+    {:ok, plan_state2} = Tore.Planning.load_plan("plan:2026-06-22")
+    refute Map.has_key?(plan_state2.slots, "tue_dinner")
+
+    html2 = render(lv)
+    assert html2 =~ Gettext.dgettext(ToreWeb.Gettext, "default", "Reverted")
+  end
 end

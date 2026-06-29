@@ -2,6 +2,7 @@ defmodule ToreWeb.CaptureLive do
   use ToreWeb, :live_view
 
   alias Tore.Capture.Router
+  alias Tore.Harness.RunReceipts
 
   @impl true
   def mount(_params, _session, socket) do
@@ -15,6 +16,22 @@ defmodule ToreWeb.CaptureLive do
 
   @impl true
   def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  def handle_event("undo_run", %{"sid" => sid}, socket) do
+    case RunReceipts.revert(sid) do
+      :ok ->
+        messages =
+          Enum.map(socket.assigns.messages, fn
+            %{run_stream_id: ^sid} = m -> Map.put(m, :reverted, true)
+            other -> other
+          end)
+
+        {:noreply, assign(socket, messages: messages)}
+
+      {:error, _} ->
+        {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("send_message", %{"message" => text}, socket) do
@@ -174,13 +191,28 @@ defmodule ToreWeb.CaptureLive do
                 !Map.get(msg, :pantry_suggestions) && !Map.get(msg, :shop_link)
             }
             class={[
-              "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+              "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed flex flex-col gap-1",
               msg.role == :user && "bg-[color:var(--accent)] text-white",
               msg.role == :assistant &&
                 "bg-[var(--surface)] border border-[color:var(--border)] text-[color:var(--text)]"
             ]}
           >
-            {msg.text}
+            <span>{msg.text}</span>
+            <button
+              :if={Map.get(msg, :run_stream_id) && !Map.get(msg, :reverted)}
+              type="button"
+              phx-click="undo_run"
+              phx-value-sid={msg.run_stream_id}
+              class="self-start text-xs text-[color:var(--accent)] font-semibold mt-1"
+            >
+              {gettext("Undo")}
+            </button>
+            <span
+              :if={Map.get(msg, :reverted)}
+              class="text-xs text-[color:var(--muted)] mt-1"
+            >
+              {gettext("Reverted")}
+            </span>
           </div>
         </div>
         <div :if={@loading} class="flex justify-start">

@@ -185,9 +185,67 @@ defmodule Tore.Harness.RunReceipts do
   defp reversible?(%UndoPayload{kind: :irreversible}), do: {:error, :irreversible}
   defp reversible?(_), do: :ok
 
-  # Phase 1 stops here: the compensator dispatch is a no-op so the state
-  # transition still happens, but the affected aggregates are not actually
-  # rolled back. Phase 3 implements the per-aggregate compensators
-  # (planning compensating events, pantry snapshot restore).
+  defp compensate(%UndoPayload{kind: :composite, data: %{children: children}}) do
+    # Children compensate in reverse order so the most recent effect rolls
+    # back first, matching how the user perceives an "undo".
+    Enum.reduce_while(Enum.reverse(children), :ok, fn child, :ok ->
+      case compensate(child) do
+        :ok -> {:cont, :ok}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
+  defp compensate(%UndoPayload{kind: :event_sourced, data: %{stream_type: "planning"} = data}) do
+    events = Enum.map(data.compensating_events, &to_planning_event/1)
+    Tore.Planning.apply_events(data.stream_id, events)
+  end
+
+  defp compensate(%UndoPayload{kind: :snapshot, data: %{schema: "Tore.Pantry.PantryItem"} = data}) do
+    Enum.reduce_while(data.changes, :ok, fn change, :ok ->
+      case restore_pantry_change(change) do
+        :ok -> {:cont, :ok}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
   defp compensate(_payload), do: :ok
+
+  defp to_planning_event(%{event_type: "RecipeRemoved", slot_key: sk}),
+    do: %Tore.Planning.Events.RecipeRemoved{slot_key: sk}
+
+  defp restore_pantry_change(%{item_id: id, before: nil}) do
+    case Tore.Pantry.remove_item(id) do
+      :ok -> :ok
+      # The row may already be gone (compensation should be idempotent).
+      {:error, :not_found} -> :ok
+    end
+  end
+
+  defp restore_pantry_change(%{item_id: id, before: before}) do
+    case Tore.Repo.get(Tore.Pantry.PantryItem, id) do
+      nil ->
+        :ok
+
+      item ->
+        item
+        |> Tore.Pantry.PantryItem.changeset(restore_attrs(before))
+        |> Tore.Repo.update()
+        |> case do
+          {:ok, _} -> :ok
+          {:error, _} = err -> err
+        end
+    end
+  end
+
+  defp restore_attrs(before) do
+    before
+    |> Map.take([:quantity, :unit, :last_seen_at, :provenance, :belief])
+    |> Map.reject(fn {_, v} -> is_nil(v) end)
+  end
+
+  # Legacy snapshot shape derived directly from PantryBeliefUpdate before
+  # PantrySnapshot existed. We cannot compensate without row identity.
+  defp restore_pantry_change(_legacy), do: :ok
 end

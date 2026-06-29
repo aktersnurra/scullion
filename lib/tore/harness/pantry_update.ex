@@ -64,9 +64,13 @@ defmodule Tore.Harness.PantryUpdate do
 
   @doc """
   Canonicalise the artifact items via the LLM, then atomically upsert each
-  belief. Returns `{:ok, counts}` where counts is `%{added: n, bumped: n}`.
+  belief. Returns `{:ok, counts, snapshots}` where counts is `%{added: n,
+  bumped: n}` and snapshots is `[%{item_id, before, after}]` capturing the
+  pre-mutation state of each affected row (`before == nil` for newly
+  created rows). The snapshots feed `PantrySnapshot` so the run can undo.
   """
-  @spec apply!(Artifact.t(), String.t() | nil) :: {:ok, map()} | {:error, term()}
+  @spec apply!(Artifact.t(), String.t() | nil) ::
+          {:ok, map(), [map()]} | {:error, term()}
   def apply!(%Artifact{items: items}, locale) do
     raws = Enum.map(items, &%{raw_name: &1.name})
 
@@ -74,17 +78,38 @@ defmodule Tore.Harness.PantryUpdate do
       indexed = Map.new(norms, fn n -> {n.raw_name, n} end)
 
       Tore.Repo.transaction(fn ->
-        Enum.reduce(items, %{added: 0, bumped: 0}, fn it, acc ->
+        Enum.reduce(items, {%{added: 0, bumped: 0}, []}, fn it, {counts, snaps} ->
           attrs = merge_norm(it, Map.get(indexed, it.name))
 
           case Pantry.upsert_belief(attrs) do
-            {:ok, _, :added} -> Map.update!(acc, :added, &(&1 + 1))
-            {:ok, _, :bumped} -> Map.update!(acc, :bumped, &(&1 + 1))
-            {:error, reason} -> Tore.Repo.rollback(reason)
+            {:ok, item, :added, _before} ->
+              {Map.update!(counts, :added, &(&1 + 1)),
+               [%{item_id: item.id, before: nil, after: snapshot_of(item)} | snaps]}
+
+            {:ok, item, :bumped, before} ->
+              {Map.update!(counts, :bumped, &(&1 + 1)),
+               [%{item_id: item.id, before: before, after: snapshot_of(item)} | snaps]}
+
+            {:error, reason} ->
+              Tore.Repo.rollback(reason)
           end
         end)
       end)
+      |> case do
+        {:ok, {counts, snaps}} -> {:ok, counts, Enum.reverse(snaps)}
+        {:error, _} = err -> err
+      end
     end
+  end
+
+  defp snapshot_of(item) do
+    %{
+      quantity: item.quantity && Decimal.to_string(item.quantity),
+      unit: item.unit,
+      last_seen_at: item.last_seen_at,
+      provenance: item.provenance,
+      belief: item.belief
+    }
   end
 
   defp merge_norm(it, nil), do: it

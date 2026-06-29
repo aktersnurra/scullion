@@ -92,7 +92,8 @@ defmodule Tore.Pantry do
 
   Returns `{:ok, %PantryItem{}, :added | :bumped}`.
   """
-  @spec upsert_belief(map()) :: {:ok, PantryItem.t(), :added | :bumped} | {:error, term()}
+  @spec upsert_belief(map()) ::
+          {:ok, PantryItem.t(), :added | :bumped, map() | nil} | {:error, term()}
   def upsert_belief(attrs) do
     Repo.transaction(fn ->
       ingredient = find_or_create_ingredient(attrs)
@@ -105,17 +106,28 @@ defmodule Tore.Pantry do
             |> Map.put(:quantity, attrs[:quantity])
             |> add_item()
 
-          {item, :added}
+          {item, :added, nil}
 
         existing ->
+          before = snapshot_attrs(existing)
           {:ok, item} = bump_existing(existing, attrs)
-          {item, :bumped}
+          {item, :bumped, before}
       end
     end)
     |> case do
-      {:ok, {item, change}} -> {:ok, item, change}
+      {:ok, {item, change, before}} -> {:ok, item, change, before}
       {:error, _} = err -> err
     end
+  end
+
+  defp snapshot_attrs(%PantryItem{} = item) do
+    %{
+      quantity: item.quantity && Decimal.to_string(item.quantity),
+      unit: item.unit,
+      last_seen_at: item.last_seen_at,
+      provenance: item.provenance,
+      belief: item.belief
+    }
   end
 
   defp find_or_create_ingredient(attrs) do

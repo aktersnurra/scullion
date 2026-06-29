@@ -320,7 +320,14 @@ defmodule Tore.Harness.RunTest do
 
     payload = %UndoPayload{
       kind: :event_sourced,
-      data: %{stream_id: "plan-h1-w1", stream_type: "planning", event_types: ["RecipeAssigned"]}
+      data: %{
+        stream_id: "plan-h1-w1",
+        stream_type: "planning",
+        event_types: ["RecipeAssigned"],
+        compensating_events: [
+          %{event_type: "RecipeRemoved", slot_key: "tue_dinner", payload: %{}}
+        ]
+      }
     }
 
     committed = %Events.Committed{at: ~U[2026-06-28 12:00:00Z], undo_payload: payload}

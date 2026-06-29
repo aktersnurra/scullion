@@ -178,7 +178,14 @@ defmodule Tore.Harness.UndoPayloadTest do
     test "event_sourced encodes and decodes" do
       payload = %UndoPayload{
         kind: :event_sourced,
-        data: %{stream_id: "plan-1", stream_type: "planning", event_types: ["RecipeAssigned"]}
+        data: %{
+          stream_id: "plan-1",
+          stream_type: "planning",
+          event_types: ["RecipeAssigned"],
+          compensating_events: [
+            %{event_type: "RecipeRemoved", slot_key: "tue_dinner", payload: %{}}
+          ]
+        }
       }
 
       assert payload |> UndoPayload.to_json() |> UndoPayload.from_json() == payload
@@ -211,7 +218,12 @@ defmodule Tore.Harness.UndoPayloadTest do
           children: [
             %UndoPayload{
               kind: :event_sourced,
-              data: %{stream_id: "plan-1", stream_type: "planning", event_types: []}
+              data: %{
+                stream_id: "plan-1",
+                stream_type: "planning",
+                event_types: [],
+                compensating_events: []
+              }
             },
             %UndoPayload{kind: :irreversible, data: %{reason: "x"}}
           ]

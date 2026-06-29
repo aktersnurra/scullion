@@ -217,7 +217,8 @@ defmodule Tore.Capture.Dispatch do
                title: title,
                day: long_day_for(date),
                date: Date.to_iso8601(date)
-             )
+             ),
+           run_stream_id: sid
          }, sid}
 
       {:error, :recipe_not_found} ->
@@ -477,7 +478,7 @@ defmodule Tore.Capture.Dispatch do
     }
 
     case Pantry.upsert_belief(attrs) do
-      {:ok, item, :added} ->
+      {:ok, item, :added, _before} ->
         %{
           role: :assistant,
           text:
@@ -486,7 +487,7 @@ defmodule Tore.Capture.Dispatch do
             )
         }
 
-      {:ok, item, :bumped} ->
+      {:ok, item, :bumped, _before} ->
         %{
           role: :assistant,
           text:
