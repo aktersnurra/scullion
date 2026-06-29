@@ -112,6 +112,7 @@ defmodule Tore.Shop do
     pantry =
       Pantry.list_inventory()
       |> Enum.reject(&(&1.belief == "missing"))
+      |> Enum.map(fn row -> {row, name_tokens(row.name)} end)
 
     Enum.map(items, fn item ->
       match = match_pantry_row(item.name, pantry)
@@ -123,15 +124,32 @@ defmodule Tore.Shop do
   end
 
   defp match_pantry_row(name, pantry) when is_binary(name) do
-    needle = String.downcase(String.trim(name))
+    needle_tokens = name_tokens(name)
 
-    Enum.find(pantry, fn row ->
-      hay = String.downcase(row.name)
-      String.contains?(hay, needle) or String.contains?(needle, hay)
-    end)
+    case Enum.find(pantry, fn {_row, row_tokens} -> tokens_overlap?(needle_tokens, row_tokens) end) do
+      {row, _} -> row
+      nil -> nil
+    end
   end
 
   defp match_pantry_row(_, _), do: nil
+
+  # Tokenise on non-word characters; drop tokens shorter than 3 chars so
+  # filler words ("of", "1l") and short ambiguous fragments ("ham" inside
+  # "graham") can't trigger a false match. Whole-token equality only —
+  # substring overlap is too greedy when the user reads the result as
+  # "we're sure you have this at home".
+  defp name_tokens(nil), do: MapSet.new()
+
+  defp name_tokens(name) when is_binary(name) do
+    name
+    |> String.downcase()
+    |> String.split(~r/[^\p{L}\p{N}]+/u, trim: true)
+    |> Enum.filter(&(String.length(&1) >= 3))
+    |> MapSet.new()
+  end
+
+  defp tokens_overlap?(a, b), do: not MapSet.disjoint?(a, b)
 
   def remove_item(list_id, item_id, user_id) do
     run(list_id, %Commands.RemoveItem{item_id: item_id, removed_by: user_id})

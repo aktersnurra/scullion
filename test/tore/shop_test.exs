@@ -143,6 +143,41 @@ defmodule Tore.ShopTest do
     assert saffron.pantry_last_seen_at == nil
   end
 
+  test "annotate_with_pantry_belief/1 does not match on partial-word overlaps" do
+    {:ok, _, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Graham flour", provenance: "manual"})
+
+    {:ok, _, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Buttermilk", provenance: "manual"})
+
+    {:ok, _, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Salted butter", provenance: "manual"})
+
+    items = [
+      %{id: "a", name: "ham", quantity: nil, unit: nil, checked: false},
+      %{id: "b", name: "milk", quantity: nil, unit: nil, checked: false},
+      %{id: "c", name: "salt", quantity: nil, unit: nil, checked: false}
+    ]
+
+    [ham, milk, salt] = Shop.annotate_with_pantry_belief(items)
+
+    assert ham.pantry_belief == nil
+    assert milk.pantry_belief == nil
+    assert salt.pantry_belief == nil
+  end
+
+  test "annotate_with_pantry_belief/1 matches when one full token is shared" do
+    {:ok, _, _, _} =
+      Tore.Pantry.upsert_belief(%{catalogue_name: "Whole milk", provenance: "manual"})
+
+    [annotated] =
+      Shop.annotate_with_pantry_belief([
+        %{id: "x", name: "Milk, 1L", quantity: nil, unit: nil, checked: false}
+      ])
+
+    assert annotated.pantry_belief == :confirmed
+  end
+
   test "annotate_with_pantry_belief/1 ignores pantry rows that are missing" do
     {:ok, item, _, _} =
       Tore.Pantry.upsert_belief(%{catalogue_name: "Yeast", provenance: "manual"})
