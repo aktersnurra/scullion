@@ -31,7 +31,8 @@ Maximum depth from any nav destination: two (surface → sheet).
 | Shop grouping | Store sections (already UI_SPEC §6.3 default; confirmed) |
 | Navigation | Three tabs (Today · Plan · Shop) + the command pill, a global action, not a tab |
 | Primary interaction | The anticipation layer: precomputed one-tap predicted actions replace generic affordances; typing is the fallback for the unpredicted |
-| Text/photo entry | One command tray (swipe up / tap the pill): multimodal input, no separate photo vs chat interfaces; no docked command bar anywhere, including Plan |
+| Text/photo entry | One command tray (tap the pill; drag as accelerator): multimodal input, no separate photo vs chat interfaces; no docked command bar anywhere, including Plan |
+| Object-scoped commands | Long-press (or the object's existing tap-sheet) opens scoped predictions + a scoped input; touch resolves the referent (no LLM disambiguation) |
 | Tone of the entry point | The pill is chrome, not a character — explicitly must not read as a customer-support AI widget |
 
 ## 1. Navigation
@@ -121,7 +122,21 @@ system learns what not to predict.
 **Replaces the Capture tab/page (UI_SPEC §6.4 content moves here) and the
 docked planner command bar (UI_SPEC §5.4 becomes the tray's input).**
 
-Swipe up or tap the pill; the tray follows the finger, interruptible.
+**Tap is the primary affordance; gestures are accelerators, never the only
+path.** Tapping the pill opens the tray. Once open (and while opening) it
+is draggable — swipe-up users get finger-following, interruptible physics
+as a discovered bonus. Everything reachable by gesture is reachable by tap.
+Long-press the pill jumps straight to camera state.
+
+The interaction hierarchy the tray sits at the bottom of:
+
+```
+no input          predictions inline on the surface (§3)
+point at a thing  object sheet: scoped predictions + scoped input (§4.1)
+global tray       anything unscoped: photos, free text, plan-the-week
+```
+
+Each tier should visibly absorb demand from the one below it.
 
 - **Half state (default):** the predicted actions for the current surface —
   the same CounterNotes from §3, as tappable rows — with one multimodal
@@ -151,6 +166,36 @@ embedded customer-support AI bubble every site has:
 
 The pill is chrome — the app's command surface, like an address bar — not
 a character living in the app.
+
+### 4.1 Object sheets — commands attach to nouns
+
+Most utterances are about a thing already on screen ("swap *Tuesday*",
+"I don't have *heavy cream*", "more of *this*"). So commands attach to
+objects: long-pressing a plan slot, the tonight card, or a grocery row —
+or opening the object's existing tap-sheet where one exists (UI_SPEC §6.2
+slot interactions) — raises a scoped sheet:
+
+```
+Tuesday · Salmon pasta
+─────────────────────────────
+Swap with Thursday's gratäng      ← scoped predictions (§3)
+Skip — Tuesdays usually go quick
+Make leftovers from Sunday
+─────────────────────────────
+[ input field scoped to Tuesday ]
+```
+
+Anything typed in the scoped field already means that object — the
+dispatched run receives the referent as a pre-resolved handle.
+
+**Why this is architecture, not garnish:** the harness's hardest problem is
+reference resolution (SPEC.md §A.6.2 — `resolve_slot("the salmon slot")`,
+ambiguity, `ask_user`, confidence thresholds). Touch resolves the referent
+with certainty: the object sheet constructs the handle directly
+(`source: :direct_touch`, confidence 1.0), skipping the resolver round-trip
+and deleting the ambiguity failure mode for every command that starts from
+an object. Desktop maps one-to-one: right-click → object sheet, ⌘K → tray.
+The kiosk gets neither.
 
 ## 5. Receipts and reviews, layered
 
@@ -289,6 +334,11 @@ amendment, listed here for the implementation plan:
 4. **Ambient scan re-triggers.** Besides the daily 07:00 job, the scan
    re-runs on plan or pantry mutation (debounced) so predictions stay
    fresh. Still Tier 0, cheap model tier, SpendGuard-gated.
+5. **Direct-touch handles.** SPEC.md §A.6.2's handle types gain a
+   `source: :direct_touch` provenance with confidence 1.0, constructed by
+   the UI when a command originates from an object sheet. Action tools
+   accept them like resolver-produced handles; `resolved_in_run` semantics
+   apply unchanged (the handle is minted for the run the sheet dispatches).
 
 No other harness changes: receipts, undo, diff rows, and the runs table all
 exist; this design only moves where they render.
@@ -312,10 +362,13 @@ exist; this design only moves where they render.
 4. Settings flattening (+ Run history section; fold Spending in).
 5. Plan: tray predictions (skill chips first — they need no new scan),
    prep layer; remove `/prep`, `/deals` from user routes.
-6. Anticipation layer backend: new CounterNote kinds + scan re-triggers
+6. Object sheets: enrich the existing slot tap-sheet with a scoped input
+   and direct-touch handles (SPEC.md amendment #5); extend to tonight
+   card and grocery rows via long-press.
+7. Anticipation layer backend: new CounterNote kinds + scan re-triggers
    (SPEC.md amendment #3/#4), then wire predicted content into hero
-   card / Shop placeholder / tray half state.
-7. Shop: deal product line (needs SPEC.md amendment #1 first).
+   card / Shop placeholder / tray half state / object sheets.
+8. Shop: deal product line (needs SPEC.md amendment #1 first).
 
 Each step is independently shippable; UI_SPEC gets amended alongside the
 step that changes it.
