@@ -1052,8 +1052,6 @@ defmodule ToreWeb.CostLive do
     end
   end
 
-  defp store_pct(_store, []), do: 0
-
   defp store_pct(store, stores) do
     total = Enum.reduce(stores, 0, fn s, acc -> acc + decimal_to_int(s.total) end)
 

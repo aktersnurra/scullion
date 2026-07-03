@@ -264,13 +264,13 @@ defmodule Tore.Harness.RunReceipts do
     end
   end
 
+  # Legacy snapshot shape derived directly from PantryBeliefUpdate before
+  # PantrySnapshot existed. We cannot compensate without row identity.
+  defp restore_pantry_change(_legacy), do: :ok
+
   defp restore_attrs(before) do
     before
     |> Map.take([:quantity, :unit, :last_seen_at, :provenance, :belief])
     |> Map.reject(fn {_, v} -> is_nil(v) end)
   end
-
-  # Legacy snapshot shape derived directly from PantryBeliefUpdate before
-  # PantrySnapshot existed. We cannot compensate without row identity.
-  defp restore_pantry_change(_legacy), do: :ok
 end

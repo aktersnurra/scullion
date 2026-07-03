@@ -77,10 +77,6 @@ defmodule Tore.Harness.Run do
     }
   end
 
-  defp surface_to_atom(s) when is_atom(s), do: s
-  defp surface_to_atom(s) when is_binary(s), do: surface_atom(s)
-  defp surface_to_atom(nil), do: nil
-
   defp rehydrate(%Events.PhaseEntered{at: at} = event),
     do: %Events.PhaseEntered{event | at: parse_datetime(at)}
 
@@ -115,6 +111,9 @@ defmodule Tore.Harness.Run do
     do: %Events.RunDiscarded{event | reason: discard_reason_atom(r), at: parse_datetime(at)}
 
   defp rehydrate(event), do: event
+
+  defp surface_to_atom(s) when is_atom(s), do: s
+  defp surface_to_atom(s) when is_binary(s), do: surface_atom(s)
 
   defp discard_reason_atom("user_discarded"), do: :user_discarded
   defp discard_reason_atom("ttl_expired"), do: :ttl_expired
