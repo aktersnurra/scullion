@@ -13,7 +13,26 @@ defmodule ToreWeb.CaptureLiveTest do
 
   test "mount renders empty chat", %{conn: conn} do
     {:ok, _lv, html} = live(conn, "/capture")
-    assert html =~ "Ask Tore"
+    assert html =~ "Fråga Tore"
+  end
+
+  test "capture renders as a sheet with a close affordance", %{conn: conn} do
+    {:ok, _view, html} = live(conn, ~p"/capture")
+    assert html =~ ~s(data-role="command-tray")
+    assert html =~ ~s(data-role="tray-close")
+  end
+
+  test "return_to only accepts internal paths", %{conn: conn} do
+    for evil <- ["https://evil.example", "//evil.example", "/\\evil.example"] do
+      {:ok, _view, html} = live(conn, ~p"/capture?return_to=#{evil}")
+      refute html =~ "evil.example"
+    end
+
+    {:ok, view, _html} = live(conn, ~p"/capture?return_to=/plan")
+
+    assert view
+           |> element(~s([data-role="tray-close"]))
+           |> render() =~ ~s(href="/plan")
   end
 
   test "sending a message appends user bubble", %{conn: conn} do

@@ -89,7 +89,7 @@ defmodule ToreWeb.Live.Auth do
   end
 
   # Keep the global :inbox_count assign in sync — every authenticated
-  # LiveView shares the layout's nav badge via @inbox_count.
+  # LiveView shares this via @inbox_count, most visibly Today's review pill.
   defp attach_inbox_count_hook(socket, household_id) do
     Phoenix.LiveView.attach_hook(socket, :inbox_count, :handle_info, fn
       {:run_state_changed, _stream_id, _state}, socket ->

@@ -5,10 +5,15 @@ defmodule ToreWeb.CaptureLive do
   alias Tore.Harness.RunReceipts
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     socket =
       socket
-      |> assign(messages: [], input: "", loading: false)
+      |> assign(
+        messages: [],
+        input: "",
+        loading: false,
+        return_to: ToreWeb.SafeReturn.path(params["return_to"], ~p"/")
+      )
       |> allow_upload(:chat_photos, accept: ~w(.jpg .jpeg .png), max_entries: 5)
 
     {:ok, socket}
@@ -16,6 +21,10 @@ defmodule ToreWeb.CaptureLive do
 
   @impl true
   def handle_event("validate", _params, socket), do: {:noreply, socket}
+
+  def handle_event("close_tray", _params, socket) do
+    {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
+  end
 
   def handle_event("undo_run", %{"sid" => sid}, socket) do
     case RunReceipts.revert(sid) do
@@ -96,12 +105,33 @@ defmodule ToreWeb.CaptureLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col h-dvh bg-[var(--bg)]">
+    <div
+      id="command-tray"
+      data-role="command-tray"
+      phx-mounted={
+        JS.transition(
+          {"motion-safe:transition-transform motion-safe:duration-200 ease-out", "translate-y-full",
+           "translate-y-0"}
+        )
+      }
+      class="fixed inset-x-0 bottom-0 top-8 z-50 rounded-t-2xl bg-[var(--surface)] border-t border-[color:var(--border)] flex flex-col"
+      phx-window-keydown="close_tray"
+      phx-key="Escape"
+    >
+      <div class="flex justify-center py-2">
+        <.link navigate={@return_to} aria-label={gettext("Close")} data-role="tray-close">
+          <span class="w-10 h-1.5 rounded-full bg-[color:var(--border)] block"></span>
+        </.link>
+      </div>
+
       <div class="flex items-center gap-3 px-4 py-3 border-b border-[color:var(--border)]">
-        <.link navigate="/" class="text-[color:var(--muted)] hover:text-[color:var(--text)]">
+        <.link
+          navigate={@return_to}
+          class="text-[color:var(--muted)] hover:text-[color:var(--text)]"
+        >
           <.icon name="hero-arrow-left" class="size-5" />
         </.link>
-        <span class="font-semibold text-[color:var(--text)]">Ask Tore</span>
+        <span class="font-semibold text-[color:var(--text)]">{gettext("Ask Tore")}</span>
       </div>
 
       <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-4">

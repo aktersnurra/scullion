@@ -258,10 +258,6 @@ defmodule ToreWeb.PlannerLive do
     {:noreply, socket}
   end
 
-  def handle_event("open_chat", _params, socket) do
-    {:noreply, push_navigate(socket, to: "/capture")}
-  end
-
   defp update_slot(socket, fun) do
     case socket.assigns.slot_action do
       nil -> socket
@@ -404,7 +400,7 @@ defmodule ToreWeb.PlannerLive do
       )
 
     ~H"""
-    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={assigns[:current_path] || "/"}>
+    <Layouts.app flash={@flash} current_path={assigns[:current_path] || "/"}>
       <.page max_width={:md}>
         <header class="flex items-center justify-between gap-4 mb-5">
           <button
@@ -561,15 +557,6 @@ defmodule ToreWeb.PlannerLive do
           recipes={@recipes}
         />
       </.page>
-
-      <button
-        phx-click="open_chat"
-        class="fixed bottom-20 right-4 md:bottom-6 z-30 flex items-center gap-2 rounded-full bg-[color:var(--accent)] text-white px-5 py-3 shadow-lg text-sm font-semibold"
-        aria-label={gettext("Ask Tore")}
-      >
-        <.icon name="hero-chat-bubble-left-ellipsis" class="size-5" />
-        {gettext("Ask Tore")}
-      </button>
     </Layouts.app>
     """
   end

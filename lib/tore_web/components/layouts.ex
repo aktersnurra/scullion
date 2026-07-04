@@ -17,7 +17,6 @@ defmodule ToreWeb.Layouts do
   attr :flash, :map, required: true
   attr :current_scope, :map, default: nil
   attr :current_path, :string, default: "/"
-  attr :inbox_count, :integer, default: 0
   slot :inner_block, required: true
 
   def app(assigns) do
@@ -34,6 +33,13 @@ defmodule ToreWeb.Layouts do
           label={label}
         />
         <.nav_link
+          path="/capture"
+          href={~p"/capture?return_to=#{@current_path}"}
+          current={@current_path}
+          icon="nav-inbox"
+          label={gettext("Capture")}
+        />
+        <.nav_link
           path="/settings"
           current={@current_path}
           icon="nav-settings"
@@ -48,14 +54,22 @@ defmodule ToreWeb.Layouts do
 
     <nav
       data-role="bottom-nav"
-      class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-3 bg-[var(--surface)] border-t border-[color:var(--border)]"
+      class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-4 bg-[var(--surface)] border-t border-[color:var(--border)]"
     >
-      <.bottom_link
-        :for={{path, _label, icon} <- @nav_items}
-        path={path}
-        current={@current_path}
-        icon={icon}
-      />
+      <%!-- fixed 4-slot bar (Today, Plan, pill, Shop) — deliberately not driven by nav_items/0; keep grid-cols in sync --%>
+      <.bottom_link path="/" current={@current_path} icon="nav-home" />
+      <.bottom_link path="/plan" current={@current_path} icon="nav-week" />
+      <a
+        href={~p"/capture?return_to=#{@current_path}"}
+        data-role="command-pill"
+        aria-label={gettext("Open command tray")}
+        class="flex items-center justify-center h-14"
+      >
+        <span class="w-12 h-7 rounded-full border border-[color:var(--border)] bg-[var(--bg)] flex items-center justify-center">
+          <span class="w-5 h-1 rounded-full bg-[color:var(--muted)]"></span>
+        </span>
+      </a>
+      <.bottom_link path="/shop" current={@current_path} icon="nav-shop" />
     </nav>
 
     <.flash_group flash={@flash} />
@@ -63,6 +77,7 @@ defmodule ToreWeb.Layouts do
   end
 
   attr :path, :string, required: true
+  attr :href, :string, default: nil, doc: "link target when it differs from the active-state path"
   attr :current, :string, required: true
   attr :icon, :string, required: true
   attr :label, :string, required: true
@@ -72,7 +87,7 @@ defmodule ToreWeb.Layouts do
 
     ~H"""
     <a
-      href={@path}
+      href={@href || @path}
       title={@label}
       aria-label={@label}
       data-active={if @active?, do: "true"}

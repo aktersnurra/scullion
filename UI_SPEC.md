@@ -128,16 +128,21 @@ Chat is for ambiguous input, photos, and complex commands. The main product shou
 
 ### 3.1 Primary nav
 
-Use **four main destinations** on phone/laptop:
+Use **three main destinations plus one action** on phone/laptop:
 
 ```md
-Today
-Plan
-Shop
-Capture
+[Today]  [Plan]  ( pill )  [Shop]
 ```
 
-Settings is accessed from the profile/household button, not the main nav.
+Capture is not a destination — it is the command pill in the center slot of
+the bottom bar (tabs are destinations; actions are buttons). Tapping the
+pill opens Capture as a slide-up sheet over the current surface; closing it
+returns exactly where you were (`return_to`). The pill is neutral chrome:
+no AI iconography, no label, no animation, no badge — never a
+support-widget bubble.
+
+Settings is accessed from the desktop header / profile affordance, not the
+mobile bar.
 
 Do not expose these as primary tabs:
 
@@ -147,57 +152,56 @@ Pantry
 Deals
 Costs
 Prep
+Inbox
 ```
 
-Those are system resources, not user destinations.
+Those are system resources, not user destinations. The run inbox is reached
+through Today's review pill and Settings → Run history, never from the nav.
 
 ### 3.2 Route map
 
 ```md
 /              → Today
 /plan          → Plan
-/groceries     → Shop
-/capture       → Capture
-/cook/:id      → Cooking mode
+/shop          → Shop
+/capture       → Capture (routable for deep links; presents as a sheet)
+/cooking       → Cooking mode
 /settings      → Settings
-/settings/memory
 /settings/pantry
-/settings/spending
+/settings/costs
+/inbox         → Run history (not in nav; via review pill + Settings)
+/runs/:id      → Run review (not in nav; deep-linkable)
+/recipes       → Recipe catalog (system resource, not in nav)
+/prep          → Prep guide (system resource, not in nav)
+/deals         → Deals (system resource, not in nav)
 /kiosk         → Kiosk Today
-/kiosk/cook/:id
-/kiosk/chat
+/kiosk/capture
 ```
 
-This preserves the current spec’s surfaces — Home, Planner, Chat, Groceries, Settings, Kiosk — but makes the nav more product-like and less CRUD-shaped. 
+Surfaces stay routable so deep links work, but capture/inbox/run-review are
+presented as layers, not destinations.
 
 ### 3.3 Navigation behavior
 
 On mobile:
 
 ```md
-Bottom nav:
-[Today] [Plan] [Shop] [Capture]
+Bottom bar:
+[Today] [Plan] (pill) [Shop]
 ```
 
 On desktop/tablet:
 
 ```md
-Left rail:
-Tore
-Today
-Plan
-Shop
-Capture
-
-bottom:
-Settings
+Header:
+Today · Plan · Shop · Capture · Settings
 ```
 
 On kiosk:
 
 ```md
 No nav.
-Only Tonight, Cook, and restricted Kiosk Chat.
+Only Tonight, Cook, and restricted Kiosk Capture.
 ```
 
 The kiosk must remain narrow: tonight’s recipe, prepped components, one counter note, next three days, and no planning/editing. 
@@ -667,10 +671,10 @@ Hero
 Secondary
 - Tomorrow compact card
 - One opportunity/counter note
-- Week strip
+- Review pill ("N to review") — only when runs await the user; links to run history; never red, never badge-styled
 
-Floating
-- Capture/Ask button
+Bar
+- [Today] [Plan] (pill) [Shop] — the pill is the Capture entry; no floating FAB
 ```
 
 ### Empty state
@@ -695,21 +699,11 @@ Rice is already prepped
 [Swap]
 ```
 
-### Week strip
-
-Compact, glanceable:
-
-```md
-M   T   W   T   F   S   S
-✓   ●   ○   L   –   ○   ○
-```
-
-Legend should appear only on long press or info tap. Do not permanently explain obvious visual language.
-
 ### Rules
 
 ```md
 Today must not show a full calendar.
+Today must not duplicate the week — that is Plan, one tap away.
 Today must not show pantry inventory.
 Today must not show spending charts.
 Today must not show more than one proactive note by default.
@@ -1081,8 +1075,13 @@ Kitchen Memory
 Devices
 Pantry belief
 Spending
+Run history
 Account
 ```
+
+Run history is the full kitchen-runs audit list (the old inbox): everything
+Tore has done and how to undo it. Reachable, never surfaced — the calm home
+for the rare "what happened last month?" dig.
 
 ### Kitchen Memory
 

@@ -62,11 +62,9 @@ defmodule ToreWeb.RunReviewLive do
   # Only allow same-origin paths in ?from= — never honour an absolute URL or
   # anything that could push the user off-site. Defaults to /inbox because
   # that's where pending work lives.
-  defp return_to_from_params(%{"from" => "/" <> _ = path}) do
-    if String.contains?(path, "://"), do: "/inbox", else: path
+  defp return_to_from_params(params) do
+    ToreWeb.SafeReturn.path(Map.get(params, "from"), "/inbox")
   end
-
-  defp return_to_from_params(_), do: "/inbox"
 
   @impl true
   def handle_event("update", %{"receipt" => params}, socket) do
@@ -152,7 +150,7 @@ defmodule ToreWeb.RunReviewLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path={~p"/runs/#{@stream_id}"}>
+    <Layouts.app flash={@flash} current_path={~p"/runs/#{@stream_id}"}>
       <div class="max-w-2xl mx-auto px-4 py-6">
         <.link
           navigate={@return_to}

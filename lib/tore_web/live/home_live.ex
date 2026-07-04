@@ -27,12 +27,8 @@ defmodule ToreWeb.HomeLive do
 
     {:ok,
      assign(socket,
-       today: today,
-       week_start: week_start,
        plan_id: plan_id,
        today_key: today_key,
-       plan_state: plan_state,
-       tonight_slot: tonight_slot,
        tonight_recipe: tonight_recipe,
        recipes_by_id: recipes_by_id,
        home_notes: home_notes
@@ -41,7 +37,7 @@ defmodule ToreWeb.HomeLive do
 
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} inbox_count={@inbox_count} current_path="/">
+    <Layouts.app flash={@flash} current_path="/">
       <%!-- Counter notes for home surface --%>
       <div :if={@home_notes != []} class="mb-4 flex flex-col gap-2">
         <div
@@ -51,6 +47,15 @@ defmodule ToreWeb.HomeLive do
           {note.body}
         </div>
       </div>
+
+      <.link
+        :if={@inbox_count > 0}
+        navigate={~p"/inbox"}
+        data-role="review-pill"
+        class="inline-flex items-center gap-2 px-4 h-9 rounded-full border border-[color:var(--border)] bg-[var(--surface)] text-sm text-[var(--text)] mb-4"
+      >
+        {ngettext("%{count} to review", "%{count} to review", @inbox_count, count: @inbox_count)}
+      </.link>
 
       <%!-- Tonight card --%>
       <section class="mb-6">
@@ -96,49 +101,8 @@ defmodule ToreWeb.HomeLive do
           </div>
         </div>
       </section>
-
-      <%!-- Week strip --%>
-      <.week_strip
-        plan_state={@plan_state}
-        week_start={@week_start}
-        today={@today}
-        recipes_by_id={@recipes_by_id}
-      />
-
-      <%!-- FAB --%>
-      <button
-        phx-click="open_chat"
-        class="fixed bottom-20 right-4 md:bottom-6 z-30 flex items-center gap-2 rounded-full bg-[color:var(--accent)] text-white px-5 py-3 shadow-lg text-sm font-semibold"
-        aria-label={gettext("Ask Tore")}
-      >
-        <.icon name="hero-chat-bubble-left-ellipsis" class="size-5" />
-        {gettext("Ask Tore")}
-      </button>
     </Layouts.app>
     """
-  end
-
-  def handle_event("prev_week", _params, socket) do
-    {:noreply, shift_week(socket, -7)}
-  end
-
-  def handle_event("next_week", _params, socket) do
-    {:noreply, shift_week(socket, 7)}
-  end
-
-  def handle_event("this_week", _params, socket) do
-    today = socket.assigns.today
-    {:noreply, load_week(socket, week_start(today))}
-  end
-
-  defp shift_week(socket, offset_days) do
-    load_week(socket, Date.add(socket.assigns.week_start, offset_days))
-  end
-
-  defp load_week(socket, week_start) do
-    plan_id = plan_id(week_start)
-    {:ok, plan_state} = Planning.load_plan(plan_id)
-    assign(socket, week_start: week_start, plan_id: plan_id, plan_state: plan_state)
   end
 
   def handle_event("something_else", _params, socket) do
@@ -154,113 +118,8 @@ defmodule ToreWeb.HomeLive do
 
     {:noreply,
      socket
-     |> assign(plan_state: plan_state, tonight_slot: tonight_slot, tonight_recipe: tonight_recipe)
+     |> assign(tonight_recipe: tonight_recipe)
      |> put_flash(:info, gettext("Slot cleared — pick something from the planner."))}
-  end
-
-  def handle_event("open_chat", _params, socket) do
-    {:noreply, push_navigate(socket, to: "/capture")}
-  end
-
-  attr :plan_state, :map, required: true
-  attr :week_start, :any, required: true
-  attr :today, :any, required: true
-  attr :recipes_by_id, :map, required: true
-
-  defp week_strip(assigns) do
-    days = ~w[mon tue wed thu fri sat sun]
-    dates = Enum.with_index(days, fn day, i -> {day, Date.add(assigns.week_start, i)} end)
-    week_end = Date.add(assigns.week_start, 6)
-    is_current? = Date.compare(assigns.week_start, week_start(assigns.today)) == :eq
-
-    assigns =
-      assigns
-      |> assign(:days_with_dates, dates)
-      |> assign(:week_end, week_end)
-      |> assign(:is_current_week?, is_current?)
-
-    ~H"""
-    <section>
-      <div class="flex items-center justify-between mb-3">
-        <button
-          phx-click="prev_week"
-          class="p-2 -ml-2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
-          aria-label={gettext("Previous week")}
-        >
-          <.icon name="hero-chevron-left" class="size-4" />
-        </button>
-        <div class="flex flex-col items-center">
-          <span class="text-xs font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-            <%= if @is_current_week? do %>
-              {gettext("This week")}
-            <% else %>
-              <button phx-click="this_week" class="underline decoration-dotted">
-                {Date.to_iso8601(@week_start)} – {Date.to_iso8601(@week_end)}
-              </button>
-            <% end %>
-          </span>
-        </div>
-        <button
-          phx-click="next_week"
-          class="p-2 -mr-2 text-[color:var(--muted)] hover:text-[color:var(--text)]"
-          aria-label={gettext("Next week")}
-        >
-          <.icon name="hero-chevron-right" class="size-4" />
-        </button>
-      </div>
-      <div class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
-        <.link
-          :for={{day, date} <- @days_with_dates}
-          navigate={~p"/plan"}
-          class={[
-            "snap-start shrink-0 w-24 rounded-xl border p-3 flex flex-col gap-1 transition-colors",
-            date == @today && "border-[color:var(--accent)] bg-[var(--accent)]/10",
-            date != @today && "border-[color:var(--border)] bg-[var(--surface)]"
-          ]}
-        >
-          <span class={[
-            "text-xs font-semibold uppercase tracking-wide",
-            date == @today && "text-[color:var(--accent)]",
-            date != @today && "text-[color:var(--muted)]"
-          ]}>
-            {day_abbr(date)}
-          </span>
-          <div class="w-full h-12 rounded-lg bg-[var(--border)]" />
-          <span class="text-xs text-[color:var(--text)] truncate leading-tight">
-            {slot_title(@plan_state, "#{day}_dinner", @recipes_by_id)}
-          </span>
-        </.link>
-      </div>
-    </section>
-    """
-  end
-
-  defp slot_title(plan_state, slot_key, recipes_by_id) do
-    slot = Map.get(plan_state.slots, slot_key)
-
-    cond do
-      is_nil(slot) || is_nil(slot.recipe_id) ->
-        "—"
-
-      slot.skipped ->
-        gettext("Skipped")
-
-      true ->
-        recipe = Map.get(recipes_by_id, slot.recipe_id)
-        if recipe, do: recipe.title, else: "—"
-    end
-  end
-
-  defp day_abbr(date) do
-    case Date.day_of_week(date) do
-      1 -> gettext("Mon")
-      2 -> gettext("Tue")
-      3 -> gettext("Wed")
-      4 -> gettext("Thu")
-      5 -> gettext("Fri")
-      6 -> gettext("Sat")
-      7 -> gettext("Sun")
-    end
   end
 
   defp today_slot_key(today) do
