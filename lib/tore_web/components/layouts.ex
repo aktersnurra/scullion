@@ -8,15 +8,9 @@ defmodule ToreWeb.Layouts do
 
   defp nav_items do
     [
-      {"/", gettext("Home"), "nav-home"},
-      {"/plan", gettext("Week"), "nav-week"},
-      {"/inbox", gettext("Inbox"), "nav-inbox"},
-      {"/recipes", gettext("Recipes"), "nav-recipes"},
-      {"/shop", gettext("Shop"), "nav-shop"},
-      {"/prep", gettext("Prep"), "nav-prep"},
-      {"/deals", gettext("Deals"), "nav-deals"},
-      {"/cooking", gettext("Cooking"), "nav-cooking"},
-      {"/settings", gettext("Settings"), "nav-settings"}
+      {"/", gettext("Today"), "nav-home"},
+      {"/plan", gettext("Plan"), "nav-week"},
+      {"/shop", gettext("Shop"), "nav-shop"}
     ]
   end
 
@@ -38,7 +32,12 @@ defmodule ToreWeb.Layouts do
           current={@current_path}
           icon={icon}
           label={label}
-          badge={badge_for(path, @inbox_count)}
+        />
+        <.nav_link
+          path="/settings"
+          current={@current_path}
+          icon="nav-settings"
+          label={gettext("Settings")}
         />
       </nav>
     </header>
@@ -47,13 +46,15 @@ defmodule ToreWeb.Layouts do
       {render_slot(@inner_block)}
     </main>
 
-    <nav class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-10 bg-[var(--surface)] border-t border-[color:var(--border)]">
+    <nav
+      data-role="bottom-nav"
+      class="md:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-3 bg-[var(--surface)] border-t border-[color:var(--border)]"
+    >
       <.bottom_link
         :for={{path, _label, icon} <- @nav_items}
         path={path}
         current={@current_path}
         icon={icon}
-        badge={badge_for(path, @inbox_count)}
       />
     </nav>
 
@@ -61,15 +62,10 @@ defmodule ToreWeb.Layouts do
     """
   end
 
-  # Surface the pending-runs count on the inbox nav entry. nil = no badge.
-  defp badge_for("/inbox", count) when is_integer(count) and count > 0, do: count
-  defp badge_for(_, _), do: nil
-
   attr :path, :string, required: true
   attr :current, :string, required: true
   attr :icon, :string, required: true
   attr :label, :string, required: true
-  attr :badge, :integer, default: nil
 
   defp nav_link(assigns) do
     assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
@@ -87,7 +83,6 @@ defmodule ToreWeb.Layouts do
       ]}
     >
       <.icon name={@icon} class="size-5" />
-      <.nav_badge :if={@badge} count={@badge} />
     </a>
     """
   end
@@ -95,7 +90,6 @@ defmodule ToreWeb.Layouts do
   attr :path, :string, required: true
   attr :current, :string, required: true
   attr :icon, :string, required: true
-  attr :badge, :integer, default: nil
 
   defp bottom_link(assigns) do
     assigns = assign(assigns, :active?, active?(assigns.current, assigns.path))
@@ -111,18 +105,7 @@ defmodule ToreWeb.Layouts do
       ]}
     >
       <.icon name={@icon} class="size-5" />
-      <.nav_badge :if={@badge} count={@badge} />
     </a>
-    """
-  end
-
-  attr :count, :integer, required: true
-
-  defp nav_badge(assigns) do
-    ~H"""
-    <span class="absolute -top-0.5 -right-0.5 min-w-[1.1rem] h-[1.1rem] px-1 inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
-      {if @count > 99, do: "99+", else: @count}
-    </span>
     """
   end
 

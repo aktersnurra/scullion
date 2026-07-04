@@ -32,4 +32,31 @@ defmodule ToreWeb.HomeLiveTest do
     {:ok, _view, html} = live(conn, ~p"/")
     assert html =~ "Fråga Tore"
   end
+
+  describe "app shell nav" do
+    test "shows only Today, Plan, Shop as destinations", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      nav_html = view |> element("header nav") |> render()
+      bottom_nav_html = view |> element(~s(nav[data-role="bottom-nav"])) |> render()
+
+      assert nav_html =~ ~s(href="/plan")
+      assert nav_html =~ ~s(href="/shop")
+      assert nav_html =~ ~s(href="/settings")
+      refute nav_html =~ ~s(href="/recipes")
+      refute nav_html =~ ~s(href="/prep")
+      refute nav_html =~ ~s(href="/deals")
+      refute nav_html =~ ~s(href="/inbox")
+      refute nav_html =~ ~s(href="/cooking")
+
+      assert bottom_nav_html =~ ~s(href="/plan")
+      assert bottom_nav_html =~ ~s(href="/shop")
+      refute bottom_nav_html =~ ~s(href="/settings")
+      refute bottom_nav_html =~ ~s(href="/recipes")
+      refute bottom_nav_html =~ ~s(href="/prep")
+      refute bottom_nav_html =~ ~s(href="/deals")
+      refute bottom_nav_html =~ ~s(href="/inbox")
+      refute bottom_nav_html =~ ~s(href="/cooking")
+    end
+  end
 end
