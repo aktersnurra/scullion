@@ -258,6 +258,39 @@ defmodule ToreWeb.PlannerLive do
     {:noreply, socket}
   end
 
+  def handle_event("slot_command", %{"command" => command}, socket) when command != "" do
+    %{slot_key: slot_key} = socket.assigns.slot_action
+    pid = self()
+
+    ctx = %{
+      household_id: socket.assigns.current_user.household_id,
+      user_id: socket.assigns.current_user.id,
+      command: command,
+      plan_stream_id: socket.assigns.plan_id,
+      week_start: socket.assigns.week_start,
+      scoped_slot: slot_key
+    }
+
+    # Save pending sheet edits before the run starts, so the agent plans
+    # against what the user sees and the save can't land after apply_events.
+    socket = auto_save_slot(socket)
+
+    Task.start(fn ->
+      result =
+        try do
+          Tore.Harness.Orchestrator.dispatch(:planner_command_run, ctx)
+        rescue
+          e -> {:error, e}
+        end
+
+      send(pid, {:run_dispatched, result})
+    end)
+
+    {:noreply, assign(socket, slot_action: nil, quick_loading: true)}
+  end
+
+  def handle_event("slot_command", _params, socket), do: {:noreply, socket}
+
   defp update_slot(socket, fun) do
     case socket.assigns.slot_action do
       nil -> socket
@@ -909,6 +942,16 @@ defmodule ToreWeb.PlannerLive do
                 {if @slot_action.pinned, do: gettext("Pinned"), else: gettext("Pin this day")}
               </button>
             </div>
+
+            <form phx-submit="slot_command" class="px-6 pb-6">
+              <input
+                type="text"
+                name="command"
+                autocomplete="off"
+                placeholder={gettext("Anything about this day…")}
+                class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </form>
           </div>
 
           <%!-- BACK PANEL (recipe browser) --%>

@@ -49,10 +49,33 @@ defmodule Tore.Harness.WeeklyPlanningRunTest do
         [
           %{
             id: "c1",
+            name: "resolve_recipe",
+            args: %{"query" => "Lentil stew"}
+          }
+        ]}, %{prompt_tokens: 10, completion_tokens: 5, cost_usd: 0.0001}}
+    end)
+    |> Mox.expect(:chat_with_tools, fn _sys, msgs, _tools, _opts ->
+      ref =
+        msgs
+        |> Enum.reverse()
+        |> Enum.find_value(fn
+          %{role: "tool", name: "resolve_recipe", content: content} ->
+            %{"match" => %{"ref" => ref}} = Jason.decode!(content)
+            ref
+
+          _ ->
+            nil
+        end)
+
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c2",
             name: "assign_recipe",
             args: %{
               "slot_key" => "wed_dinner",
-              "recipe_id" => chosen.id,
+              "recipe_ref" => ref,
               "servings" => 4,
               "rationale" => "Filling empty slot"
             }

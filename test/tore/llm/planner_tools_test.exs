@@ -1,11 +1,23 @@
 defmodule Tore.LLM.PlannerToolsTest do
   use Tore.DataCase, async: false
+
+  import Mox
+
   alias Tore.LLM.PlannerTools
   alias Tore.Planning.{Decider, State, Events}
 
   @week_start ~D[2026-06-01]
 
+  setup :set_mox_from_context
+
   setup do
+    # Recipes.create/1 fires an async Task that calls Tore.LLM.text to write
+    # an image-gen prompt; stub it so the fire-and-forget task doesn't crash
+    # under Mox's ownership checks.
+    stub(Tore.MockLLM, :text, fn _system, _user, _opts ->
+      {:ok, %{"prompt" => "A plate of food."}, %{}}
+    end)
+
     %{ctx: %{plan_id: "plan:test", week_start: @week_start}}
   end
 
@@ -118,7 +130,7 @@ defmodule Tore.LLM.PlannerToolsTest do
     state = %State{} |> with_slot("mon_dinner", r1.id) |> with_slot("tue_dinner", r2.id)
     tool = find("swap_recipe")
 
-    assert {:ok, %{ok: true, recipe_id: rid, label: "One"}, events, next} =
+    assert {:ok, %{ok: true, label: "One"} = result, events, next} =
              tool.run.(
                %{
                  "from_slot_key" => "mon_dinner",
@@ -129,7 +141,7 @@ defmodule Tore.LLM.PlannerToolsTest do
                state
              )
 
-    assert rid == r1.id
+    refute Map.has_key?(result, :recipe_id)
     assert next.slots["tue_dinner"].recipe_id == r1.id
     assert next.slots["mon_dinner"].recipe_id == r2.id
     assert events != []
@@ -145,5 +157,66 @@ defmodule Tore.LLM.PlannerToolsTest do
 
     assert {:ok, %{ask_user: "which day?"}, [], %State{}} =
              tool.run.(%{"question" => "which day?"}, ctx, %State{})
+  end
+
+  test "search_recipes results carry a ref string and __handles__", %{ctx: ctx} do
+    make_recipe(%{title: "Findable Stew"})
+    tool = find("search_recipes")
+
+    assert {:ok, %{recipes: recipes} = result, [], %State{}} =
+             tool.run.(%{"query" => "Findable"}, ctx, %State{})
+
+    assert [%{ref: ref, title: "Findable Stew"} = entry] = recipes
+    assert is_binary(ref)
+    assert String.starts_with?(ref, "rcp_")
+    refute Map.has_key?(entry, :id)
+
+    assert %{__handles__: [%Tore.Harness.Handles.ResolvedRecipe{ref: ^ref}]} = result
+  end
+
+  test "resolve_recipe tool maps an :ok resolver result", %{ctx: ctx} do
+    %{id: rid, title: title} = make_recipe(%{title: "Very Unique Recipe Name"})
+    tool = find("resolve_recipe")
+
+    assert {:ok, %{match: match} = result, [], %State{}} =
+             tool.run.(%{"query" => "Very Unique Recipe Name"}, ctx, %State{})
+
+    assert match.label == title
+    assert is_binary(match.ref)
+    assert is_float(match.confidence)
+
+    assert %{__handles__: [%Tore.Harness.Handles.ResolvedRecipe{id: ^rid}]} = result
+  end
+
+  test "resolve_recipe tool maps an :ambiguous resolver result", %{ctx: ctx} do
+    make_recipe(%{title: "Chicken Soup With Rice"})
+    make_recipe(%{title: "Chicken Soup With Noodles"})
+    tool = find("resolve_recipe")
+
+    assert {:ok, %{ambiguous: matches, note: note} = result, [], %State{}} =
+             tool.run.(%{"query" => "chicken soup recipe"}, ctx, %State{})
+
+    assert matches != []
+    assert Enum.all?(matches, &(is_binary(&1.ref) and is_binary(&1.label)))
+    assert note =~ "ask_user"
+    assert %{__handles__: handles} = result
+    assert length(handles) == length(matches)
+  end
+
+  test "resolve_recipe tool maps a :not_found resolver result", %{ctx: ctx} do
+    tool = find("resolve_recipe")
+
+    assert {:ok, %{not_found: true}, [], %State{}} =
+             tool.run.(%{"query" => "zzzzzzz-nonexistent-recipe-zzzzzzz"}, ctx, %State{})
+  end
+
+  test "assign_recipe schema requires recipe_ref and not recipe_id" do
+    tool = find("assign_recipe")
+    required = tool.parameters.required
+
+    assert "recipe_ref" in required
+    refute "recipe_id" in required
+    refute Map.has_key?(tool.parameters.properties, :recipe_id)
+    assert Map.has_key?(tool.parameters.properties, :recipe_ref)
   end
 end

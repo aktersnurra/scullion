@@ -11,6 +11,7 @@ defmodule Tore.LLM.PlannerTools do
   alias Tore.LLM.Tool
   alias Tore.Planning
   alias Tore.Planning.{Decider, Commands}
+  alias Tore.Harness.{Handles, Resolvers}
 
   @slot_key %{type: "string", description: "Slot identifier like \"mon_dinner\""}
   @rationale %{
@@ -28,8 +29,8 @@ defmodule Tore.LLM.PlannerTools do
       set_servings(),
       remove_recipe(),
       ask_user(),
-      # Read-tool stubs — implemented in Task 6.
       search_recipes(),
+      resolve_recipe(),
       pantry_snapshot(),
       active_deals()
     ]
@@ -46,11 +47,14 @@ defmodule Tore.LLM.PlannerTools do
         type: "object",
         properties: %{
           slot_key: @slot_key,
-          recipe_id: %{type: "integer"},
+          recipe_ref: %{
+            type: "string",
+            description: "a ref returned by search_recipes or resolve_recipe"
+          },
           servings: %{type: "integer", minimum: 1},
           rationale: @rationale
         },
-        required: ["slot_key", "recipe_id", "servings", "rationale"]
+        required: ["slot_key", "recipe_ref", "servings", "rationale"]
       },
       run: fn args, _ctx, plan ->
         cmd = %Commands.AssignRecipe{
@@ -83,8 +87,7 @@ defmodule Tore.LLM.PlannerTools do
           {:ok, events, next} ->
             to_recipe_id = get_in(next.slots, [args["to_slot_key"], :recipe_id])
 
-            {:ok, %{ok: true, label: recipe_title(to_recipe_id), recipe_id: to_recipe_id}, events,
-             next}
+            {:ok, %{ok: true, label: recipe_title(to_recipe_id)}, events, next}
 
           {:error, reason} ->
             {:error, reason}
@@ -186,7 +189,7 @@ defmodule Tore.LLM.PlannerTools do
     %Tool{
       name: "search_recipes",
       description:
-        "Search the recipe catalog. Combine query text and max cooking time, plus an optional limit. Use this before assigning a recipe so you have a real recipe_id.",
+        "Search the recipe catalog. Combine query text and max cooking time, plus an optional limit. Use this before assigning a recipe so you have a ref to pass to assign_recipe.",
       kind: :read,
       parameters: %{
         type: "object",
@@ -217,12 +220,54 @@ defmodule Tore.LLM.PlannerTools do
               Tore.Recipes.list(opts)
           end
 
+        handles =
+          base
+          |> Enum.take(limit)
+          |> Enum.map(&Handles.recipe(&1.id, &1.title, :search_recipes, 1.0))
+
         result =
           base
           |> Enum.take(limit)
-          |> Enum.map(&summarise_recipe/1)
+          |> Enum.zip(handles)
+          |> Enum.map(fn {r, h} -> Map.put(summarise_recipe(r), :ref, h.ref) end)
 
-        {:ok, %{recipes: result}, [], plan}
+        {:ok, %{recipes: result, __handles__: handles}, [], plan}
+      end
+    }
+  end
+
+  defp resolve_recipe do
+    %Tool{
+      name: "resolve_recipe",
+      description:
+        "Resolve a natural-language recipe reference to a ref. Use this (or search_recipes) before assign_recipe.",
+      kind: :read,
+      parameters: %{
+        type: "object",
+        properties: %{query: %{type: "string"}},
+        required: ["query"]
+      },
+      run: fn args, _ctx, plan ->
+        case Resolvers.resolve_recipe(args["query"]) do
+          {:ok, h} ->
+            {:ok,
+             %{
+               match: %{ref: h.ref, label: h.label, confidence: h.confidence},
+               __handles__: [h]
+             }, [], plan}
+
+          {:ambiguous, hs} ->
+            {:ok,
+             %{
+               ambiguous:
+                 Enum.map(hs, &%{ref: &1.ref, label: &1.label, confidence: &1.confidence}),
+               note: "multiple matches — ask_user or refine",
+               __handles__: hs
+             }, [], plan}
+
+          :not_found ->
+            {:ok, %{not_found: true}, [], plan}
+        end
       end
     }
   end
@@ -287,7 +332,6 @@ defmodule Tore.LLM.PlannerTools do
 
   defp summarise_recipe(r) do
     %{
-      id: r.id,
       title: r.title,
       base_servings: r.base_servings,
       total_minutes: total_minutes(r)

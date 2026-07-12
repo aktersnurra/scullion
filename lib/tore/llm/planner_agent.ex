@@ -5,6 +5,7 @@ defmodule Tore.LLM.PlannerAgent do
   """
 
   alias Tore.LLM.{Tool, PlannerTools}
+  alias Tore.Harness.Handles
 
   @default_max_round_trips 6
   @default_max_action_calls 12
@@ -55,7 +56,8 @@ defmodule Tore.LLM.PlannerAgent do
       max_round_trips: max_round_trips,
       max_action_calls: max_action_calls,
       working_plan: Map.fetch!(ctx, :working_plan),
-      plan_events: []
+      plan_events: [],
+      handles: Map.get(ctx, :handles, %{})
     }
 
     loop(system_prompt, state)
@@ -144,7 +146,18 @@ defmodule Tore.LLM.PlannerAgent do
 
       {:cap_hit, state}
     else
-      run_and_record(tool, call, rest, %{state | action_calls: state.action_calls + 1})
+      state = %{state | action_calls: state.action_calls + 1}
+
+      case exchange_recipe_ref(call, state) do
+        {:ok, call} ->
+          run_and_record(tool, call, rest, state)
+
+        {:error, ref} ->
+          message =
+            "unknown recipe_ref #{inspect(ref)} — call search_recipes or resolve_recipe first and use a ref from the result"
+
+          execute_calls(rest, append_tool_result(state, call, %{error: message}))
+      end
     end
   end
 
@@ -157,7 +170,15 @@ defmodule Tore.LLM.PlannerAgent do
       :ok ->
         case tool.run.(call.args, state.ctx, state.working_plan) do
           {:ok, result, events, next_plan} ->
-            state = %{state | working_plan: next_plan, plan_events: state.plan_events ++ events}
+            {handles, result} = Map.pop(result, :__handles__)
+
+            state = %{
+              state
+              | working_plan: next_plan,
+                plan_events: state.plan_events ++ events,
+                handles: register_handles(state.handles, handles)
+            }
+
             execute_calls(rest, append_tool_result(state, call, result))
 
           {:error, reason} ->
@@ -168,6 +189,29 @@ defmodule Tore.LLM.PlannerAgent do
         execute_calls(rest, append_tool_result(state, call, %{error: inspect(reason)}))
     end
   end
+
+  defp register_handles(registry, nil), do: registry
+
+  defp register_handles(registry, handles) when is_list(handles) do
+    Enum.reduce(handles, registry, &Handles.register(&2, &1))
+  end
+
+  defp exchange_recipe_ref(%{args: %{"recipe_ref" => ref} = args} = call, state) do
+    case Handles.fetch(state.handles, ref) do
+      {:ok, %Handles.ResolvedRecipe{} = handle} ->
+        {:ok, %{call | args: Map.put(args, "recipe_id", handle.id)}}
+
+      # A ref that exists but is not a recipe handle is as unusable here as an
+      # invented one — reject it the same way rather than crash on a missing :id.
+      {:ok, _other} ->
+        {:error, ref}
+
+      :error ->
+        {:error, ref}
+    end
+  end
+
+  defp exchange_recipe_ref(call, _state), do: {:ok, call}
 
   defp append_tool_result(state, call, result) do
     msg = %{

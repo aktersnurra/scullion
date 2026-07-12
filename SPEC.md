@@ -13,6 +13,7 @@
 - **2026-06-02:** Added §Agent Harness Layer. Tore is reframed as a household food-operations harness; every state-changing AI action is a `KitchenRun` producing typed artifacts, verified deterministically, applied atomically. §The Six LLM-Native Features rewritten in harness terms. Future sub-specs implement the harness primitives, verifiers, capsules, risk tiers, resolved references, and Kitchen Skills.
 - **2026-06-02:** UI/UX vocabulary adopted. Canonical names: `CounterNote` (artifact and code module — replaces the working name `Opportunity` from the first draft of §A), `Shop` (UI surface and route `/shop` — replaces `Groceries` / `/groceries`), `Capture` (UI surface and route `/capture` — replaces `Chat` / `/chat`), `Tore.Capture` (module namespace — replaces `Tore.Chat`). The code rename is a separate sub-plan; SPEC.md uses the new names throughout from this commit forward.
 - **2026-07-03:** Reconciliation pass. Absorbed what the run-receipts slice (`SPEC_FEAT_run_receipts.md`) and a month of implementation legitimately decided: the run aggregate is event-sourced (`Tore.Harness.Run`), a seventh `:discarded` terminal state with a weekly TTL sweep, `undo_payload` as a sum type replacing `undo_ref`, the `PantrySnapshot` / `RunBundle` artifacts, and the `:capture_turn_run` parent-run kind. Fixed internal contradictions (SystemPrompt, fridge-rescue tier, weekly planning Pattern A vs B, leftover Chat naming, Quantum jobs bypassing the harness). Made the single-household deployment assumption explicit. Decided: Capture keeps LLM photo classification (`classify_image`) rather than explicit intent chips — considered and rejected the chips.
+- **2026-07-12:** §A.6.2 resolved-handles landed for plan slots. Decided: handles carry an opaque `ref` token (not the struct) to the model; the PlannerAgent runtime exchanges refs for real IDs at the action-tool boundary via a per-run registry, and rejects invented/stale refs as a tool error without invoking the tool. Added `:direct_touch` as a `source` value (confidence 1.0 — the user touched the object in the UI, nothing to resolve). Shipped: `resolve_recipe`, direct-touch slot handles from the plan slot sheet's scoped command input. Deferred: `resolve_slot`, `resolve_grocery_item`, `resolve_pantry_item` — until their consumers exist. Slot action-tool params stay structural `slot_key` domain keys by design, not a `ResolvedSlot` ref.
 - **Supersedes:** the original Scullion SPEC.md (2026-05-02), now archived in git history at commit `af0ad48`.
 - **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `UI_SPEC.md` (UI/UX contract — meets this spec at the artifact boundary), `SPEC_FEAT_run_receipts.md` (the first vertical slice of the harness: receipts, diffs, undo). Per-feature design notes live under `docs/superpowers/specs/`.
 - **Naming:** the project is *Tore*. Any remaining reference to Scullion or Family in code is legacy and slated for deletion (see §Removed in Rewrite).
@@ -361,17 +362,37 @@ A handle is a struct:
 
 ```elixir
 %ResolvedRecipe{
-  id: "recipe_123",
+  id: 123,
   label: "Salmon pasta",
   source: :search_recipes,        # which resolver produced it
   confidence: 0.91,
-  resolved_in_run: "run_abc"      # the KitchenRun that resolved it
+  ref: "rcp_a1B2c3"               # opaque token, registered per run
 }
 ```
 
 The same shape applies to `ResolvedSlot`, `ResolvedGroceryItem`,
 `ResolvedPantryItem`, `ResolvedDeal`. Every handle carries `source`,
-`confidence`, and the run that resolved it.
+`confidence`, and a `ref` registered to the run that resolved it.
+
+**Ref tokens and the per-run registry.** The LLM never sees the handle
+struct itself, and never sees a raw aggregate ID. Every handle also carries
+an opaque `ref` token (e.g. `rcp_a1B2c3`, `slt_x9Y8z7` — a short prefix plus
+random base64url) minted when the handle is created. Read-tool results that
+produce handles carry them under a reserved `__handles__` key; the
+PlannerAgent runtime pops that key, registers each handle in a per-run
+registry, and strips it before the result is JSON-encoded for the model —
+so the model only ever sees `ref` and `label` strings, never an ID. When the
+model calls an action tool with a `_ref` argument, the runtime looks the ref
+up in the run's registry and, on a hit, substitutes the real ID into the
+tool args before running the tool. On a miss (an invented or stale ref) the
+tool is **not** invoked — the model gets a tool error telling it to call the
+matching resolver or search tool first — though the call still counts
+toward `max_action_calls`.
+
+`source` values include `:search_recipes`, `:resolve_recipe`, and
+`:direct_touch`. `:direct_touch` means the user physically touched the
+object in the UI (e.g. opened a plan slot's sheet) — there is no resolution
+step, so confidence is always `1.0`.
 
 **Resolver tools (V1):**
 
@@ -389,14 +410,25 @@ swap_recipe(from_slot_handle, to_slot_handle)
 
 If a resolver returns `:ambiguous`, the LLM is expected to call `ask_user`
 rather than guess. The harness will not accept an action tool call with an
-unresolved or invented handle: any handle whose `resolved_in_run` is not the
-current run is rejected.
+unresolved or invented handle: any ref not present in the current run's
+registry is rejected.
 
 **Hard rules.**
 
 - Action tools may not accept raw IDs. The Tool struct's parameter schema rejects an `integer` where a handle is expected.
-- A handle's `confidence` below the per-tool threshold (default 0.7) is treated as ambiguous — the action tool refuses and the LLM must call `ask_user` or rerun the resolver with more specificity.
-- The same handle may be reused within a single run but not across runs. The harness re-validates the handle's `resolved_in_run` on every action call.
+- The confidence threshold (default 0.7) is enforced in the resolver: below it, or without a clear gap to the runner-up, the resolver returns `:ambiguous` instead of a single match. Ambiguous candidates are still registered, so after `ask_user` the LLM can act with the ref the user picked.
+- The same handle may be reused within a single run but not across runs. The registry is per-run, so a ref minted in one run does not exist in another; the harness looks the ref up in the current run's registry on every action call.
+
+**Implementation status (V1).** Shipped: `resolve_recipe` (Jaro similarity
+over the recipe catalog) and direct-touch slot handles (minted by the
+Orchestrator when a run is scoped to a slot the user opened in the UI, e.g.
+the plan slot sheet's scoped command input). Deferred until their consumers
+exist: `resolve_slot` (natural-language slot resolution), `resolve_grocery_item`,
+`resolve_pantry_item`. Slot-targeting action tools (`assign_recipe`,
+`swap_recipe`, `skip_meal`, `mark_leftover`, `set_servings`, `remove_recipe`)
+still take a structural `slot_key` domain key rather than a `ResolvedSlot`
+ref — by design, not a gap: slot keys are stable, deterministic, and never
+ambiguous, so there is nothing for a resolver to disambiguate.
 
 #### A.6.3 — Kitchen Skills
 

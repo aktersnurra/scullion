@@ -127,6 +127,38 @@ defmodule ToreWeb.PlannerLiveTest do
       html = render(lv)
       assert html =~ ~r/>\s*12\s*<\/span>\s*<button[^>]*phx-click="inc_servings"/
     end
+
+    test "slot sheet scoped command dispatches a run scoped to the touched slot", %{
+      conn: conn,
+      user: user
+    } do
+      conn = authed(conn, user)
+      test_pid = self()
+
+      Mox.expect(Tore.MockLLM, :chat_with_tools, fn _sys, msgs, _tools, _opts ->
+        send(test_pid, {:llm_messages, msgs})
+        {:ok, {:message, "Done — made it vegetarian."}, %{}}
+      end)
+
+      {:ok, view, _} = live(conn, "/plan")
+
+      view
+      |> element(~s([phx-click="open_slot"][phx-value-slot_key="mon_dinner"]))
+      |> render_click()
+
+      view
+      |> form(~s(form[phx-submit="slot_command"]), %{command: "make it vegetarian"})
+      |> render_submit()
+
+      assert_receive {:llm_messages, msgs}, 1000
+      assert [%{role: "user", content: content}] = msgs
+      assert content =~ "[The user is referring to"
+      assert content =~ "mon_dinner"
+      assert content =~ "make it vegetarian"
+
+      # the modal closes after dispatch, same as close_slot
+      refute has_element?(view, ~s(form[phx-submit="slot_command"]))
+    end
   end
 
   describe "command bar" do

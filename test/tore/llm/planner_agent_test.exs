@@ -5,6 +5,7 @@ defmodule Tore.LLM.PlannerAgentTest do
 
   alias Tore.LLM.PlannerAgent
   alias Tore.Planning.{State, Events, Decider}
+  alias Tore.Harness.Handles
 
   @system_prompt "system: be brief"
   @ctx %{plan_id: "plan-1", week_start: ~D[2026-06-01], household_id: 1, working_plan: %State{}}
@@ -122,5 +123,159 @@ defmodule Tore.LLM.PlannerAgentTest do
 
     assert [%Events.MealSkipped{slot_key: "mon_dinner"}] = outcome.plan_events
     assert outcome.working_plan.slots["mon_dinner"].skipped == true
+  end
+
+  test "action tool with an invented recipe_ref is rejected and fed back" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "assign_recipe",
+            args: %{
+              "slot_key" => "mon_dinner",
+              "recipe_ref" => "rcp_fake",
+              "servings" => 2,
+              "rationale" => "guess"
+            }
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "I couldn't find that recipe."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "assign something", @ctx, [])
+
+    assert outcome.plan_events == []
+    assert outcome.result == {:message, "I couldn't find that recipe."}
+
+    tool_result_step =
+      Enum.find(outcome.tool_trace, &(&1.step_kind == :tool_result))
+
+    assert tool_result_step
+    result_str = inspect(tool_result_step.payload.result)
+    assert result_str =~ "unknown recipe_ref"
+  end
+
+  test "a rejected recipe_ref still counts toward max_action_calls" do
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "assign_recipe",
+            args: %{
+              "slot_key" => "mon_dinner",
+              "recipe_ref" => "rcp_fake",
+              "servings" => 2,
+              "rationale" => "guess"
+            }
+          },
+          %{
+            id: "c2",
+            name: "assign_recipe",
+            args: %{
+              "slot_key" => "tue_dinner",
+              "recipe_ref" => "rcp_fake2",
+              "servings" => 2,
+              "rationale" => "guess"
+            }
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "stopping"},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, outcome} =
+      PlannerAgent.run(@system_prompt, "assign something", @ctx, max_action_calls: 1)
+
+    assert outcome.plan_events == []
+
+    results =
+      outcome.tool_trace
+      |> Enum.filter(&(&1.step_kind == :tool_result))
+      |> Enum.map(&inspect(&1.payload.result))
+
+    # The rejected first call consumed the only action slot, so the second
+    # call must hit the cap rather than the ref check.
+    assert Enum.any?(results, &(&1 =~ "unknown recipe_ref"))
+    assert Enum.any?(results, &(&1 =~ "action_cap_reached"))
+  end
+
+  test "a registered non-recipe handle passed as recipe_ref is rejected, not crashed on" do
+    slot_handle = Handles.slot("mon_dinner", "mon dinner")
+    ctx = Map.put(@ctx, :handles, Handles.register(%{}, slot_handle))
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "assign_recipe",
+            args: %{
+              "slot_key" => "mon_dinner",
+              "recipe_ref" => slot_handle.ref,
+              "servings" => 2,
+              "rationale" => "confused"
+            }
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "ok"}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "assign something", ctx, [])
+
+    assert outcome.plan_events == []
+    result_str = inspect(Enum.map(outcome.tool_trace, & &1.payload))
+    assert result_str =~ "unknown recipe_ref"
+  end
+
+  test "assign_recipe via a pre-seeded handle ref applies the command" do
+    {:ok, r} = Tore.Recipes.create(%{title: "Salmon", base_servings: 2, instructions: "x"})
+    handle = Handles.recipe(r.id, r.title, :search_recipes, 1.0)
+    ctx = Map.put(@ctx, :handles, Handles.register(%{}, handle))
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _sys, _msgs, _tools, _opts ->
+      {:ok,
+       {:tool_calls,
+        [
+          %{
+            id: "c1",
+            name: "assign_recipe",
+            args: %{
+              "slot_key" => "mon_dinner",
+              "recipe_ref" => handle.ref,
+              "servings" => 2,
+              "rationale" => "known good"
+            }
+          }
+        ]}, %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:message, "Done."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "assign salmon", ctx, [])
+
+    rid = r.id
+
+    assert [%Events.RecipeAssigned{slot_key: "mon_dinner", recipe_id: ^rid, servings: 2}] =
+             outcome.plan_events
+
+    assert outcome.working_plan.slots["mon_dinner"].recipe_id == rid
   end
 end

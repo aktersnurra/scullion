@@ -34,6 +34,7 @@ defmodule Tore.Harness.Orchestrator do
   def dispatch(:planner_command_run, ctx) do
     stream_id = Run.next_stream_id()
     metadata = %{household_id: ctx.household_id}
+    scoped_slot = Map.get(ctx, :scoped_slot)
 
     open_cmd = %Commands.Open{
       household_id: ctx.household_id,
@@ -44,22 +45,34 @@ defmodule Tore.Harness.Orchestrator do
       input: %{
         command: ctx.command,
         plan_stream_id: ctx.plan_stream_id,
-        week_start: ctx.week_start
+        week_start: ctx.week_start,
+        scoped_slot: scoped_slot
       }
     }
+
+    user_text = scoped_user_text(ctx.command, scoped_slot)
 
     run_dispatch(stream_id, metadata, "planner_command_run", fn ->
       with {:ok, state} <- open_run(stream_id, open_cmd, metadata),
            {:ok, state} <- enter(state, :gathering_context, metadata),
            {:ok, state} <- enter(state, :proposing, metadata),
            {:ok, state} <-
-             run_planner_loop(state, ctx, stream_id, ctx.command, [], metadata) do
+             run_planner_loop(state, ctx, stream_id, user_text, [], metadata) do
         {:ok, state}
       else
         {:error, reason} -> {:error, {:step_failed, reason}}
       end
     end)
   end
+
+  defp scoped_user_text(command, nil), do: command
+
+  defp scoped_user_text(command, scoped_slot) do
+    label = humanize_slot(scoped_slot)
+    "[The user is referring to #{label} (slot #{scoped_slot}).] " <> command
+  end
+
+  defp humanize_slot(slot_key), do: String.replace(slot_key, "_", " ")
 
   @weekly_max_round_trips 10
   @weekly_max_action_calls 25
@@ -843,8 +856,16 @@ defmodule Tore.Harness.Orchestrator do
       week_start: ctx.week_start,
       household_id: ctx.household_id,
       run_stream_id: stream_id,
-      working_plan: working_plan
+      working_plan: working_plan,
+      handles: scoped_handles(Map.get(ctx, :scoped_slot))
     }
+  end
+
+  defp scoped_handles(nil), do: %{}
+
+  defp scoped_handles(scoped_slot) do
+    handle = Tore.Harness.Handles.slot(scoped_slot, humanize_slot(scoped_slot))
+    Tore.Harness.Handles.register(%{}, handle)
   end
 
   defp weekly_fill_instruction do
@@ -864,8 +885,11 @@ defmodule Tore.Harness.Orchestrator do
     a request that maps to a planning action (assign, swap, skip, mark as
     leftovers, set servings, remove), call the corresponding tool. When you
     need to look up recipes, pantry, or deals to decide what to do, call the
-    matching read tool first. When the user's request is ambiguous, call
-    ask_user with a specific clarifying question instead of guessing.
+    matching read tool first. Recipes are referenced by the `ref` returned
+    from search_recipes or resolve_recipe — never invent or guess a ref, and
+    never reuse a ref from an earlier turn. When resolve_recipe returns
+    multiple ambiguous matches, or the user's request is otherwise ambiguous,
+    call ask_user with a specific clarifying question instead of guessing.
 
     After your tool calls succeed, give a one-sentence confirmation of what you
     did. Do not narrate or restate the plan. If you cannot perform the action

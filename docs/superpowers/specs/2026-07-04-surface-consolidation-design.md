@@ -197,6 +197,10 @@ and deleting the ambiguity failure mode for every command that starts from
 an object. Desktop maps one-to-one: right-click → object sheet, ⌘K → tray.
 The kiosk gets neither.
 
+**Shipped** 2026-07 for plan slots (scoped input + direct-touch handles +
+recipe refs); tonight-card/grocery-row long-press and NL `resolve_slot`
+ride Plan 3.
+
 ## 5. Receipts and reviews, layered
 
 **Delta to UI_SPEC §7.1 (placement/behavior; content unchanged) and to the

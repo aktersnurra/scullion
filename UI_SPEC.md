@@ -801,6 +801,21 @@ Run receipt appears
 Changed slots animate subtly
 ```
 
+Slot sheet scoped input:
+
+```md
+Input inside the open slot sheet
+Referent is the touched slot — pre-resolved, no need to name the day
+```
+
+Calm rules:
+
+```md
+Quiet placeholder copy ("Anything about this day…")
+No AI branding, no AI iconography
+Silent until used — no idle affordance calling attention to itself
+```
+
 ### Critical rule
 
 Skipping is neutral:
