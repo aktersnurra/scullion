@@ -113,7 +113,9 @@ defmodule Tore.Shop do
 
     pantry =
       Pantry.list_inventory()
-      |> Enum.map(fn row -> {row, Tore.Pantry.PantryItem.effective_belief(row, now), name_tokens(row.name)} end)
+      |> Enum.map(fn row ->
+        {row, Tore.Pantry.PantryItem.effective_belief(row, now), name_tokens(row.name)}
+      end)
       |> Enum.reject(fn {_row, eff, _tokens} -> eff == :missing end)
 
     Enum.map(items, fn item ->
@@ -134,7 +136,9 @@ defmodule Tore.Shop do
   defp match_pantry_row(name, pantry) when is_binary(name) do
     needle_tokens = name_tokens(name)
 
-    case Enum.find(pantry, fn {_row, _eff, row_tokens} -> tokens_overlap?(needle_tokens, row_tokens) end) do
+    case Enum.find(pantry, fn {_row, _eff, row_tokens} ->
+           tokens_overlap?(needle_tokens, row_tokens)
+         end) do
       {row, eff, _} -> {row, eff}
       nil -> nil
     end

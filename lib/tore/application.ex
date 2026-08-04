@@ -20,6 +20,7 @@ defmodule Tore.Application do
       Tore.Accounts.LoginToken,
       Tore.Scheduler,
       {Task.Supervisor, name: Tore.TaskSupervisor},
+      {Tore.Harness.AmbientScan.Debouncer, subscribe?: true},
       # Start to serve requests, typically the last entry
       ToreWeb.Endpoint
     ]

@@ -4,11 +4,24 @@ defmodule ToreWeb.CaptureLiveTest do
   import Mox
 
   setup :verify_on_exit!
+  setup :set_mox_from_context
 
   setup do
     {:ok, {user, _code}} = Tore.Accounts.create_admin("Gustaf")
     conn = build_conn() |> Plug.Test.init_test_session(%{user_id: user.id})
     %{conn: conn, user: user}
+  end
+
+  defp eventually(fun, attempts \\ 50)
+  defp eventually(_fun, 0), do: flunk("Timed out waiting for condition")
+
+  defp eventually(fun, attempts) do
+    if fun.() do
+      true
+    else
+      Process.sleep(10)
+      eventually(fun, attempts - 1)
+    end
   end
 
   test "mount renders empty chat", %{conn: conn} do
@@ -72,6 +85,7 @@ defmodule ToreWeb.CaptureLiveTest do
       case Process.get(:turn_count, 0) do
         0 ->
           Process.put(:turn_count, 1)
+
           {:ok, {:tool_calls, [tool_call]},
            %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
 
@@ -102,5 +116,85 @@ defmodule ToreWeb.CaptureLiveTest do
 
     html2 = render(lv)
     assert html2 =~ Gettext.dgettext(ToreWeb.Gettext, "default", "Reverted")
+  end
+
+  test "tray half state lists the origin surface's actionable predictions and tapping follows",
+       %{conn: conn} do
+    {:ok, note} =
+      Tore.CounterNotes.create(%{
+        surface: "home",
+        kind: "freezer_fallback",
+        title: "Frozen bolognese tonight?",
+        body: "b",
+        proposed_run: %{
+          "kind" => "planner_command",
+          "command" => "assign frozen bolognese",
+          "scoped_slot" => "mon_dinner"
+        }
+      })
+
+    {:ok, view, html} = live(conn, ~p"/capture?return_to=/")
+    assert html =~ "Frozen bolognese tonight?"
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _s, _m, _t, _o ->
+      {:ok, {:message, "done"},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    view
+    |> element(~s(button[phx-click="follow_note"][phx-value-id="#{note.id}"]))
+    |> render_click()
+
+    eventually(fn ->
+      Tore.Repo.get!(Tore.CounterNotes.CounterNote, note.id).status == "accepted" and
+        not (render(view) =~ ~s(phx-click="follow_note"))
+    end)
+  end
+
+  test "tray from /plan shows week predictions, not home ones", %{conn: conn} do
+    {:ok, _} =
+      Tore.CounterNotes.create(%{
+        surface: "home",
+        kind: "freezer_fallback",
+        title: "Home note",
+        body: "b",
+        proposed_run: %{
+          "kind" => "planner_command",
+          "command" => "x",
+          "scoped_slot" => "mon_dinner"
+        }
+      })
+
+    {:ok, _view, html} = live(conn, ~p"/capture?return_to=/plan")
+    refute html =~ "Home note"
+  end
+
+  test "predictions disappear once a message is sent", %{conn: conn} do
+    {:ok, _} =
+      Tore.CounterNotes.create(%{
+        surface: "home",
+        kind: "freezer_fallback",
+        title: "Frozen bolognese tonight?",
+        body: "b",
+        proposed_run: %{
+          "kind" => "planner_command",
+          "command" => "assign frozen bolognese",
+          "scoped_slot" => "mon_dinner"
+        }
+      })
+
+    stub(Tore.MockLLM, :chat_with_tools, fn _s, _m, _t, _o ->
+      {:ok, {:message, "Sure."},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    {:ok, view, html} = live(conn, ~p"/capture?return_to=/")
+    assert html =~ "Frozen bolognese tonight?"
+
+    html = view |> form("form", %{message: "hej"}) |> render_submit()
+
+    refute html =~ "Frozen bolognese tonight?"
+
+    eventually(fn -> render(view) =~ "Sure." end)
   end
 end

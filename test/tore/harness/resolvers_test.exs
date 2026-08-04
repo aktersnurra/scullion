@@ -45,4 +45,52 @@ defmodule Tore.Harness.ResolversTest do
   test "garbage is not found" do
     assert :not_found = Resolvers.resolve_recipe("zzzz qqqq")
   end
+
+  describe "resolve_slot/2" do
+    # slots: %{slot_key => recipe title or nil}
+    @slots %{
+      "mon_dinner" => "Salmon pasta",
+      "tue_dinner" => nil,
+      "wed_dinner" => "Chicken skewers"
+    }
+
+    test "day words resolve structurally" do
+      assert {:ok, %{slot_key: "mon_dinner", label: "Monday dinner"}} =
+               Resolvers.resolve_slot("monday", slots: @slots, today: ~D[2026-07-15])
+
+      assert {:ok, %{slot_key: "tue_dinner"}} =
+               Resolvers.resolve_slot("Tuesday", slots: @slots, today: ~D[2026-07-15])
+    end
+
+    test "tonight/today and tomorrow resolve relative to today" do
+      # 2026-07-15 is a Wednesday
+      assert {:ok, %{slot_key: "wed_dinner"}} =
+               Resolvers.resolve_slot("tonight", slots: @slots, today: ~D[2026-07-15])
+
+      assert {:ok, %{slot_key: "thu_dinner"}} =
+               Resolvers.resolve_slot("tomorrow", slots: @slots, today: ~D[2026-07-15])
+    end
+
+    test "a recipe reference resolves to the slot holding it" do
+      assert {:ok, %{slot_key: "wed_dinner"}} =
+               Resolvers.resolve_slot("the chicken skewers slot",
+                 slots: @slots,
+                 today: ~D[2026-07-15]
+               )
+    end
+
+    test "a reference matching multiple assigned recipes is ambiguous" do
+      slots = Map.put(@slots, "fri_dinner", "Salmon soup")
+
+      assert {:ambiguous, candidates} =
+               Resolvers.resolve_slot("the salmon dinner", slots: slots, today: ~D[2026-07-15])
+
+      assert Enum.map(candidates, & &1.slot_key) |> Enum.sort() == ["fri_dinner", "mon_dinner"]
+    end
+
+    test "garbage is not found" do
+      assert :not_found =
+               Resolvers.resolve_slot("xyzzy plugh", slots: @slots, today: ~D[2026-07-15])
+    end
+  end
 end

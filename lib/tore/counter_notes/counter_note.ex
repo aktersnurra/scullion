@@ -11,17 +11,29 @@ defmodule Tore.CounterNotes.CounterNote do
     field :confidence, :string, default: "medium"
     field :status, :string, default: "pending"
     field :expires_at, :utc_datetime
+    field :proposed_run, :map
     timestamps(updated_at: false)
   end
 
   @valid_surfaces ~w(home week groceries pantry deals)
-  @valid_kinds ~w(deal_opportunity plan_repair pantry_assumption habit_pattern)
+  @valid_kinds ~w(deal_opportunity plan_repair pantry_assumption habit_pattern
+                  swap_suggestion freezer_fallback missing_ingredient usual_item_missing)
   @valid_confidences ~w(low medium high)
   @valid_statuses ~w(pending accepted ignored expired)
 
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:surface, :kind, :title, :body, :commands, :confidence, :status, :expires_at])
+    |> cast(attrs, [
+      :surface,
+      :kind,
+      :title,
+      :body,
+      :commands,
+      :confidence,
+      :status,
+      :expires_at,
+      :proposed_run
+    ])
     |> validate_required([:surface, :kind, :title, :body])
     |> validate_inclusion(:surface, @valid_surfaces)
     |> validate_inclusion(:kind, @valid_kinds)

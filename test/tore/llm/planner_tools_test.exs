@@ -210,6 +210,30 @@ defmodule Tore.LLM.PlannerToolsTest do
              tool.run.(%{"query" => "zzzzzzz-nonexistent-recipe-zzzzzzz"}, ctx, %State{})
   end
 
+  test "resolve_slot tool resolves against the working plan", %{ctx: ctx} do
+    %{id: rid} = make_recipe(%{title: "Chicken skewers"})
+    state = %State{} |> with_slot("wed_dinner", rid)
+    tool = find("resolve_slot")
+
+    assert {:ok, %{slot_key: "wed_dinner", label: label}, [], ^state} =
+             tool.run.(%{"reference" => "the chicken skewers slot"}, ctx, state)
+
+    assert label =~ "dinner"
+  end
+
+  test "resolve_slot tool reports ambiguity with candidates", %{ctx: ctx} do
+    r1 = make_recipe(%{title: "Salmon pasta"})
+    r2 = make_recipe(%{title: "Salmon soup"})
+    state = %State{} |> with_slot("mon_dinner", r1.id) |> with_slot("fri_dinner", r2.id)
+    tool = find("resolve_slot")
+
+    assert {:ok, %{ambiguous: candidates, note: note}, [], ^state} =
+             tool.run.(%{"reference" => "the salmon one"}, ctx, state)
+
+    assert length(candidates) == 2
+    assert note =~ "ask_user"
+  end
+
   test "assign_recipe schema requires recipe_ref and not recipe_id" do
     tool = find("assign_recipe")
     required = tool.parameters.required

@@ -1,7 +1,7 @@
 defmodule ToreWeb.ShopLive do
   use ToreWeb, :live_view
 
-  alias Tore.Shop
+  alias Tore.{Shop, CounterNotes}
   alias Phoenix.PubSub
 
   def mount(_params, session, socket) do
@@ -22,8 +22,16 @@ defmodule ToreWeb.ShopLive do
        list_id: list_id,
        grocery_state: grocery_state,
        user_id: user_id,
-       export_text: nil
+       export_text: nil,
+       predicted_item: predicted_item(),
+       item_sheet: nil,
+       item_command_loading: false
      )}
+  end
+
+  defp predicted_item do
+    CounterNotes.list_for_surface("groceries")
+    |> Enum.find(&match?(%{"kind" => "add_item"}, &1.proposed_run))
   end
 
   def handle_event("toggle_item", %{"item_id" => id}, socket) do
@@ -57,31 +65,104 @@ defmodule ToreWeb.ShopLive do
   def handle_event("add_item", %{"name" => name} = params, socket) do
     name = String.trim(name)
 
-    if name != "" do
-      qty = Map.get(params, "quantity", "")
-      unit = Map.get(params, "unit", "")
-      quantity = if qty == "", do: nil, else: parse_qty(qty)
-      unit = if unit == "", do: nil, else: unit
+    cond do
+      name != "" ->
+        qty = Map.get(params, "quantity", "")
+        unit = Map.get(params, "unit", "")
+        quantity = if qty == "", do: nil, else: parse_qty(qty)
+        unit = if unit == "", do: nil, else: unit
 
-      Shop.add_item(
-        socket.assigns.list_id,
-        name,
-        quantity,
-        unit,
-        socket.assigns.user_id
-      )
+        Shop.add_item(
+          socket.assigns.list_id,
+          name,
+          quantity,
+          unit,
+          socket.assigns.user_id
+        )
+
+        {:noreply, socket}
+
+      socket.assigns.predicted_item ->
+        actor = %{
+          household_id: socket.assigns.current_user.household_id,
+          user_id: socket.assigns.current_user.id
+        }
+
+        CounterNotes.follow_up(socket.assigns.predicted_item.id, actor)
+
+        {:ok, grocery_state} = Shop.load_list(socket.assigns.list_id)
+
+        {:noreply, assign(socket, grocery_state: grocery_state, predicted_item: predicted_item())}
+
+      true ->
+        {:noreply, socket}
     end
+  end
 
-    {:noreply, socket}
+  def handle_event("open_item_sheet", %{"item_id" => id}, socket) do
+    case Map.get(socket.assigns.grocery_state.items, id) do
+      nil -> {:noreply, socket}
+      item -> {:noreply, assign(socket, item_sheet: item)}
+    end
+  end
+
+  def handle_event("close_item_sheet", _params, socket) do
+    {:noreply, assign(socket, item_sheet: nil)}
+  end
+
+  def handle_event("item_command", %{"command" => command}, socket) when command != "" do
+    item = socket.assigns.item_sheet
+    pid = self()
+
+    ctx = %{
+      household_id: Tore.Household.get_household!().id,
+      user_id: socket.assigns.current_user && socket.assigns.current_user.id,
+      locale: socket.assigns.current_user && socket.assigns.current_user.locale
+    }
+
+    prefixed =
+      "[The user is referring to the grocery item \"#{item.name}\" on the shopping list.] " <>
+        command
+
+    Task.start(fn ->
+      result = Tore.Capture.Router.route(prefixed, [], ctx, [])
+      send(pid, {:item_command_complete, result})
+    end)
+
+    {:noreply, assign(socket, item_sheet: nil, item_command_loading: true)}
+  end
+
+  def handle_event("item_command", _params, socket), do: {:noreply, socket}
+
+  def handle_info({:item_command_complete, result}, socket) do
+    flash =
+      case result do
+        {:ok, bubbles} ->
+          {:info, bubble_text(bubbles)}
+
+        {:error, _} ->
+          {:error, gettext("Tore couldn't finish that. Try again in a moment.")}
+      end
+
+    {kind, text} = flash
+
+    {:noreply,
+     socket
+     |> assign(item_command_loading: false)
+     |> put_flash(kind, text)}
   end
 
   def handle_info({:events, _events}, socket) do
     {:ok, grocery_state} = Shop.load_list(socket.assigns.list_id)
-    {:noreply, assign(socket, grocery_state: grocery_state)}
+
+    {:noreply, assign(socket, grocery_state: grocery_state, predicted_item: predicted_item())}
   end
 
-  def handle_info({:run_state_changed, _sid, %Tore.Harness.Run.State.Reverted{surface: :shop}}, socket),
-    do: {:noreply, put_flash(socket, :info, gettext("Undone."))}
+  def handle_info(
+        {:run_state_changed, _sid, %Tore.Harness.Run.State.Reverted{surface: :shop}},
+        socket
+      ),
+      do: {:noreply, put_flash(socket, :info, gettext("Undone."))}
 
   def handle_info({:run_state_changed, _sid, _state}, socket), do: {:noreply, socket}
   def handle_info({:run_event, _sid, _event}, socket), do: {:noreply, socket}
@@ -186,8 +267,10 @@ defmodule ToreWeb.ShopLive do
               <input
                 type="text"
                 name="name"
-                placeholder={gettext("Add item…")}
-                required
+                placeholder={
+                  (@predicted_item && "#{@predicted_item.proposed_run["name"]}?") ||
+                    gettext("Add item…")
+                }
                 class="flex-1 h-10 bg-transparent border-0 text-[var(--text)] placeholder:text-[color:var(--subtle)] focus:outline-none"
                 style="font-size: var(--t-body);"
               />
@@ -210,6 +293,45 @@ defmodule ToreWeb.ShopLive do
           </div>
         </.card>
       </.page>
+
+      <%!-- Grocery item object sheet (long-press) --%>
+      <div
+        :if={@item_sheet}
+        id="item-sheet"
+        class="fixed inset-x-0 bottom-0 top-8 z-50 rounded-t-2xl bg-[var(--surface)] border-t border-[color:var(--border)] flex flex-col"
+        phx-window-keydown="close_item_sheet"
+        phx-key="Escape"
+      >
+        <div class="flex justify-center py-2">
+          <button
+            type="button"
+            phx-click="close_item_sheet"
+            aria-label={gettext("Close")}
+            data-role="item-sheet-close"
+          >
+            <span class="w-10 h-1.5 rounded-full bg-[color:var(--border)] block"></span>
+          </button>
+        </div>
+
+        <div class="flex items-baseline gap-2 px-4 py-3 border-b border-[color:var(--border)]">
+          <span class="font-semibold text-[color:var(--text)]">{@item_sheet.name}</span>
+          <span :if={qty_label(@item_sheet) != ""} class="text-[color:var(--muted)] text-sm">
+            {qty_label(@item_sheet)}
+          </span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-4 py-4">
+          <form phx-submit="item_command">
+            <input
+              type="text"
+              name="command"
+              autocomplete="off"
+              placeholder={gettext("Anything about this item…")}
+              class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </form>
+        </div>
+      </div>
     </Layouts.app>
     """
   end
@@ -218,10 +340,17 @@ defmodule ToreWeb.ShopLive do
 
   defp item_row(assigns) do
     ~H"""
-    <li class={[
-      "flex items-center gap-4 py-3 transition-opacity",
-      @item.checked && "opacity-50"
-    ]}>
+    <li
+      id={"item-#{@item.id}"}
+      phx-hook="LongPress"
+      data-long-press-event="open_item_sheet"
+      data-item-id={@item.id}
+      data-item-name={@item.name}
+      class={[
+        "flex items-center gap-4 py-3 transition-opacity",
+        @item.checked && "opacity-50"
+      ]}
+    >
       <.checkbox checked={@item.checked} phx-click="toggle_item" phx-value-item_id={@item.id} />
       <button
         type="button"
@@ -264,6 +393,17 @@ defmodule ToreWeb.ShopLive do
       </button>
     </li>
     """
+  end
+
+  defp bubble_text(bubbles) do
+    bubbles
+    |> Enum.map(&Map.get(&1, :text, ""))
+    |> Enum.reject(&(&1 == ""))
+    |> List.last()
+    |> case do
+      nil -> gettext("Done.")
+      text -> text
+    end
   end
 
   defp sorted_items(items) do

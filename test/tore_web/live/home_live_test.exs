@@ -1,15 +1,45 @@
 defmodule ToreWeb.HomeLiveTest do
   use ToreWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
+  import Mox
 
   alias Tore.Accounts
   alias Tore.Harness.Run
   alias Tore.Harness.Run.{Commands, State}
+  alias Tore.CounterNotes.CounterNote
+
+  setup :verify_on_exit!
+  setup :set_mox_from_context
 
   setup do
+    stub(Tore.MockLLM, :text, fn _system, _user, _opts ->
+      {:ok, %{"prompt" => "A plate of food."}, %{}}
+    end)
+
     {:ok, {user, _code}} = Accounts.create_admin("Gustaf")
     conn = build_conn() |> Plug.Test.init_test_session(%{user_id: user.id})
     %{conn: conn, user: user}
+  end
+
+  defp today_slot_key do
+    days = ~w[mon tue wed thu fri sat sun]
+    today = Date.utc_today()
+    dow = Date.day_of_week(today)
+    day = Enum.at(days, dow - 1)
+    "#{day}_dinner"
+  end
+
+  defp eventually(fun, attempts \\ 50)
+
+  defp eventually(_fun, 0), do: flunk("Timed out waiting for condition")
+
+  defp eventually(fun, attempts) do
+    if fun.() do
+      true
+    else
+      Process.sleep(10)
+      eventually(fun, attempts - 1)
+    end
   end
 
   defp open_needs_user_run(household_id, user_id) do
@@ -104,5 +134,134 @@ defmodule ToreWeb.HomeLiveTest do
   test "review pill is absent when nothing needs review", %{conn: conn} do
     {:ok, _view, html} = live(conn, ~p"/")
     refute html =~ ~s(data-role="review-pill")
+  end
+
+  defp plan_id_for_today do
+    today = Date.utc_today()
+    dow = Date.day_of_week(today)
+    week_start = Date.add(today, -(dow - 1))
+    "plan:#{Date.to_iso8601(week_start)}"
+  end
+
+  defp seed_tonight_recipe do
+    {:ok, recipe} =
+      Tore.Recipes.create(%{
+        title: "Chicken gratäng",
+        recipe_type: :meal,
+        base_servings: 4,
+        prep_time_minutes: 10,
+        cook_time_minutes: 30
+      })
+
+    Tore.Planning.assign_recipe(plan_id_for_today(), today_slot_key(), recipe.id, 4)
+    recipe
+  end
+
+  describe "hero note follow-up" do
+    test "hero action is replaced by the top actionable prediction, and tapping follows it",
+         %{conn: conn} do
+      seed_tonight_recipe()
+
+      {:ok, note} =
+        Tore.CounterNotes.create(%{
+          surface: "home",
+          kind: "swap_suggestion",
+          title: "Swap with Thursday's gratäng",
+          body: "Tuesdays go quick.",
+          proposed_run: %{
+            "kind" => "planner_command",
+            "command" => "swap today with thursday",
+            "scoped_slot" => today_slot_key()
+          }
+        })
+
+      {:ok, view, html} = live(conn, ~p"/")
+
+      assert html =~ "Swap with Thursday&#39;s gratäng"
+      refute html =~ "Något annat"
+
+      test_pid = self()
+
+      expect(Tore.MockLLM, :chat_with_tools, fn _s, _m, _t, _o ->
+        send(test_pid, :hero_note_dispatched)
+
+        {:ok, {:message, "done"},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      end)
+
+      view |> element(~s(button[phx-click="follow_note"])) |> render_click()
+
+      assert_receive :hero_note_dispatched, 2_000
+
+      eventually(fn ->
+        Tore.Repo.get!(CounterNote, note.id).status == "accepted"
+      end)
+    end
+
+    test "hero keeps its generic action when no prediction exists", %{conn: conn} do
+      seed_tonight_recipe()
+      {:ok, _view, html} = live(conn, ~p"/")
+      assert html =~ "Något annat"
+    end
+  end
+
+  describe "tonight object sheet" do
+    test "long-pressing the tonight card opens a sheet scoped to today with a scoped input",
+         %{conn: conn} do
+      seed_tonight_recipe()
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element(~s([phx-hook="LongPress"][data-long-press-event="open_tonight_sheet"]))
+      |> render_hook("open_tonight_sheet", %{})
+
+      html = render(view)
+      assert html =~ ~s(phx-submit="tonight_command")
+
+      test_pid = self()
+
+      expect(Tore.MockLLM, :chat_with_tools, fn _sys, msgs, _tools, _opts ->
+        [%{role: "user", content: content}] = msgs
+        assert content =~ "The user is referring to"
+        assert content =~ today_slot_key()
+        send(test_pid, :tonight_command_dispatched)
+
+        {:ok, {:message, "done"},
+         %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+      end)
+
+      view
+      |> form(~s(form[phx-submit="tonight_command"]), %{command: "make it vegetarian"})
+      |> render_submit()
+
+      refute render(view) =~ ~s(phx-submit="tonight_command")
+
+      assert_receive :tonight_command_dispatched, 2_000
+    end
+
+    test "escape closes the tonight sheet without dispatching", %{conn: conn} do
+      seed_tonight_recipe()
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element(~s([phx-hook="LongPress"][data-long-press-event="open_tonight_sheet"]))
+      |> render_hook("open_tonight_sheet", %{})
+
+      assert render(view) =~ ~s(phx-submit="tonight_command")
+
+      view
+      |> element(~s([phx-hook="LongPress"][data-long-press-event="open_tonight_sheet"]))
+      |> render_hook("close_tonight_sheet", %{})
+
+      refute render(view) =~ ~s(phx-submit="tonight_command")
+    end
+
+    test "no sheet opens on the empty state", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_hook(view, "open_tonight_sheet", %{})
+
+      refute render(view) =~ ~s(phx-submit="tonight_command")
+    end
   end
 end

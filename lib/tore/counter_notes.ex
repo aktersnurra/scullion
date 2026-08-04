@@ -51,4 +51,76 @@ defmodule Tore.CounterNotes do
       set: [status: "expired"]
     )
   end
+
+  @scan_kinds ~w(swap_suggestion freezer_fallback missing_ingredient usual_item_missing)
+
+  @doc "One scan owns the scan-kind notes: expire the previous pending batch, insert the new one."
+  def replace_scan_notes(attrs_list) do
+    Repo.transaction(fn ->
+      from(n in CounterNote, where: n.status == "pending" and n.kind in @scan_kinds)
+      |> Repo.update_all(set: [status: "expired"])
+
+      Enum.map(attrs_list, fn attrs ->
+        case create(attrs) do
+          {:ok, note} -> note
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+    end)
+  end
+
+  @doc "Dismissal is signal: what the household recently swiped away, for the next scan prompt."
+  def recently_ignored(days) do
+    since = DateTime.add(DateTime.utc_now(), -days, :day)
+
+    from(n in CounterNote,
+      where: n.status == "ignored" and n.inserted_at >= ^since,
+      select: %{kind: n.kind, title: n.title}
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Accept the note and execute its proposed run. Deterministic proposals
+  (add_item) apply directly — code disposes; planner commands dispatch a
+  scoped run with counter_note_followup provenance.
+  """
+  @spec follow_up(integer(), %{household_id: term(), user_id: term()}) ::
+          {:ok, term()} | {:error, term()}
+  def follow_up(id, %{household_id: household_id, user_id: user_id}) do
+    note = Repo.get!(CounterNote, id)
+
+    case note.proposed_run do
+      %{"kind" => "add_item", "name" => name} = pr ->
+        {:ok, _} = accept(id)
+
+        week_start = week_start(Date.utc_today())
+        list_id = "shop_list:#{Date.to_iso8601(week_start)}"
+
+        Tore.Shop.add_item(list_id, name, pr["quantity"], pr["unit"], user_id)
+
+      %{"kind" => "planner_command", "command" => command} = pr ->
+        {:ok, _} = accept(id)
+
+        week_start = week_start(Date.utc_today())
+
+        Tore.Harness.Orchestrator.dispatch(:planner_command_run, %{
+          household_id: household_id,
+          user_id: user_id,
+          command: command,
+          plan_stream_id: "plan:#{Date.to_iso8601(week_start)}",
+          week_start: week_start,
+          scoped_slot: pr["scoped_slot"],
+          started_by: "counter_note_followup"
+        })
+
+      _ ->
+        {:error, :no_proposed_run}
+    end
+  end
+
+  defp week_start(date) do
+    dow = Date.day_of_week(date)
+    Date.add(date, -(dow - 1))
+  end
 end

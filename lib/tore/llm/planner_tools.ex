@@ -31,6 +31,7 @@ defmodule Tore.LLM.PlannerTools do
       ask_user(),
       search_recipes(),
       resolve_recipe(),
+      resolve_slot(),
       pantry_snapshot(),
       active_deals()
     ]
@@ -268,6 +269,44 @@ defmodule Tore.LLM.PlannerTools do
           :not_found ->
             {:ok, %{not_found: true}, [], plan}
         end
+      end
+    }
+  end
+
+  defp resolve_slot do
+    %Tool{
+      name: "resolve_slot",
+      description:
+        "Resolve a natural-language day/slot reference (in English — e.g. \"tonight\", " <>
+          "\"tuesday\", \"the salmon dinner\") to a structural slot_key. " <>
+          "Use before slot-targeting actions when the user did not name a slot key.",
+      kind: :read,
+      parameters: %{
+        type: "object",
+        properties: %{reference: %{type: "string"}},
+        required: ["reference"]
+      },
+      run: fn args, ctx, plan ->
+        slots =
+          Map.new(plan.slots, fn {k, slot} ->
+            {k, slot.recipe_id && recipe_title(slot.recipe_id)}
+          end)
+
+        today = Map.get(ctx, :today, Date.utc_today())
+
+        result =
+          case Resolvers.resolve_slot(args["reference"], slots: slots, today: today) do
+            {:ok, res} ->
+              res
+
+            {:ambiguous, candidates} ->
+              %{ambiguous: candidates, note: "multiple matches — ask_user or refine"}
+
+            :not_found ->
+              %{not_found: true}
+          end
+
+        {:ok, result, [], plan}
       end
     }
   end

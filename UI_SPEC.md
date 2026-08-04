@@ -100,6 +100,25 @@ Kiosk:     "Rice is already prepped."
 
 No push notifications. No nags. No streaks. Your current spec already requires proactive intelligence to appear inline and explicitly forbids interruption. 
 
+**Three rules for predictions (shipped, 2026-08 — the anticipation layer,
+see `docs/superpowers/specs/2026-07-04-surface-consolidation-design.md`
+§3):**
+
+```md
+Rule 1 — Replace, never add. Predictions replace a surface's generic
+affordance (a button label, a placeholder, a form) instead of adding a new
+element. Same element count with or without a prediction.
+
+Rule 2 — Precomputed, never awaited. Predictions render instantly from
+notes materialized by the daily/debounced ambient scan. No LLM call, no
+spinner, no "predicting…" state on page load. Nothing precomputed → the
+surface shows its ordinary generic affordance.
+
+Rule 3 — Dismissal is signal. Swiping a prediction away tombstones it and
+feeds the next scan's prompt ("do not re-propose this"). The system learns
+what not to predict, not just what to predict.
+```
+
 ### 2.4 The user never has to maintain the machine
 
 The UI must not ask the user to manage pantry, maintain datasets, rate meals, or explain every skip.
@@ -709,6 +728,31 @@ Today must not show spending charts.
 Today must not show more than one proactive note by default.
 ```
 
+### Hero card prediction (shipped, 2026-08)
+
+Rule 1 applied to the hero card: the second action button is replaced by
+the top actionable home-surface prediction, max one. Tapping it follows the
+prediction (accepts the note and dispatches its `proposed_run`) instead of
+opening a generic flow. No prediction → the button reverts to its generic
+label ("Swap").
+
+### Tonight-card long-press sheet (shipped, 2026-08)
+
+Long-pressing the tonight card (500 ms) raises a sheet scoped to today,
+mirroring §6.2's slot sheet:
+
+```md
+Tonight · Pork skewers with cucumber yoghurt
+─────────────────────────────
+Swap with Thursday's gratäng   ← scoped predictions (max one, §2.3)
+─────────────────────────────
+[ input field scoped to tonight ]
+```
+
+Calm rules (same as §6.2's slot sheet): quiet placeholder copy ("Anything
+about tonight…"), no AI branding or iconography, silent until used. Escape
+or tapping the scrim closes the sheet without dispatching.
+
 ## 6.2 Plan
 
 ### Job
@@ -816,6 +860,11 @@ No AI branding, no AI iconography
 Silent until used — no idle affordance calling attention to itself
 ```
 
+Slot sheet predictions (shipped, 2026-08): the open slot sheet also lists
+predictions scoped to that slot, above the command input, as tappable rows
+(§2.3 Rule 1) — the top-level week counter-note list (§5.2) shows only
+unscoped predictions, so a scoped prediction is never shown twice.
+
 ### Critical rule
 
 Skipping is neutral:
@@ -911,6 +960,32 @@ Do not show pantry as exact truth.
 
 This follows your spec’s rule that groceries are the reliability anchor and must survive missing plans, missing pantry data, and LLM failure. 
 
+### Predicted add (shipped, 2026-08)
+
+Rule 1 applied to the add-item input: the field's placeholder becomes the
+predicted item's name instead of the generic "Add item…". Submitting with
+an empty name accepts the prediction; typed text always wins over the
+prediction. No prediction → the placeholder reverts to "Add item…".
+
+### Grocery-row long-press sheet (shipped, 2026-08)
+
+Long-pressing a grocery row (500 ms) raises an item sheet, mirroring §6.2's
+slot sheet:
+
+```md
+Greek yoghurt
+─────────────────────────────
+[ input field scoped to this item ]
+```
+
+The scoped input routes through Capture's classifier with a text referent
+("[The user is referring to the grocery item "Greek yoghurt" on the
+shopping list.]") rather than a resolved handle — no grocery action tools
+exist yet to consume one (`ResolvedGroceryItem` is deferred, SPEC.md
+§A.6.2). Calm rules as §6.2's slot sheet: quiet placeholder ("Anything
+about this item…"), no AI branding, silent until used. Escape or the scrim
+closes without dispatching.
+
 ## 6.4 Capture
 
 ### Job
@@ -964,6 +1039,18 @@ Suggested:
 ### Rule
 
 The default outcome should be a useful artifact, not a question. Your current spec says the fridge-photo flow must end in three concrete recipe suggestions with “add to tonight,” not stop at “Want me to suggest some recipes?” 
+
+### Tray half state (shipped, 2026-08)
+
+Per `docs/superpowers/specs/2026-07-04-surface-consolidation-design.md` §4,
+Capture is reached as the command pill's tray, not a page. Its default
+("half") state lists the origin surface's actionable predictions (Home →
+`home`, Plan → `week`, Shop → `groceries`) above the multimodal input, as
+tappable rows — the same notes §2.3/§6.1/§6.2/§6.3 render on their home
+surfaces. The list renders only while no message has been sent in the
+session; once the user sends one, the predictions are gone for that tray
+open (no transcript, closing discards the view). No AI branding — no
+sparkle/robot iconography, no "Ask AI" label, matter-of-fact row copy.
 
 ## 6.5 Cooking mode
 

@@ -16,12 +16,12 @@ msgstr ""
 msgid "%{duration} total"
 msgstr "%{duration} totalt"
 
-#: lib/tore_web/live/planner_live.ex:1095
+#: lib/tore_web/live/planner_live.ex:1150
 #, elixir-autogen, elixir-format
 msgid "%{n} min"
 msgstr "%{n} min"
 
-#: lib/tore_web/live/planner_live.ex:1096
+#: lib/tore_web/live/planner_live.ex:1151
 #, elixir-autogen, elixir-format
 msgid "%{n} portions"
 msgstr "%{n} portioner"
@@ -31,18 +31,18 @@ msgstr "%{n} portioner"
 msgid "%{n} recipes"
 msgstr "%{n} recept"
 
-#: lib/tore_web/live/planner_live.ex:691
+#: lib/tore_web/live/planner_live.ex:730
 #: lib/tore_web/live/recipe_live.ex:603
 #, elixir-autogen, elixir-format
 msgid "%{n} servings"
 msgstr "%{n} portioner"
 
-#: lib/tore_web/live/shop_live.ex:116
+#: lib/tore_web/live/shop_live.ex:197
 #, elixir-autogen, elixir-format
 msgid "%{n} unchecked · Week %{week}"
 msgstr "%{n} okryssade · Vecka %{week}"
 
-#: lib/tore_web/live/planner_live.ex:1211
+#: lib/tore_web/live/planner_live.ex:1274
 #, elixir-autogen, elixir-format
 msgid "%{range} · %{meals} meals planned"
 msgstr "%{range} · %{meals} måltider planerade"
@@ -67,7 +67,7 @@ msgstr "Lägg till"
 msgid "Add ingredient"
 msgstr "Lägg till ingrediens"
 
-#: lib/tore_web/live/shop_live.ex:189
+#: lib/tore_web/live/shop_live.ex:272
 #, elixir-autogen, elixir-format
 msgid "Add item…"
 msgstr "Lägg till vara…"
@@ -77,7 +77,7 @@ msgstr "Lägg till vara…"
 msgid "Add to pantry"
 msgstr "Lägg till i skafferiet"
 
-#: lib/tore_web/live/planner_live.ex:1032
+#: lib/tore_web/live/planner_live.ex:1087
 #, elixir-autogen, elixir-format
 msgid "All recipes"
 msgstr "Alla recept"
@@ -124,7 +124,7 @@ msgstr "Bygg rika, interaktiva webbapplikationer snabbt, med mindre kod och fär
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: lib/tore_web/live/planner_live.ex:901
+#: lib/tore_web/live/planner_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Change recipe"
 msgstr "Byt recept"
@@ -134,14 +134,16 @@ msgstr "Byt recept"
 msgid "Changelog"
 msgstr "Ändringslogg"
 
-#: lib/tore_web/live/planner_live.ex:968
+#: lib/tore_web/live/planner_live.ex:1023
 #, elixir-autogen, elixir-format
 msgid "Choose a recipe"
 msgstr "Välj ett recept"
 
 #: lib/tore_web/components/core_components.ex:913
-#: lib/tore_web/live/capture_live.ex:122
+#: lib/tore_web/live/capture_live.ex:182
+#: lib/tore_web/live/home_live.ex:136
 #: lib/tore_web/live/run_review_live.ex:213
+#: lib/tore_web/live/shop_live.ex:309
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "Stäng"
@@ -166,7 +168,7 @@ msgstr "Tillagningstid (min)"
 msgid "Could not delete recipe"
 msgstr "Kunde inte ta bort receptet"
 
-#: lib/tore_web/live/planner_live.ex:411
+#: lib/tore_web/live/planner_live.ex:449
 #, elixir-autogen, elixir-format
 msgid "Couldn't fetch a new suggestion"
 msgstr "Kunde inte hämta ett nytt förslag"
@@ -191,7 +193,7 @@ msgstr "Driftsätt din applikation"
 msgid "Discuss on the Elixir Forum"
 msgstr "Diskutera på Elixir Forum"
 
-#: lib/tore_web/live/shop_live.ex:173
+#: lib/tore_web/live/shop_live.ex:254
 #, elixir-autogen, elixir-format
 msgid "Done · %{n}"
 msgstr "Klart · %{n}"
@@ -201,7 +203,7 @@ msgstr "Klart · %{n}"
 msgid "Edit"
 msgstr "Redigera"
 
-#: lib/tore_web/live/planner_live.ex:625
+#: lib/tore_web/live/planner_live.ex:664
 #, elixir-autogen, elixir-format
 msgid "Edit %{label}"
 msgstr "Redigera %{label}"
@@ -221,7 +223,7 @@ msgstr "Ange alla 16 siffror"
 msgid "Enter your 16-digit code"
 msgstr "Ange din 16-siffriga kod"
 
-#: lib/tore_web/live/shop_live.ex:140
+#: lib/tore_web/live/shop_live.ex:221
 #, elixir-autogen, elixir-format
 msgid "Export"
 msgstr "Exportera"
@@ -236,7 +238,7 @@ msgstr "Kunde inte logga"
 msgid "Failed to save"
 msgstr "Kunde inte spara"
 
-#: lib/tore_web/live/planner_live.ex:1012
+#: lib/tore_web/live/planner_live.ex:1067
 #, elixir-autogen, elixir-format
 msgid "Finding suggestions…"
 msgstr "Söker förslag…"
@@ -319,17 +321,17 @@ msgstr "Köksläge"
 msgid "Last used"
 msgstr "Senast använd"
 
-#: lib/tore_web/live/planner_live.ex:701
+#: lib/tore_web/live/planner_live.ex:740
 #, elixir-autogen, elixir-format
 msgid "Leftovers"
 msgstr "Rester"
 
-#: lib/tore_web/live/planner_live.ex:871
+#: lib/tore_web/live/planner_live.ex:911
 #, elixir-autogen, elixir-format
 msgid "Leftovers for"
 msgstr "Rester från"
 
-#: lib/tore_web/live/planner_live.ex:715
+#: lib/tore_web/live/planner_live.ex:754
 #, elixir-autogen, elixir-format
 msgid "Leftovers for %{day}"
 msgstr "Rester från %{day}"
@@ -349,14 +351,14 @@ msgstr "Logga restaurangbesök"
 msgid "Logged"
 msgstr "Loggat"
 
-#: lib/tore_web/live/planner_live.ex:409
+#: lib/tore_web/live/planner_live.ex:447
 #: lib/tore_web/live/prep_live.ex:52
 #, elixir-autogen, elixir-format
 msgid "Monthly LLM budget reached"
 msgstr "Månadens AI-budget uppnådd"
 
 #: lib/tore_web/live/settings_live.ex:357
-#: lib/tore_web/live/shop_live.ex:123
+#: lib/tore_web/live/shop_live.ex:204
 #, elixir-autogen, elixir-format
 msgid "More"
 msgstr "Mer"
@@ -382,7 +384,7 @@ msgstr "Behöver du hjälp?"
 msgid "New recipe"
 msgstr "Nytt recept"
 
-#: lib/tore_web/live/planner_live.ex:458
+#: lib/tore_web/live/planner_live.ex:496
 #, elixir-autogen, elixir-format
 msgid "Next week"
 msgstr "Nästa vecka"
@@ -397,12 +399,12 @@ msgstr "Inga komponenter"
 msgid "No guide yet"
 msgstr "Ingen guide än"
 
-#: lib/tore_web/live/shop_live.ex:154
+#: lib/tore_web/live/shop_live.ex:235
 #, elixir-autogen, elixir-format
 msgid "No items yet"
 msgstr "Inga varor än"
 
-#: lib/tore_web/live/planner_live.ex:823
+#: lib/tore_web/live/planner_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "No meal chosen yet — tap Change recipe to pick one."
 msgstr "Ingen måltid vald än — tryck på Byt recept för att välja en."
@@ -412,7 +414,7 @@ msgstr "Ingen måltid vald än — tryck på Byt recept för att välja en."
 msgid "No notes"
 msgstr "Inga anteckningar"
 
-#: lib/tore_web/live/planner_live.ex:1047
+#: lib/tore_web/live/planner_live.ex:1102
 #, elixir-autogen, elixir-format
 msgid "No recipes match."
 msgstr "Inga recept matchar."
@@ -452,12 +454,12 @@ msgstr "Phoenix Framework"
 msgid "Please wait a moment before generating again"
 msgstr "Vänta lite innan du genererar igen"
 
-#: lib/tore_web/live/planner_live.ex:410
+#: lib/tore_web/live/planner_live.ex:448
 #, elixir-autogen, elixir-format
 msgid "Please wait a moment before trying again"
 msgstr "Vänta lite innan du försöker igen"
 
-#: lib/tore_web/live/planner_live.ex:837
+#: lib/tore_web/live/planner_live.ex:877
 #, elixir-autogen, elixir-format
 msgid "Portions"
 msgstr "Portioner"
@@ -477,14 +479,14 @@ msgstr "Förberedelseguide"
 msgid "Prep guide generation failed"
 msgstr "Generering av förberedelseguide misslyckades"
 
-#: lib/tore_web/live/planner_live.ex:440
+#: lib/tore_web/live/planner_live.ex:478
 #, elixir-autogen, elixir-format
 msgid "Previous week"
 msgstr "Föregående vecka"
 
 #: lib/tore_web/live/cost_live.ex:398
 #: lib/tore_web/live/recipe_live.ex:909
-#: lib/tore_web/live/shop_live.ex:197
+#: lib/tore_web/live/shop_live.ex:280
 #, elixir-autogen, elixir-format
 msgid "Qty"
 msgstr "Antal"
@@ -507,7 +509,7 @@ msgstr "Recept"
 #: lib/tore_web/live/cost_live.ex:420
 #: lib/tore_web/live/pantry_live.ex:50
 #: lib/tore_web/live/pantry_live.ex:52
-#: lib/tore_web/live/shop_live.ex:260
+#: lib/tore_web/live/shop_live.ex:389
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Ta bort"
@@ -517,7 +519,7 @@ msgstr "Ta bort"
 msgid "Restaurant / occasion"
 msgstr "Restaurang / tillfälle"
 
-#: lib/tore_web/live/planner_live.ex:1032
+#: lib/tore_web/live/planner_live.ex:1087
 #, elixir-autogen, elixir-format
 msgid "Results"
 msgstr "Resultat"
@@ -553,7 +555,7 @@ msgstr "Skanning misslyckades"
 msgid "Search recipes, ingredients, or meals…"
 msgstr "Sök recept, ingredienser eller måltider…"
 
-#: lib/tore_web/live/planner_live.ex:983
+#: lib/tore_web/live/planner_live.ex:1038
 #, elixir-autogen, elixir-format
 msgid "Search recipes…"
 msgstr "Sök recept…"
@@ -569,13 +571,13 @@ msgstr "Portioner"
 msgid "Settings"
 msgstr "Inställningar"
 
-#: lib/tore_web/live/planner_live.ex:920
+#: lib/tore_web/live/planner_live.ex:960
 #, elixir-autogen, elixir-format
 msgid "Skip dinner"
 msgstr "Hoppa över middagen"
 
-#: lib/tore_web/live/planner_live.ex:705
-#: lib/tore_web/live/planner_live.ex:920
+#: lib/tore_web/live/planner_live.ex:744
+#: lib/tore_web/live/planner_live.ex:960
 #, elixir-autogen, elixir-format
 msgid "Skipped"
 msgstr "Överhoppad"
@@ -605,7 +607,7 @@ msgstr "Käll-URL"
 msgid "Submit"
 msgstr "Skicka"
 
-#: lib/tore_web/live/planner_live.ex:997
+#: lib/tore_web/live/planner_live.ex:1052
 #, elixir-autogen, elixir-format
 msgid "Suggested"
 msgstr "Föreslagna"
@@ -615,7 +617,7 @@ msgstr "Föreslagna"
 msgid "Sunday Prep Plan"
 msgstr "Söndagsförberedelse"
 
-#: lib/tore_web/live/planner_live.ex:1006
+#: lib/tore_web/live/planner_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "Surprise me"
 msgstr "Överraska mig"
@@ -625,7 +627,7 @@ msgstr "Överraska mig"
 msgid "Sushi night"
 msgstr "Sushibjudning"
 
-#: lib/tore_web/live/planner_live.ex:579
+#: lib/tore_web/live/planner_live.ex:617
 #, elixir-autogen, elixir-format
 msgid "Swipe left to right to see other weeks"
 msgstr "Svep från vänster till höger för att se andra veckor"
@@ -640,7 +642,7 @@ msgstr "Taggar"
 msgid "This month"
 msgstr "Denna månad"
 
-#: lib/tore_web/live/planner_live.ex:447
+#: lib/tore_web/live/planner_live.ex:485
 #, elixir-autogen, elixir-format
 msgid "This week"
 msgstr "Denna vecka"
@@ -661,7 +663,7 @@ msgid "Title"
 msgstr "Titel"
 
 #: lib/tore_web/components/layouts.ex:11
-#: lib/tore_web/live/planner_live.ex:653
+#: lib/tore_web/live/planner_live.ex:692
 #, elixir-autogen, elixir-format
 msgid "Today"
 msgstr "Idag"
@@ -689,7 +691,7 @@ msgstr "Typ"
 
 #: lib/tore_web/live/cost_live.ex:408
 #: lib/tore_web/live/recipe_live.ex:920
-#: lib/tore_web/live/shop_live.ex:205
+#: lib/tore_web/live/shop_live.ex:288
 #, elixir-autogen, elixir-format
 msgid "Unit"
 msgstr "Enhet"
@@ -699,7 +701,7 @@ msgstr "Enhet"
 msgid "Users"
 msgstr "Användare"
 
-#: lib/tore_web/live/planner_live.ex:696
+#: lib/tore_web/live/planner_live.ex:735
 #, elixir-autogen, elixir-format
 msgid "Uses leftovers"
 msgstr "Använder rester"
@@ -744,7 +746,7 @@ msgstr "aktiv"
 msgid "close"
 msgstr "stäng"
 
-#: lib/tore_web/live/planner_live.ex:709
+#: lib/tore_web/live/planner_live.ex:748
 #, elixir-autogen, elixir-format
 msgid "— add a meal"
 msgstr "— lägg till en måltid"
@@ -812,149 +814,149 @@ msgstr "Totalt (kr)"
 msgid "Vegetarian"
 msgstr "Vegetarisk"
 
-#: lib/tore_web/live/planner_live.ex:1138
+#: lib/tore_web/live/planner_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Apr"
 msgstr "apr"
 
-#: lib/tore_web/live/planner_live.ex:1142
+#: lib/tore_web/live/planner_live.ex:1197
 #, elixir-autogen, elixir-format
 msgid "Aug"
 msgstr "aug"
 
-#: lib/tore_web/live/planner_live.ex:1146
+#: lib/tore_web/live/planner_live.ex:1201
 #, elixir-autogen, elixir-format
 msgid "Dec"
 msgstr "dec"
 
-#: lib/tore_web/live/planner_live.ex:1168
+#: lib/tore_web/live/planner_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Dinner"
 msgstr "Middag"
 
-#: lib/tore_web/live/planner_live.ex:1136
+#: lib/tore_web/live/planner_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Feb"
 msgstr "feb"
 
-#: lib/tore_web/live/planner_live.ex:1127
+#: lib/tore_web/live/planner_live.ex:1182
 #, elixir-autogen, elixir-format
 msgid "Fri"
 msgstr "Fre"
 
 #: lib/tore_web/components/receipt_live.ex:151
-#: lib/tore_web/live/planner_live.ex:1158
+#: lib/tore_web/live/planner_live.ex:1213
 #, elixir-autogen, elixir-format
 msgid "Friday"
 msgstr "Fredag"
 
-#: lib/tore_web/live/planner_live.ex:1135
+#: lib/tore_web/live/planner_live.ex:1190
 #, elixir-autogen, elixir-format
 msgid "Jan"
 msgstr "jan"
 
-#: lib/tore_web/live/planner_live.ex:1141
+#: lib/tore_web/live/planner_live.ex:1196
 #, elixir-autogen, elixir-format
 msgid "Jul"
 msgstr "jul"
 
-#: lib/tore_web/live/planner_live.ex:1140
+#: lib/tore_web/live/planner_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Jun"
 msgstr "jun"
 
-#: lib/tore_web/live/planner_live.ex:1167
+#: lib/tore_web/live/planner_live.ex:1222
 #, elixir-autogen, elixir-format
 msgid "Lunch"
 msgstr "Lunch"
 
-#: lib/tore_web/live/planner_live.ex:1137
+#: lib/tore_web/live/planner_live.ex:1192
 #, elixir-autogen, elixir-format
 msgid "Mar"
 msgstr "mar"
 
-#: lib/tore_web/live/planner_live.ex:1139
+#: lib/tore_web/live/planner_live.ex:1194
 #, elixir-autogen, elixir-format
 msgid "May"
 msgstr "maj"
 
-#: lib/tore_web/live/planner_live.ex:1123
+#: lib/tore_web/live/planner_live.ex:1178
 #, elixir-autogen, elixir-format
 msgid "Mon"
 msgstr "Mån"
 
 #: lib/tore_web/components/receipt_live.ex:147
-#: lib/tore_web/live/planner_live.ex:1154
+#: lib/tore_web/live/planner_live.ex:1209
 #, elixir-autogen, elixir-format
 msgid "Monday"
 msgstr "Måndag"
 
-#: lib/tore_web/live/planner_live.ex:1145
+#: lib/tore_web/live/planner_live.ex:1200
 #, elixir-autogen, elixir-format
 msgid "Nov"
 msgstr "nov"
 
-#: lib/tore_web/live/planner_live.ex:1144
+#: lib/tore_web/live/planner_live.ex:1199
 #, elixir-autogen, elixir-format
 msgid "Oct"
 msgstr "okt"
 
-#: lib/tore_web/live/planner_live.ex:1128
+#: lib/tore_web/live/planner_live.ex:1183
 #, elixir-autogen, elixir-format
 msgid "Sat"
 msgstr "Lör"
 
 #: lib/tore_web/components/receipt_live.ex:152
-#: lib/tore_web/live/planner_live.ex:1159
+#: lib/tore_web/live/planner_live.ex:1214
 #, elixir-autogen, elixir-format
 msgid "Saturday"
 msgstr "Lördag"
 
-#: lib/tore_web/live/planner_live.ex:1143
+#: lib/tore_web/live/planner_live.ex:1198
 #, elixir-autogen, elixir-format
 msgid "Sep"
 msgstr "sep"
 
-#: lib/tore_web/live/planner_live.ex:1129
+#: lib/tore_web/live/planner_live.ex:1184
 #, elixir-autogen, elixir-format
 msgid "Sun"
 msgstr "Sön"
 
 #: lib/tore_web/components/receipt_live.ex:153
-#: lib/tore_web/live/planner_live.ex:1160
+#: lib/tore_web/live/planner_live.ex:1215
 #, elixir-autogen, elixir-format
 msgid "Sunday"
 msgstr "Söndag"
 
-#: lib/tore_web/live/planner_live.ex:1126
+#: lib/tore_web/live/planner_live.ex:1181
 #, elixir-autogen, elixir-format
 msgid "Thu"
 msgstr "Tor"
 
 #: lib/tore_web/components/receipt_live.ex:150
-#: lib/tore_web/live/planner_live.ex:1157
+#: lib/tore_web/live/planner_live.ex:1212
 #, elixir-autogen, elixir-format
 msgid "Thursday"
 msgstr "Torsdag"
 
-#: lib/tore_web/live/planner_live.ex:1124
+#: lib/tore_web/live/planner_live.ex:1179
 #, elixir-autogen, elixir-format
 msgid "Tue"
 msgstr "Tis"
 
 #: lib/tore_web/components/receipt_live.ex:148
-#: lib/tore_web/live/planner_live.ex:1155
+#: lib/tore_web/live/planner_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Tuesday"
 msgstr "Tisdag"
 
-#: lib/tore_web/live/planner_live.ex:1125
+#: lib/tore_web/live/planner_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Wed"
 msgstr "Ons"
 
 #: lib/tore_web/components/receipt_live.ex:149
-#: lib/tore_web/live/planner_live.ex:1156
+#: lib/tore_web/live/planner_live.ex:1211
 #, elixir-autogen, elixir-format
 msgid "Wednesday"
 msgstr "Onsdag"
@@ -1522,22 +1524,22 @@ msgstr "Snittkvitto"
 msgid "Bases"
 msgstr "Baser"
 
-#: lib/tore_web/live/shop_live.ex:295
+#: lib/tore_web/live/shop_live.ex:435
 #, elixir-autogen, elixir-format
 msgid "Beverages"
 msgstr "Drycker"
 
-#: lib/tore_web/live/shop_live.ex:293
+#: lib/tore_web/live/shop_live.ex:433
 #, elixir-autogen, elixir-format
 msgid "Bread"
 msgstr "Bröd"
 
-#: lib/tore_web/live/shop_live.ex:294
+#: lib/tore_web/live/shop_live.ex:434
 #, elixir-autogen, elixir-format
 msgid "Canned Goods"
 msgstr "Konserver"
 
-#: lib/tore_web/live/shop_live.ex:297
+#: lib/tore_web/live/shop_live.ex:437
 #, elixir-autogen, elixir-format
 msgid "Condiments & Oils"
 msgstr "Såser & oljor"
@@ -1547,17 +1549,17 @@ msgstr "Såser & oljor"
 msgid "Cost views"
 msgstr "Kostnadsvyer"
 
-#: lib/tore_web/live/shop_live.ex:290
+#: lib/tore_web/live/shop_live.ex:430
 #, elixir-autogen, elixir-format
 msgid "Dairy & Eggs"
 msgstr "Mejeri & ägg"
 
-#: lib/tore_web/live/shop_live.ex:291
+#: lib/tore_web/live/shop_live.ex:431
 #, elixir-autogen, elixir-format
 msgid "Deli"
 msgstr "Chark"
 
-#: lib/tore_web/live/shop_live.ex:299
+#: lib/tore_web/live/shop_live.ex:439
 #, elixir-autogen, elixir-format
 msgid "Dry Goods"
 msgstr "Torrvaror"
@@ -1579,7 +1581,7 @@ msgstr "Äta ute – denna månad"
 msgid "Favourite restaurants"
 msgstr "Vanligaste restauranger"
 
-#: lib/tore_web/live/shop_live.ex:289
+#: lib/tore_web/live/shop_live.ex:429
 #, elixir-autogen, elixir-format
 msgid "Fish & Seafood"
 msgstr "Fisk & skaldjur"
@@ -1589,7 +1591,7 @@ msgstr "Fisk & skaldjur"
 msgid "Food costs"
 msgstr "Matkostnader"
 
-#: lib/tore_web/live/shop_live.ex:292
+#: lib/tore_web/live/shop_live.ex:432
 #, elixir-autogen, elixir-format
 msgid "Frozen"
 msgstr "Fryst"
@@ -1604,18 +1606,18 @@ msgstr "Genererar din prepguide…"
 msgid "Groceries — this month"
 msgstr "Matvaror – denna månad"
 
-#: lib/tore_web/live/shop_live.ex:296
+#: lib/tore_web/live/shop_live.ex:436
 #, elixir-autogen, elixir-format
 msgid "Herbs & Spices"
 msgstr "Kryddor & örter"
 
 #: lib/tore_web/live/settings_live.ex:208
-#: lib/tore_web/live/shop_live.ex:298
+#: lib/tore_web/live/shop_live.ex:438
 #, elixir-autogen, elixir-format
 msgid "Household"
 msgstr "Hushåll"
 
-#: lib/tore_web/live/shop_live.ex:288
+#: lib/tore_web/live/shop_live.ex:428
 #, elixir-autogen, elixir-format
 msgid "Meat"
 msgstr "Kött"
@@ -1645,12 +1647,12 @@ msgstr "Inga restauranger ännu"
 msgid "No stores yet"
 msgstr "Inga butiker ännu"
 
-#: lib/tore_web/live/shop_live.ex:300
+#: lib/tore_web/live/shop_live.ex:440
 #, elixir-autogen, elixir-format
 msgid "Other"
 msgstr "Övrigt"
 
-#: lib/tore_web/live/shop_live.ex:287
+#: lib/tore_web/live/shop_live.ex:427
 #, elixir-autogen, elixir-format
 msgid "Produce"
 msgstr "Frukt & grönt"
@@ -1757,17 +1759,17 @@ msgstr "kvitton"
 msgid "visits"
 msgstr "besök"
 
-#: lib/tore_web/live/planner_live.ex:1227
+#: lib/tore_web/live/planner_live.ex:1290
 #, elixir-autogen, elixir-format
 msgid "%{count} slot(s) unplanned."
 msgstr "%{count} måltid(er) oplanerade."
 
-#: lib/tore_web/live/planner_live.ex:478
+#: lib/tore_web/live/planner_live.ex:516
 #, elixir-autogen, elixir-format
 msgid "..."
 msgstr "…"
 
-#: lib/tore_web/live/planner_live.ex:507
+#: lib/tore_web/live/planner_live.ex:545
 #, elixir-autogen, elixir-format
 msgid "Accept"
 msgstr "Acceptera"
@@ -1793,13 +1795,13 @@ msgstr "Justerade portioner på %{day}"
 msgid "Approximate inventory"
 msgstr "Ungefärligt lager"
 
-#: lib/tore_web/live/planner_live.ex:478
+#: lib/tore_web/live/planner_live.ex:516
 #: lib/tore_web/live/recipe_live.ex:714
 #, elixir-autogen, elixir-format
 msgid "Ask"
 msgstr "Fråga"
 
-#: lib/tore_web/live/capture_live.ex:134
+#: lib/tore_web/live/capture_live.ex:194
 #: lib/tore_web/live/kiosk_capture_live.ex:39
 #, elixir-autogen, elixir-format
 msgid "Ask Tore"
@@ -1810,17 +1812,17 @@ msgstr "Fråga Tore"
 msgid "Ask a cooking question…"
 msgstr "Ställ en matlagningsfråga…"
 
-#: lib/tore_web/live/planner_live.ex:469
+#: lib/tore_web/live/planner_live.ex:507
 #, elixir-autogen, elixir-format
 msgid "Ask about tonight's plan..."
 msgstr "Fråga om kvällens plan..."
 
-#: lib/tore_web/live/capture_live.ex:262
+#: lib/tore_web/live/capture_live.ex:335
 #, elixir-autogen, elixir-format
 msgid "Ask anything about meals, groceries…"
 msgstr "Fråga vad som helst om måltider, inköp…"
 
-#: lib/tore_web/live/capture_live.ex:279
+#: lib/tore_web/live/capture_live.ex:352
 #, elixir-autogen, elixir-format
 msgid "Attach photo"
 msgstr "Bifoga foto"
@@ -1830,7 +1832,7 @@ msgstr "Bifoga foto"
 msgid "Back to chat"
 msgstr "Tillbaka till chatten"
 
-#: lib/tore_web/live/planner_live.ex:543
+#: lib/tore_web/live/planner_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "Budget"
 msgstr "Budget"
@@ -1910,7 +1912,7 @@ msgstr "Hög säkerhet"
 msgid "I cooked it ✓"
 msgstr "Jag lagade den ✓"
 
-#: lib/tore_web/live/planner_live.ex:514
+#: lib/tore_web/live/planner_live.ex:552
 #, elixir-autogen, elixir-format
 msgid "Ignore"
 msgstr "Ignorera"
@@ -1930,7 +1932,7 @@ msgstr "Rester på %{day}"
 msgid "Low confidence"
 msgstr "Låg säkerhet"
 
-#: lib/tore_web/live/planner_live.ex:543
+#: lib/tore_web/live/planner_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "Low effort"
 msgstr "Lågt krångel"
@@ -1945,7 +1947,7 @@ msgstr "Medelhög säkerhet"
 msgid "Missing something?"
 msgstr "Saknas något?"
 
-#: lib/tore_web/live/planner_live.ex:543
+#: lib/tore_web/live/planner_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "More leftovers"
 msgstr "Mer rester"
@@ -1966,17 +1968,17 @@ msgstr "Ingen måltid planerad"
 msgid "No memories yet. Tore learns as you cook."
 msgstr "Inga minnen än. Tore lär sig medan du lagar mat."
 
-#: lib/tore_web/live/home_live.ex:71
+#: lib/tore_web/live/home_live.ex:81
 #, elixir-autogen, elixir-format
 msgid "No photo"
 msgstr "Inget foto"
 
-#: lib/tore_web/live/planner_live.ex:1223
+#: lib/tore_web/live/planner_live.ex:1286
 #, elixir-autogen, elixir-format
 msgid "No plan for this week yet."
 msgstr "Ingen plan för veckan än."
 
-#: lib/tore_web/live/planner_live.ex:543
+#: lib/tore_web/live/planner_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "Normal"
 msgstr "Normal"
@@ -1986,17 +1988,17 @@ msgstr "Normal"
 msgid "Nothing in the pantry yet. Items appear here when you check off groceries or scan a receipt."
 msgstr "Inget i skafferiet än. Varor dyker upp här när du bockar av inköp eller skannar ett kvitto."
 
-#: lib/tore_web/live/home_live.ex:96
+#: lib/tore_web/live/home_live.ex:115
 #, elixir-autogen, elixir-format
 msgid "Nothing planned for tonight"
 msgstr "Inget planerat ikväll"
 
-#: lib/tore_web/live/home_live.ex:99
+#: lib/tore_web/live/home_live.ex:118
 #, elixir-autogen, elixir-format
 msgid "Open planner"
 msgstr "Öppna planeraren"
 
-#: lib/tore_web/live/planner_live.ex:1224
+#: lib/tore_web/live/planner_live.ex:1287
 #, elixir-autogen, elixir-format
 msgid "Plan looks good for the week."
 msgstr "Planen ser bra ut för veckan."
@@ -2022,7 +2024,7 @@ msgid "Receipt"
 msgstr "Kvitto"
 
 #: lib/tore_web/components/receipt_live.ex:59
-#: lib/tore_web/live/capture_live.ex:244
+#: lib/tore_web/live/capture_live.ex:317
 #, elixir-autogen, elixir-format
 msgid "Reverted"
 msgstr "Återställd"
@@ -2037,12 +2039,12 @@ msgstr "Skicka"
 msgid "Skipped %{day}"
 msgstr "Hoppade över %{day}"
 
-#: lib/tore_web/live/home_live.ex:122
+#: lib/tore_web/live/home_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "Slot cleared — pick something from the planner."
 msgstr "Platsen rensad — välj något från planeraren."
 
-#: lib/tore_web/live/home_live.ex:86
+#: lib/tore_web/live/home_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Something else"
 msgstr "Något annat"
@@ -2052,7 +2054,7 @@ msgstr "Något annat"
 msgid "Spending"
 msgstr "Utgifter"
 
-#: lib/tore_web/live/home_live.ex:80
+#: lib/tore_web/live/home_live.ex:90
 #: lib/tore_web/live/recipe_live.ex:743
 #, elixir-autogen, elixir-format
 msgid "Start cooking"
@@ -2078,14 +2080,14 @@ msgstr "Bytte in %{recipe} på %{day}"
 msgid "Things Tore has learned"
 msgstr "Saker Tore har lärt sig"
 
-#: lib/tore_web/live/capture_live.ex:250
+#: lib/tore_web/live/capture_live.ex:323
 #: lib/tore_web/live/kiosk_capture_live.ex:54
 #: lib/tore_web/live/recipe_live.ex:719
 #, elixir-autogen, elixir-format
 msgid "Thinking…"
 msgstr "Tänker…"
 
-#: lib/tore_web/live/home_live.ex:63
+#: lib/tore_web/live/home_live.ex:70
 #: lib/tore_web/live/kiosk_live.ex:132
 #, elixir-autogen, elixir-format
 msgid "Tonight"
@@ -2096,7 +2098,9 @@ msgstr "Ikväll"
 msgid "Tore adjusted the plan"
 msgstr "Tore justerade planen"
 
-#: lib/tore_web/live/planner_live.ex:355
+#: lib/tore_web/live/home_live.ex:282
+#: lib/tore_web/live/planner_live.ex:393
+#: lib/tore_web/live/shop_live.ex:144
 #, elixir-autogen, elixir-format
 msgid "Tore couldn't finish that. Try again in a moment."
 msgstr "Tore kunde inte slutföra det. Försök igen om en stund."
@@ -2116,12 +2120,12 @@ msgstr "Tore jobbar på det"
 msgid "Tore needs a moment"
 msgstr "Tore behöver ett ögonblick"
 
-#: lib/tore_web/live/planner_live.ex:497
+#: lib/tore_web/live/planner_live.ex:535
 #, elixir-autogen, elixir-format
 msgid "Tore noticed"
 msgstr "Tore märkte"
 
-#: lib/tore_web/live/planner_live.ex:543
+#: lib/tore_web/live/planner_live.ex:581
 #, elixir-autogen, elixir-format
 msgid "Use pantry"
 msgstr "Använd skafferi"
@@ -2167,7 +2171,7 @@ msgstr "Tore kunde inte slutföra det — inget ändrades."
 msgid "Tore couldn't finish that."
 msgstr "Tore kunde inte slutföra det."
 
-#: lib/tore_web/live/planner_live.ex:1230
+#: lib/tore_web/live/planner_live.ex:1293
 #, elixir-autogen, elixir-format
 msgid "%{count} dinner(s) skipped this week."
 msgstr "%{count} middag(ar) överhoppade den här veckan."
@@ -2202,50 +2206,50 @@ msgstr "Det fanns ingen tidigare måltid att göra rester av."
 msgid "Tore couldn't tell which day to skip."
 msgstr "Tore kunde inte avgöra vilken dag som skulle hoppas över."
 
-#: lib/tore_web/live/planner_live.ex:939
+#: lib/tore_web/live/planner_live.ex:979
 #, elixir-autogen, elixir-format
 msgid "Pin this day"
 msgstr "Lås dagen"
 
-#: lib/tore_web/live/planner_live.ex:658
-#: lib/tore_web/live/planner_live.ex:939
+#: lib/tore_web/live/planner_live.ex:697
+#: lib/tore_web/live/planner_live.ex:979
 #, elixir-autogen, elixir-format
 msgid "Pinned"
 msgstr "Låst"
 
 #: lib/tore_web/components/layouts.ex:13
-#: lib/tore_web/live/shop_live.ex:113
+#: lib/tore_web/live/shop_live.ex:194
 #, elixir-autogen, elixir-format
 msgid "Shop"
 msgstr "Inköp"
 
-#: lib/tore_web/live/capture_live.ex:83
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/tore_web/live/capture_live.ex:122
+#, elixir-autogen, elixir-format
 msgid "%{n} photos"
 msgstr "%{n} portioner"
 
-#: lib/tore_web/live/shop_live.ex:353
+#: lib/tore_web/live/shop_live.ex:493
 #, elixir-autogen, elixir-format
 msgid ", last confirmed %{n} days ago"
 msgstr ""
 
-#: lib/tore_web/live/shop_live.ex:351
+#: lib/tore_web/live/shop_live.ex:491
 #, elixir-autogen, elixir-format
 msgid ", last confirmed today"
 msgstr ""
 
-#: lib/tore_web/live/shop_live.ex:352
+#: lib/tore_web/live/shop_live.ex:492
 #, elixir-autogen, elixir-format
 msgid ", last confirmed yesterday"
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:82
+#: lib/tore_web/live/capture_live.ex:121
 #, elixir-autogen, elixir-format
 msgid "1 photo"
 msgstr ""
 
 #: lib/tore_web/live/run_review_live.ex:321
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Add item"
 msgstr "Lägg till vara…"
 
@@ -2255,7 +2259,7 @@ msgid "All caught up."
 msgstr ""
 
 #: lib/tore_web/live/run_review_live.ex:169
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Back"
 msgstr "Backsteg"
 
@@ -2289,8 +2293,8 @@ msgstr ""
 msgid "Go to capture"
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:163
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/tore_web/live/capture_live.ex:236
+#, elixir-autogen, elixir-format
 msgid "Imported"
 msgstr "Importera"
 
@@ -2321,7 +2325,7 @@ msgstr ""
 msgid "No items parsed. Nothing will be added to the pantry."
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:155
+#: lib/tore_web/live/capture_live.ex:228
 #, elixir-autogen, elixir-format
 msgid "Open inbox"
 msgstr ""
@@ -2331,12 +2335,12 @@ msgstr ""
 msgid "Open photo"
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:169
-#, elixir-autogen, elixir-format, fuzzy
+#: lib/tore_web/live/capture_live.ex:242
+#, elixir-autogen, elixir-format
 msgid "Open recipe"
 msgstr "Nytt recept"
 
-#: lib/tore_web/live/capture_live.ex:215
+#: lib/tore_web/live/capture_live.ex:288
 #, elixir-autogen, elixir-format
 msgid "Open shopping list"
 msgstr ""
@@ -2348,17 +2352,17 @@ msgid "Original photo"
 msgstr ""
 
 #: lib/tore_web/live/inbox_live.ex:142
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Pantry update"
 msgstr "Skafferivaror"
 
 #: lib/tore_web/live/recipe_live.ex:440
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Paste a recipe URL or drop a photo in capture"
 msgstr "Klistra in en recept-URL eller dra och släpp skärmdumpar…"
 
 #: lib/tore_web/components/layouts.ex:12
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Plan"
 msgstr "Planeringsdagar"
 
@@ -2377,7 +2381,8 @@ msgstr ""
 msgid "Receipt already saved."
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:94
+#: lib/tore_web/live/capture_live.ex:135
+#: lib/tore_web/live/capture_live.ex:151
 #, elixir-autogen, elixir-format
 msgid "Sorry, I couldn't process that. Please try again."
 msgstr ""
@@ -2402,19 +2407,19 @@ msgstr ""
 msgid "This receipt was discarded."
 msgstr ""
 
-#: lib/tore_web/live/capture_live.ex:238
+#: lib/tore_web/live/capture_live.ex:311
 #, elixir-autogen, elixir-format
 msgid "Undo"
 msgstr ""
 
-#: lib/tore_web/live/planner_live.ex:371
-#: lib/tore_web/live/shop_live.ex:84
+#: lib/tore_web/live/planner_live.ex:409
+#: lib/tore_web/live/shop_live.ex:165
 #, elixir-autogen, elixir-format
 msgid "Undone."
 msgstr ""
 
 #: lib/tore_web/live/pantry_live.ex:73
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Okänd butik"
 
@@ -2424,7 +2429,7 @@ msgstr "Okänd butik"
 msgid "Used for reading receipts, recipes and grocery labels."
 msgstr ""
 
-#: lib/tore_web/live/shop_live.ex:335
+#: lib/tore_web/live/shop_live.ex:475
 #, elixir-autogen, elixir-format
 msgid "confirmed at home%{when}"
 msgstr ""
@@ -2439,22 +2444,22 @@ msgstr ""
 msgid "looks off, is something missing?"
 msgstr ""
 
-#: lib/tore_web/live/shop_live.ex:338
+#: lib/tore_web/live/shop_live.ex:478
 #, elixir-autogen, elixir-format
 msgid "probably at home%{when}"
 msgstr ""
 
 #: lib/tore_web/live/run_review_live.ex:268
-#, elixir-autogen, elixir-format, fuzzy
+#, elixir-autogen, elixir-format
 msgid "receipt total"
 msgstr "kvitton"
 
-#: lib/tore_web/live/shop_live.ex:341
+#: lib/tore_web/live/shop_live.ex:481
 #, elixir-autogen, elixir-format
 msgid "unknown%{when}"
 msgstr ""
 
-#: lib/tore_web/live/home_live.ex:57
+#: lib/tore_web/live/home_live.ex:64
 #, elixir-autogen, elixir-format
 msgid "%{count} to review"
 msgid_plural "%{count} to review"
@@ -2476,7 +2481,28 @@ msgstr "Öppna kommandobrickan"
 msgid "Run history"
 msgstr "Körhistorik"
 
-#: lib/tore_web/live/planner_live.ex:948
+#: lib/tore_web/live/planner_live.ex:1003
 #, elixir-autogen, elixir-format
 msgid "Anything about this day…"
 msgstr "Något om den här dagen…"
+
+#: lib/tore_web/live/capture_live.ex:148
+#, elixir-autogen, elixir-format
+msgid "Done — %{title}"
+msgstr "Klart — %{title}"
+
+#: lib/tore_web/live/home_live.ex:276
+#: lib/tore_web/live/shop_live.ex:404
+#, elixir-autogen, elixir-format
+msgid "Done."
+msgstr "Klar"
+
+#: lib/tore_web/live/shop_live.ex:329
+#, elixir-autogen, elixir-format
+msgid "Anything about this item…"
+msgstr "Något om den här varan…"
+
+#: lib/tore_web/live/home_live.ex:165
+#, elixir-autogen, elixir-format
+msgid "Anything about tonight…"
+msgstr "Något om ikväll…"

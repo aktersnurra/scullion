@@ -14,6 +14,7 @@
 - **2026-06-02:** UI/UX vocabulary adopted. Canonical names: `CounterNote` (artifact and code module — replaces the working name `Opportunity` from the first draft of §A), `Shop` (UI surface and route `/shop` — replaces `Groceries` / `/groceries`), `Capture` (UI surface and route `/capture` — replaces `Chat` / `/chat`), `Tore.Capture` (module namespace — replaces `Tore.Chat`). The code rename is a separate sub-plan; SPEC.md uses the new names throughout from this commit forward.
 - **2026-07-03:** Reconciliation pass. Absorbed what the run-receipts slice (`SPEC_FEAT_run_receipts.md`) and a month of implementation legitimately decided: the run aggregate is event-sourced (`Tore.Harness.Run`), a seventh `:discarded` terminal state with a weekly TTL sweep, `undo_payload` as a sum type replacing `undo_ref`, the `PantrySnapshot` / `RunBundle` artifacts, and the `:capture_turn_run` parent-run kind. Fixed internal contradictions (SystemPrompt, fridge-rescue tier, weekly planning Pattern A vs B, leftover Chat naming, Quantum jobs bypassing the harness). Made the single-household deployment assumption explicit. Decided: Capture keeps LLM photo classification (`classify_image`) rather than explicit intent chips — considered and rejected the chips.
 - **2026-07-12:** §A.6.2 resolved-handles landed for plan slots. Decided: handles carry an opaque `ref` token (not the struct) to the model; the PlannerAgent runtime exchanges refs for real IDs at the action-tool boundary via a per-run registry, and rejects invented/stale refs as a tool error without invoking the tool. Added `:direct_touch` as a `source` value (confidence 1.0 — the user touched the object in the UI, nothing to resolve). Shipped: `resolve_recipe`, direct-touch slot handles from the plan slot sheet's scoped command input. Deferred: `resolve_slot`, `resolve_grocery_item`, `resolve_pantry_item` — until their consumers exist. Slot action-tool params stay structural `slot_key` domain keys by design, not a `ResolvedSlot` ref.
+- **2026-08-04:** Anticipation layer landed (plan 3 of 3). `CounterNote` gained a `proposed_run` map column (sum type: `planner_command` | `add_item` | `nil`) and four scan kinds (`swap_suggestion`, `freezer_fallback`, `missing_ingredient`, `usual_item_missing`); `CounterNoteVerifier` checks every scan proposal before it is materialized. A new `:ambient_scan_run` (Tier 0, `started_by: "system"`) predicts at most one actionable note per surface daily at 05:00 and after a 5-minute-debounced plan/shop mutation, gated by SpendGuard `:ambient_scan {8_000, 600}`; `CounterNotes.recently_ignored/1` feeds dismissed notes back into the next scan prompt so the model does not re-propose them. `CounterNotes.follow_up/2` is the single accept-with-effect path: `add_item` applies directly (no LLM), `planner_command` dispatches `:planner_command_run` with `started_by: "counter_note_followup"` and Plan 2's `scoped_slot` machinery. Home hero, the Plan slot sheet, the Shop add-field, and the Capture tray's half state all render these notes as one-tap predictions per Rule 1 (replace generic affordances, never add elements) — never awaited on page load (Rule 2). §A.6.2: `resolve_slot` shipped as a pure, deterministic resolver — see below. Also shipped: long-press object sheets on the tonight card (scoped to today) and grocery rows (scoped via a `Capture.Router` text referent, since no grocery action tools exist yet to consume a handle).
 - **Supersedes:** the original Scullion SPEC.md (2026-05-02), now archived in git history at commit `af0ad48`.
 - **Companion docs:** `LLM-NATIVE-FEATURES.md` (the design brief this spec absorbs), `UI_SPEC.md` (UI/UX contract — meets this spec at the artifact boundary), `SPEC_FEAT_run_receipts.md` (the first vertical slice of the harness: receipts, diffs, undo). Per-feature design notes live under `docs/superpowers/specs/`.
 - **Naming:** the project is *Tore*. Any remaining reference to Scullion or Family in code is legacy and slated for deletion (see §Removed in Rewrite).
@@ -420,15 +421,29 @@ registry is rejected.
 - The same handle may be reused within a single run but not across runs. The registry is per-run, so a ref minted in one run does not exist in another; the harness looks the ref up in the current run's registry on every action call.
 
 **Implementation status (V1).** Shipped: `resolve_recipe` (Jaro similarity
-over the recipe catalog) and direct-touch slot handles (minted by the
+over the recipe catalog), direct-touch slot handles (minted by the
 Orchestrator when a run is scoped to a slot the user opened in the UI, e.g.
-the plan slot sheet's scoped command input). Deferred until their consumers
-exist: `resolve_slot` (natural-language slot resolution), `resolve_grocery_item`,
-`resolve_pantry_item`. Slot-targeting action tools (`assign_recipe`,
-`swap_recipe`, `skip_meal`, `mark_leftover`, `set_servings`, `remove_recipe`)
-still take a structural `slot_key` domain key rather than a `ResolvedSlot`
-ref — by design, not a gap: slot keys are stable, deterministic, and never
-ambiguous, so there is nothing for a resolver to disambiguate.
+the plan slot sheet's scoped command input), and `resolve_slot` (2026-08 —
+see below). Deferred until their consumers exist: `resolve_grocery_item`,
+`resolve_pantry_item`, grocery-item handles. Slot-targeting action tools
+(`assign_recipe`, `swap_recipe`, `skip_meal`, `mark_leftover`,
+`set_servings`, `remove_recipe`) still take a structural `slot_key` domain
+key rather than a `ResolvedSlot` ref — by design, not a gap: slot keys are
+stable, deterministic, and never ambiguous, so there is nothing for a
+resolver to disambiguate.
+
+**`resolve_slot` (shipped, 2026-08) — structural, not a handle.** Unlike
+`resolve_recipe`, `resolve_slot` does not mint a `ResolvedSlot` ref or go
+through the `__handles__`/registry machinery. The slot domain is closed
+(`{mon..sun}_dinner`) — the model cannot invent a usable key that the
+action tools' existing structural validation wouldn't already reject, so
+ref-token indirection buys nothing. `resolve_slot(reference, slots:, today:)`
+is a pure, deterministic function (day words, "tonight"/"today"/"tomorrow"
+relative to `today`, and Jaro similarity over assigned-recipe titles for
+references like `"the salmon dinner"`) that returns
+`{:ok, %{slot_key:, label:}}`, `{:ambiguous, candidates}`, or `:not_found`
+directly — no LLM. Exposed to the planner as a read tool; on ambiguity the
+model is instructed to `ask_user`, never guess.
 
 #### A.6.3 — Kitchen Skills
 
@@ -639,9 +654,10 @@ Every loop iteration is logged to `AIOperations` with the run's
 
 ### 3. Proactive Intelligence → `:ambient_scan_run` + `:deal_opportunity_run`
 
-A daily Quantum job (07:00) starts an `:ambient_scan_run`. A post-scrape
-trigger (after the weekly deal scrape completes) starts a
-`:deal_opportunity_run`. Both produce `CounterNote` artifacts.
+A daily Quantum job (07:00 in the original design; **shipped at 05:00**, see
+below) starts an `:ambient_scan_run`. A post-scrape trigger (after the
+weekly deal scrape completes) starts a `:deal_opportunity_run` (not yet
+implemented). Both produce `CounterNote` artifacts.
 
 - **Capsules:** `WeekPlanCapsule`, `PantryBeliefsCapsule`, `DealsDigestCapsule`, `RecentHistoryCapsule`, `RecipeAffinityCapsule`, `ActiveInsightsCapsule`.
 - **Tools:** none — Pattern A structured-output calls.
@@ -650,7 +666,7 @@ trigger (after the weekly deal scrape completes) starts a
 - **Tier:** 0 — surface only. The runs never mutate aggregate state. State mutation happens when the user taps the primary action, which dispatches a follow-up Tier 1+ run with `started_by: :counter_note_followup`.
 - **Model tier:** cheap structured.
 
-**`CounterNote` kinds (V1):**
+**`CounterNote` kinds (V1 design):**
 
 | Kind | Trigger | Proposed run |
 |---|---|---|
@@ -661,8 +677,55 @@ trigger (after the weekly deal scrape completes) starts a
 
 New kinds are added by extending the catalog, not by new run kinds.
 
+**`CounterNote` scan kinds (shipped, 2026-08).** The ambient scan (below)
+implements a different, shipped-first catalog of four kinds — the table
+above is the original design; this is what the scan actually proposes:
+
+| Kind | Trigger | `proposed_run` shape |
+|---|---|---|
+| `swap_suggestion` | A hard slot on a busy day has an easier alternative elsewhere in the week | `%{"kind" => "planner_command", "command" => "...", "scoped_slot" => slot_key}` — `scoped_slot` required |
+| `freezer_fallback` | A frozen leftover (pantry belief) fits a busy slot | `%{"kind" => "planner_command", "command" => "...", "scoped_slot" => slot_key}` — `scoped_slot` required |
+| `missing_ingredient` | Tonight's assigned recipe needs something pantry beliefs say is absent | `%{"kind" => "planner_command", ...}` (command optional) or `nil` (informational) |
+| `usual_item_missing` | A habitual purchase is absent from the current shopping list | `%{"kind" => "add_item", "name" => "...", "quantity" => nil \| String.t(), "unit" => nil \| String.t()}` — deterministic, no LLM run on follow-up |
+
+`proposed_run` is a map column on `CounterNote` with a `"kind"`
+discriminator — `"planner_command"` (dispatched via `:planner_command_run`,
+`started_by: "counter_note_followup"`, scoped per §A.6.2/Plan-2's
+`scoped_slot`), `"add_item"` (applied directly via `Shop.add_item` — code
+disposes, no LLM run for a deterministic add), or `nil` (informational,
+today's non-scan behavior unchanged).
+
+**Verified-before-materialize pipeline.** Each raw LLM proposal is checked
+by `CounterNoteVerifier` (surface ∈ `home/week/groceries`; kind ∈ the four
+scan kinds; non-blank/length-capped title and body; `scoped_slot` — when
+present — a member of the week's slot-key domain, required for
+`swap_suggestion`/`freezer_fallback`; `command` optional; `usual_item_missing`
+requires an `item`) before it is ever inserted. Failures are dropped
+silently — an invalid proposal never reaches the user. Survivors are capped
+at one note per surface (first wins) and written via
+`CounterNotes.replace_scan_notes/1`, which expires the previous pending
+scan-kind batch and inserts the new one in a single transaction — manual and
+informational notes are untouched. `expire_stale/0` runs daily on cron
+independent of the scan, so a note nobody acts on ages out.
+
 **Hard rule.** `CounterNote`s appear inline on the relevant surface. They are
 never delivered as push, email, or any other interruption.
+
+**`:ambient_scan_run` (shipped, 2026-08).** Tier 0, headless, modeled 1:1 on
+`:kitchen_memory_synthesis_run`: capsules
+(`WeekPlanCapsule`/`PantryBeliefsCapsule`/`ActiveInsightsCapsule`/
+`RecentHistoryCapsule`, plus a serialized current shopping list and a
+"recently dismissed — do not re-propose" section built from
+`CounterNotes.recently_ignored/1`) → one `Tore.LLM.text` call → verify each
+note against `CounterNoteVerifier` → materialize via
+`replace_scan_notes/1`. `started_by: "system"`. Gated by SpendGuard feature
+`:ambient_scan` (`{8_000, 600}` — 8,000-token budget, 600 s cooldown as the
+storm backstop); usage is logged to both the `Run` and SpendGuard.
+Triggers: Quantum daily at 05:00 (`expire_stale/0` runs at 04:30, just
+before), plus a 5-minute-debounced re-trigger after `"plan"`/`"shop_list"`
+PubSub mutations settle (`Tore.Harness.AmbientScan.Debouncer`). Dismissing a
+note (Rule 3, UI_SPEC §2.3) is fed back into the next scan's prompt so the
+model does not re-propose it.
 
 ### 4. Pantry as Inference → `:pantry_belief_update_run`
 

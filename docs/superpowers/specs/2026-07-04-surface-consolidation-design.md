@@ -117,6 +117,16 @@ shows its ordinary generic affordances.
 (existing CounterNote dismissal) and feeds the next memory synthesis; the
 system learns what not to predict.
 
+**Shipped** 2026-08 — ambient scan + four kinds + `follow_up` dispatch: the
+`:ambient_scan_run` Tier-0 headless run, `proposed_run` sum type
+(`planner_command` | `add_item` | `nil`), `CounterNoteVerifier`,
+`CounterNotes.follow_up/2` as the single accept-with-effect path, and Rule
+1 wiring on Home/Plan/Shop/tray. Deferred: `:deal_opportunity_run`
+(SPEC.md §3's original catalog kinds — `:expiring_pantry_match`,
+`:cascade_break`, `:unplanned_week`, `:deal_match` — are not implemented;
+the shipped scan uses its own four-kind catalog instead); cooking-view
+inline substitutions (§11 leaves Cooking mode unchanged).
+
 ## 4. The command tray
 
 **Replaces the Capture tab/page (UI_SPEC §6.4 content moves here) and the
@@ -142,6 +152,10 @@ Each tier should visibly absorb demand from the one below it.
   the same CounterNotes from §3, as tappable rows — with one multimodal
   input field (text + camera button) below them. The model's guesses come
   first; typing is what you do when none of them fit.
+  **Shipped** 2026-08 — `capture_live.ex` derives the origin surface from
+  `return_to`, lists that surface's notes with a `proposed_run` above the
+  input, and drops the list once a message is sent in the session (no AI
+  branding).
 - **Full state:** keep pulling or focus the field — keyboard up, full
   capture surface (UI_SPEC §6.4's layout and result pattern render here).
   Text and photos route through the same classifier-and-dispatch path;
@@ -200,6 +214,17 @@ The kiosk gets neither.
 **Shipped** 2026-07 for plan slots (scoped input + direct-touch handles +
 recipe refs); tonight-card/grocery-row long-press and NL `resolve_slot`
 ride Plan 3.
+
+**Shipped** 2026-08 — tonight card and grocery rows: a plain `app.js`
+`LongPress` hook (500 ms) opens the tonight card's sheet scoped to today
+(reuses the plan-slot `scoped_slot` dispatch verbatim) and a grocery row's
+item sheet. Grocery scoping is a text referent through `Capture.Router`
+("[The user is referring to the grocery item ...]"), not a resolved
+handle — `ResolvedGroceryItem`/`ResolvedPantryItem` handles and item-scoped
+predictions on the grocery sheet stay deferred until grocery action tools
+exist to consume them (SPEC.md §A.6.2). `resolve_slot` shipped structural,
+per §3 above and SPEC.md §A.6.2 — no ref/registry indirection, since the
+slot domain is closed.
 
 ## 5. Receipts and reviews, layered
 
