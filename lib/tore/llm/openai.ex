@@ -2,18 +2,17 @@ defmodule Tore.LLM.OpenAI do
   @moduledoc """
   OpenAI-flavoured wire spec implementation of `Tore.LLM.Spec`.
 
-  Pure: builds the OpenAI `chat/completions` body, hands it to the injected
-  `Tore.Adapter` for transport, decodes the response. No I/O.
-
-  Talks to whatever provider speaks OpenAI shape via the adapter
-  (OpenRouter, OpenAI, Together, Groq, Fireworks, etc.).
+  Builds OpenAI `chat/completions` bodies, sends them through the shared
+  OpenRouter client, and decodes responses locally.
   """
 
   @behaviour Tore.LLM.Spec
 
+  alias OpenRouter.Client
+
   @impl true
   def text(system, user, opts) do
-    %{
+    body = %{
       model: Keyword.get(opts, :model, model()),
       response_format: Keyword.get(opts, :response_format, %{type: "json_object"}),
       stream: false,
@@ -22,13 +21,15 @@ defmodule Tore.LLM.OpenAI do
         %{role: "user", content: user}
       ]
     }
-    |> adapter().request()
+
+    body
+    |> chat_completions(opts)
     |> decode_json()
   end
 
   @impl true
   def vision(blobs, system, user, opts) when is_list(blobs) do
-    %{
+    body = %{
       model: Keyword.get(opts, :model, vision_model()),
       response_format: Keyword.get(opts, :response_format, %{type: "json_object"}),
       stream: false,
@@ -40,18 +41,22 @@ defmodule Tore.LLM.OpenAI do
         }
       ]
     }
-    |> adapter().request()
+
+    body
+    |> chat_completions(opts)
     |> decode_json()
   end
 
   @impl true
   def chat(system, messages, opts) do
-    %{
+    body = %{
       model: Keyword.get(opts, :model, model()),
       stream: false,
       messages: [%{role: "system", content: system} | messages]
     }
-    |> adapter().request()
+
+    body
+    |> chat_completions(opts)
     |> case do
       {:ok, resp} ->
         content = get_in(resp, ["choices", Access.at(0), "message", "content"])
@@ -73,7 +78,7 @@ defmodule Tore.LLM.OpenAI do
       }
       |> maybe_put_tool_choice(tools, opts)
 
-    case adapter().request(body) do
+    case chat_completions(body, opts) do
       {:ok, resp} ->
         msg = get_in(resp, ["choices", Access.at(0), "message"]) || %{}
         usage = extract_usage(resp)
@@ -157,9 +162,26 @@ defmodule Tore.LLM.OpenAI do
     }
   end
 
-  # ---- Config -------------------------------------------------------------
+  # ---- Shared OpenRouter client ------------------------------------------
 
-  defp adapter, do: Application.get_env(:tore, :llm_adapter, Tore.Adapters.OpenRouter)
+  defp chat_completions(body, opts) do
+    with {:ok, %OpenRouter.Response{body: response_body}} <-
+           OpenRouter.chat_completions(client(), body, opts) do
+      {:ok, response_body}
+    end
+  end
+
+  defp client do
+    {:ok, client} =
+      Client.new(
+        api_key: Application.fetch_env!(:tore, :openrouter_api_key),
+        site_url: Application.fetch_env!(:tore, :openrouter_site_url),
+        app_name: Application.fetch_env!(:tore, :openrouter_app_name)
+      )
+
+    client
+  end
+
   defp model, do: Application.get_env(:tore, :openrouter_model, "openai/gpt-5-mini")
 
   defp vision_model,

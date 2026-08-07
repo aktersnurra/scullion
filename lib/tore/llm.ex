@@ -4,18 +4,8 @@ defmodule Tore.LLM do
   implementation — by default `Tore.LLM.OpenAI`. Callers never see the
   wire shape or the underlying provider.
 
-  Three-layer stack:
-
-      Caller (Tore.Pantry, …)
-            │  uniform API
-            ▼
-      Tore.LLM                ← this module, facade
-            │  wire spec injected:  :llm_spec
-            ▼
-      Tore.LLM.OpenAI         ← OpenAI body shape
-            │  adapter injected:    :llm_adapter
-            ▼
-      Tore.Adapters.OpenRouter ← HTTP transport
+  `:llm_spec` remains injectable so contexts use a uniform facade while
+  `Tore.LLM.OpenAI` owns OpenAI body construction and response decoding.
   """
 
   @type blob :: {:image, binary()} | {:pdf, binary()}

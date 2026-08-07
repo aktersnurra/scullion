@@ -29,6 +29,12 @@ if config_env() == :prod do
            raise("environment variable UPLOADS_DIR is missing. Example: /var/data/tore/uploads")
 
   config :tore, :openrouter_api_key, System.fetch_env!("OPENROUTER_API_KEY")
+
+  config :tore,
+         :openrouter_site_url,
+         System.get_env("OPENROUTER_SITE_URL", "https://scullion.gustafrydholm.xyz")
+
+  config :tore, :openrouter_app_name, System.get_env("OPENROUTER_APP_NAME", "Tore")
   config :tore, :openrouter_model, System.get_env("OPENROUTER_MODEL", "openai/gpt-5-mini")
 
   config :tore,

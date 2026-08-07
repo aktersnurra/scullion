@@ -1,7 +1,7 @@
 defmodule Tore.LLM.Spec do
   @moduledoc """
   Wire-spec behaviour for an LLM. Implementations encode a specific provider
-  body shape (OpenAI, Anthropic, …) and delegate transport to a `Tore.Adapter`.
+  body shape (OpenAI, Anthropic, …) and decode provider responses.
 
   Contexts never call a Spec module directly — they go through the
   `Tore.LLM` facade, which dispatches to the configured Spec.

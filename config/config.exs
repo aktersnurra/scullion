@@ -52,11 +52,12 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 # Port injection — wire spec + transport adapter injected per environment.
-# Contexts call `Tore.LLM` (the facade) which dispatches to `:llm_spec`;
-# the spec module then calls `:llm_adapter` for HTTP.
+# Contexts call `Tore.LLM` (the facade), which dispatches to `:llm_spec`.
 config :tore, :llm_spec, Tore.LLM.OpenAI
-config :tore, :llm_adapter, Tore.Adapters.OpenRouter
 config :tore, :http_client, Tore.Adapters.ReqHTTP
+
+config :tore, :openrouter_site_url, "https://scullion.gustafrydholm.xyz"
+config :tore, :openrouter_app_name, "Tore"
 
 config :tore, Tore.Scheduler,
   jobs: [

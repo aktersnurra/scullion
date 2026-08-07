@@ -21,8 +21,7 @@ config :tore, ToreWeb.Endpoint,
 
 config :tore, :http_client, Tore.Adapters.ReqHTTP
 config :tore, :llm_spec, Tore.LLM.OpenAI
-config :tore, :llm_adapter, Tore.Adapters.OpenRouter
-config :tore, :image_gen_client, Tore.Adapters.OpenRouter
+config :tore, :image_gen_client, Tore.ImageGen.OpenRouter
 
 # Do not print debug messages in production
 config :logger, level: :info
