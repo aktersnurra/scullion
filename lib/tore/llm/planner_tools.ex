@@ -8,7 +8,8 @@ defmodule Tore.LLM.PlannerTools do
   and `ask_user` return `{:ok, result, [], working_plan}`.
   """
 
-  alias Tore.LLM.Tool
+  alias Tore.LLM.{Tool, Prompts}
+  alias Tore.SpendGuard
   alias Tore.Planning
   alias Tore.Planning.{Decider, Commands}
   alias Tore.Harness.{Handles, Resolvers}
@@ -33,7 +34,8 @@ defmodule Tore.LLM.PlannerTools do
       resolve_recipe(),
       resolve_slot(),
       pantry_snapshot(),
-      active_deals()
+      active_deals(),
+      find_recipe_web()
     ]
   end
 
@@ -361,6 +363,60 @@ defmodule Tore.LLM.PlannerTools do
         {:ok, %{deals: deals}, [], plan}
       end
     }
+  end
+
+  defp find_recipe_web do
+    %Tool{
+      name: "find_recipe_web",
+      description:
+        "Search the web for recipe pages when the local catalog has nothing suitable. " <>
+          "Returns candidate titles and urls only — pick one and import it; never write the recipe yourself.",
+      kind: :read,
+      parameters: %{
+        type: "object",
+        properties: %{
+          query: %{
+            type: "string",
+            description: "What kind of recipe to look for, e.g. \"quick weeknight ramen\""
+          }
+        },
+        required: ["query"]
+      },
+      run: fn args, _ctx, plan ->
+        case SpendGuard.allow?(:recipe_web_search) do
+          :ok -> search_web(args["query"], plan)
+          {:error, _reason} -> {:ok, %{unavailable: true, reason: guard_message()}, [], plan}
+        end
+      end
+    }
+  end
+
+  defp search_web(query, plan) do
+    {system, user} = Prompts.find_recipe_web(query, household_locale())
+
+    case Tore.LLM.web_search(system, user, response_format: Prompts.web_candidates_json_schema()) do
+      {:ok, payload, usage} ->
+        SpendGuard.log_usage(:recipe_web_search, usage)
+        {:ok, candidates_result(payload["candidates"] || []), [], plan}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp candidates_result([]), do: %{candidates: [], not_found: true}
+
+  defp candidates_result(candidates) do
+    %{candidates: Enum.map(candidates, &%{title: &1["title"], url: &1["url"]})}
+  end
+
+  defp guard_message, do: "web search is resting — try again shortly"
+
+  defp household_locale do
+    case Tore.Household.get_household!() do
+      %{locale: locale} when is_binary(locale) -> locale
+      _ -> nil
+    end
   end
 
   defp recipe_under_minutes?(%{prep_time_minutes: _, cook_time_minutes: _} = recipe, max) do
