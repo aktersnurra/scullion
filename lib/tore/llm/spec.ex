@@ -21,6 +21,14 @@ defmodule Tore.LLM.Spec do
   @callback text(system :: String.t(), user :: String.t(), opts()) ::
               {:ok, map(), usage()} | {:error, term()}
 
+  @doc """
+  A `text/3` call with the provider's web-search plugin attached. OpenRouter
+  routes this to a search provider and feeds the results into the model's
+  context before it answers.
+  """
+  @callback web_search(system :: String.t(), user :: String.t(), opts()) ::
+              {:ok, map(), usage()} | {:error, term()}
+
   @callback vision(blobs :: [blob()], system :: String.t(), user :: String.t(), opts()) ::
               {:ok, map(), usage()} | {:error, term()}
 

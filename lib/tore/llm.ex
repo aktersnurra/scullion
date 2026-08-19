@@ -14,6 +14,8 @@ defmodule Tore.LLM do
 
   def text(system, user, opts \\ []), do: spec().text(system, user, opts)
 
+  def web_search(system, user, opts \\ []), do: spec().web_search(system, user, opts)
+
   def vision(blobs, system, user, opts \\ []), do: spec().vision(blobs, system, user, opts)
 
   def chat(system, messages, opts \\ []), do: spec().chat(system, messages, opts)

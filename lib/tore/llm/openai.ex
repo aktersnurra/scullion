@@ -28,6 +28,30 @@ defmodule Tore.LLM.OpenAI do
   end
 
   @impl true
+  def web_search(system, user, opts) do
+    system
+    |> web_search_body(user, opts)
+    |> chat_completions(opts)
+    |> decode_json()
+  end
+
+  # OpenRouter treats web search as a body-level plugin, so no client change
+  # is needed — this is `text/3`'s body plus one key.
+  @doc false
+  def web_search_body(system, user, opts) do
+    %{
+      model: Keyword.get(opts, :model, model()),
+      response_format: Keyword.get(opts, :response_format, %{type: "json_object"}),
+      stream: false,
+      plugins: [%{id: "web", max_results: Keyword.get(opts, :max_results, 5)}],
+      messages: [
+        %{role: "system", content: system},
+        %{role: "user", content: user}
+      ]
+    }
+  end
+
+  @impl true
   def vision(blobs, system, user, opts) when is_list(blobs) do
     body = %{
       model: Keyword.get(opts, :model, vision_model()),
