@@ -26,6 +26,7 @@ defmodule Tore.LLM.PlannerAgent do
           {:message, String.t()}
           | {:question, String.t()}
           | {:capped, String.t()}
+          | {:proposal, struct(), map()}
 
   @type loop_outcome :: %{
           result: result(),
@@ -40,7 +41,7 @@ defmodule Tore.LLM.PlannerAgent do
     max_round_trips = Keyword.get(opts, :max_round_trips, @default_max_round_trips)
     max_action_calls = Keyword.get(opts, :max_action_calls, @default_max_action_calls)
 
-    tools = PlannerTools.all()
+    tools = PlannerTools.all() ++ Map.get(ctx, :extra_tools, [])
     tools_json = Enum.map(tools, &Tool.to_openai/1)
 
     state = %{
@@ -96,6 +97,9 @@ defmodule Tore.LLM.PlannerAgent do
         case execute_calls(calls, state) do
           {:terminal_question, q, state} ->
             finish(state, {:question, q})
+
+          {:terminal_proposal, proposal, pending, state} ->
+            finish(state, {:proposal, proposal, pending})
 
           {:cap_hit, state} ->
             loop(system, %{state | round_trips: state.max_round_trips})
@@ -169,6 +173,24 @@ defmodule Tore.LLM.PlannerAgent do
     case Tool.validate_args(tool, call.args) do
       :ok ->
         case tool.run.(call.args, state.ctx, state.working_plan) do
+          # A proposal ends the loop: the run parks in :needs_user for the
+          # user to confirm, so there is nothing more for the model to do.
+          {:proposal, proposal, pending, next_plan} ->
+            state =
+              %{state | working_plan: next_plan}
+              |> append_tool_result(call, %{
+                ok: true,
+                proposal: proposal.title,
+                awaiting_user: true
+              })
+
+            state =
+              Enum.reduce(rest, state, fn superseded, acc ->
+                append_tool_result(acc, superseded, %{error: "superseded_by_proposal"})
+              end)
+
+            {:terminal_proposal, proposal, pending, state}
+
           {:ok, result, events, next_plan} ->
             {handles, result} = Map.pop(result, :__handles__)
 

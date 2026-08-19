@@ -278,4 +278,76 @@ defmodule Tore.LLM.PlannerAgentTest do
 
     assert outcome.working_plan.slots["mon_dinner"].recipe_id == rid
   end
+
+  defp stub_proposal do
+    %Tore.Harness.Artifact.RecipeProposal{
+      title: "Simpler Ramen",
+      ingredients: [%{name: "miso paste", quantity: "2", unit: "msk"}],
+      instructions: "Simmer. Serve.",
+      base_servings: 4,
+      source: :generation,
+      source_recipe_id: 1,
+      instruction: "simpler"
+    }
+  end
+
+  defp proposal_tool(proposal, pending) do
+    %Tore.LLM.Tool{
+      name: "fake_proposal_tool",
+      description: "test double",
+      kind: :read,
+      parameters: %{type: "object", properties: %{}, required: []},
+      run: fn _args, _ctx, plan -> {:proposal, proposal, pending, plan} end
+    }
+  end
+
+  test "run/4 stops the loop when a read tool returns {:proposal, ...}" do
+    proposal = stub_proposal()
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "fake_proposal_tool", args: %{}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx =
+      Map.put(@ctx, :extra_tools, [proposal_tool(proposal, %{slot_key: "mon_dinner", servings: 4})])
+
+    assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "make it simpler", ctx, [])
+
+    assert {:proposal, ^proposal, pending} = outcome.result
+    assert pending == %{slot_key: "mon_dinner", servings: 4}
+  end
+
+  test "run/4 makes no further model round-trips after a proposal" do
+    proposal = stub_proposal()
+
+    # Exactly one call — a second would mean the loop kept going.
+    expect(Tore.MockLLM, :chat_with_tools, 1, fn _, _, _, _ ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "fake_proposal_tool", args: %{}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx = Map.put(@ctx, :extra_tools, [proposal_tool(proposal, %{})])
+
+    assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "make it simpler", ctx, [])
+    assert match?({:proposal, _, _}, outcome.result)
+  end
+
+  test "run/4 records the proposal in the tool trace" do
+    proposal = stub_proposal()
+
+    expect(Tore.MockLLM, :chat_with_tools, fn _, _, _, _ ->
+      {:ok, {:tool_calls, [%{id: "c1", name: "fake_proposal_tool", args: %{}}]},
+       %{prompt_tokens: 1, completion_tokens: 1, cost_usd: Decimal.new(0)}}
+    end)
+
+    ctx = Map.put(@ctx, :extra_tools, [proposal_tool(proposal, %{})])
+
+    {:ok, outcome} = PlannerAgent.run(@system_prompt, "make it simpler", ctx, [])
+
+    assert Enum.any?(outcome.tool_trace, fn entry ->
+             entry.step_kind == :tool_result and
+               entry.payload[:result][:awaiting_user] == true
+           end)
+  end
 end
