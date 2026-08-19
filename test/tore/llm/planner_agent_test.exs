@@ -310,7 +310,9 @@ defmodule Tore.LLM.PlannerAgentTest do
     end)
 
     ctx =
-      Map.put(@ctx, :extra_tools, [proposal_tool(proposal, %{slot_key: "mon_dinner", servings: 4})])
+      Map.put(@ctx, :extra_tools, [
+        proposal_tool(proposal, %{slot_key: "mon_dinner", servings: 4})
+      ])
 
     assert {:ok, outcome} = PlannerAgent.run(@system_prompt, "make it simpler", ctx, [])
 

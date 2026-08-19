@@ -35,7 +35,9 @@ defmodule Tore.LLM.PlannerTools do
       resolve_slot(),
       pantry_snapshot(),
       active_deals(),
-      find_recipe_web()
+      find_recipe_web(),
+      import_recipe_from_web(),
+      generate_recipe_variant()
     ]
   end
 
@@ -409,6 +411,123 @@ defmodule Tore.LLM.PlannerTools do
   defp candidates_result(candidates) do
     %{candidates: Enum.map(candidates, &%{title: &1["title"], url: &1["url"]})}
   end
+
+  defp import_recipe_from_web do
+    %Tool{
+      name: "import_recipe_from_web",
+      description:
+        "Import a recipe from a url returned by find_recipe_web. Produces a proposal the user " <>
+          "confirms before it enters the catalog. This ends your turn — do not call anything after it.",
+      kind: :read,
+      parameters: %{
+        type: "object",
+        properties: %{
+          url: %{type: "string", description: "a url from find_recipe_web's candidates"},
+          slot_key: %{
+            type: "string",
+            description: "optional — the slot to assign the recipe to once the user confirms"
+          },
+          servings: %{type: "integer", minimum: 1}
+        },
+        required: ["url"]
+      },
+      run: fn args, _ctx, plan ->
+        case Tore.Recipes.scrape_attrs_from_url(args["url"], household_locale()) do
+          {:ok, attrs} ->
+            {:proposal, web_import_proposal(attrs, args["url"]), pending_assignment(args), plan}
+
+          {:error, _} = err ->
+            err
+        end
+      end
+    }
+  end
+
+  defp generate_recipe_variant do
+    %Tool{
+      name: "generate_recipe_variant",
+      description:
+        "Create a variant of an existing recipe — simpler, vegetarian, scaled to different " <>
+          "servings, and so on. Produces a proposal the user confirms before it enters the " <>
+          "catalog. This ends your turn — do not call anything after it.",
+      kind: :read,
+      parameters: %{
+        type: "object",
+        properties: %{
+          recipe_ref: %{
+            type: "string",
+            description: "a ref returned by search_recipes, resolve_recipe, or resolve_slot"
+          },
+          instruction: %{
+            type: "string",
+            description: "how to change it, e.g. \"make it vegetarian\", \"simpler\", \"for 6\""
+          },
+          slot_key: %{
+            type: "string",
+            description: "optional — the slot to assign the variant to once the user confirms"
+          },
+          servings: %{type: "integer", minimum: 1}
+        },
+        required: ["recipe_ref", "instruction"]
+      },
+      run: fn args, ctx, plan ->
+        # Read tools do not get the agent's recipe_ref exchange (that runs for
+        # action tools only), so resolve the handle here.
+        with {:ok, recipe_id} <- fetch_recipe_id(ctx, args["recipe_ref"]),
+             recipe = Tore.Recipes.get!(recipe_id),
+             {:ok, proposal, usage} <-
+               Tore.Recipes.Variant.build(recipe, args["instruction"], household_locale()) do
+          SpendGuard.log_usage(:recipe_variant, usage)
+          {:proposal, proposal, pending_assignment(args), plan}
+        end
+      end
+    }
+  end
+
+  defp fetch_recipe_id(ctx, ref) do
+    case Handles.fetch(Map.get(ctx, :handles, %{}), ref) do
+      {:ok, %Handles.ResolvedRecipe{id: id}} ->
+        {:ok, id}
+
+      _ ->
+        {:error,
+         "unknown recipe_ref #{inspect(ref)} — call search_recipes or resolve_recipe first and use a ref from the result"}
+    end
+  end
+
+  defp pending_assignment(%{"slot_key" => slot_key} = args) when is_binary(slot_key) do
+    %{slot_key: slot_key, servings: args["servings"] || 4}
+  end
+
+  defp pending_assignment(_args), do: %{}
+
+  defp web_import_proposal(attrs, url) do
+    %Tore.Harness.Artifact.RecipeProposal{
+      title: attrs[:title],
+      description: attrs[:description],
+      instructions: attrs[:instructions],
+      base_servings: attrs[:base_servings],
+      prep_time_minutes: attrs[:prep_time_minutes],
+      cook_time_minutes: attrs[:cook_time_minutes],
+      ingredients: Enum.map(attrs[:ingredients] || [], &web_import_ingredient/1),
+      tags: attrs[:tags] || [],
+      source: :web_import,
+      source_url: url
+    }
+  end
+
+  defp web_import_ingredient(ing) do
+    %{
+      name: ing[:name] || ing["name"],
+      quantity: quantity_to_string(ing[:quantity] || ing["quantity"]),
+      unit: ing[:unit] || ing["unit"]
+    }
+  end
+
+  defp quantity_to_string(nil), do: nil
+  defp quantity_to_string(%Decimal{} = d), do: Decimal.to_string(d)
+  defp quantity_to_string(n) when is_number(n), do: to_string(n)
+  defp quantity_to_string(s) when is_binary(s), do: s
 
   defp guard_message, do: "web search is resting — try again shortly"
 

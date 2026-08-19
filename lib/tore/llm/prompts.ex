@@ -584,7 +584,11 @@ defmodule Tore.LLM.Prompts do
   def canonicalise_pantry_schema do
     %{
       type: "json_schema",
-      json_schema: %{name: "canonicalise_pantry", strict: true, schema: @canonicalise_pantry_schema}
+      json_schema: %{
+        name: "canonicalise_pantry",
+        strict: true,
+        schema: @canonicalise_pantry_schema
+      }
     }
   end
 

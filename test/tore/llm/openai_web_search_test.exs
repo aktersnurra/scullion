@@ -57,7 +57,10 @@ defmodule Tore.LLM.OpenAIWebSearchTest do
 
     assert_received {:request_body, body}
 
-    assert [%{"role" => "system", "content" => "find recipes"}, %{"role" => "user", "content" => "ramen"}] =
+    assert [
+             %{"role" => "system", "content" => "find recipes"},
+             %{"role" => "user", "content" => "ramen"}
+           ] =
              body["messages"]
   end
 
