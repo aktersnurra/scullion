@@ -1,0 +1,152 @@
+defmodule Tore.Harness.Artifact.RecipeProposal do
+  @moduledoc """
+  A recipe that does not exist in the catalog yet, awaiting user confirmation
+  on a `:needs_user` card. Two sources:
+
+    * `:web_import` — parsed from a page the user chose out of web search
+      results. `source_url` carries the page.
+    * `:generation` — a variant the planner generated from an existing recipe.
+      `source_recipe_id` and `instruction` carry the provenance ("recipe 7,
+      made simpler").
+
+  `pending_assignment` carries the slot the user was talking about when they
+  asked for the recipe ("make *tonight's* ramen vegetarian"). It rides on the
+  artifact rather than the run's `input` because the slot is only known
+  mid-loop, after `Commands.Open` has already written `input` — and there is
+  no command for amending it. `nil` means "save the recipe, slot nothing".
+
+  Nothing here is persisted until `Orchestrator.commit_recipe_proposal/3`
+  turns it into a real `Tore.Recipes.Recipe`.
+  """
+
+  @behaviour Tore.Harness.Artifact
+
+  @derive Jason.Encoder
+  @enforce_keys [:title, :ingredients, :source]
+  defstruct [
+    :title,
+    :description,
+    :instructions,
+    :base_servings,
+    :prep_time_minutes,
+    :cook_time_minutes,
+    :source,
+    :source_url,
+    :source_recipe_id,
+    :instruction,
+    :pending_assignment,
+    ingredients: [],
+    tags: []
+  ]
+
+  @type ingredient :: %{
+          name: String.t(),
+          quantity: String.t() | nil,
+          unit: String.t() | nil
+        }
+
+  @type source :: :web_import | :generation
+
+  @type pending_assignment :: %{slot_key: String.t(), servings: pos_integer()}
+
+  @type t :: %__MODULE__{
+          title: String.t(),
+          description: String.t() | nil,
+          instructions: String.t() | nil,
+          base_servings: pos_integer() | nil,
+          prep_time_minutes: non_neg_integer() | nil,
+          cook_time_minutes: non_neg_integer() | nil,
+          ingredients: [ingredient()],
+          tags: [String.t()],
+          source: source(),
+          source_url: String.t() | nil,
+          source_recipe_id: integer() | nil,
+          instruction: String.t() | nil,
+          pending_assignment: pending_assignment() | nil
+        }
+
+  @impl true
+  def kind, do: "RecipeProposal"
+
+  @impl true
+  def summary(%__MODULE__{title: title, ingredients: ingredients}) do
+    %{counts: %{ingredients: length(ingredients)}, text_fallback: title}
+  end
+
+  # A generated recipe must say what it was generated from; an imported one
+  # must say which page it came from. Otherwise the card cannot explain itself.
+  @impl true
+  def is_rationale_complete(%__MODULE__{source: :generation, instruction: i}),
+    do: is_binary(i) and i != ""
+
+  def is_rationale_complete(%__MODULE__{source: :web_import, source_url: u}),
+    do: is_binary(u) and u != ""
+
+  @impl true
+  def to_json(%__MODULE__{} = proposal) do
+    %{
+      "title" => proposal.title,
+      "description" => proposal.description,
+      "instructions" => proposal.instructions,
+      "base_servings" => proposal.base_servings,
+      "prep_time_minutes" => proposal.prep_time_minutes,
+      "cook_time_minutes" => proposal.cook_time_minutes,
+      "ingredients" => Enum.map(proposal.ingredients, &ingredient_to_json/1),
+      "tags" => proposal.tags,
+      "source" => Atom.to_string(proposal.source),
+      "source_url" => proposal.source_url,
+      "source_recipe_id" => proposal.source_recipe_id,
+      "instruction" => proposal.instruction,
+      "pending_assignment" => pending_to_json(proposal.pending_assignment)
+    }
+  end
+
+  @impl true
+  def from_json(%{"title" => title} = json) do
+    %__MODULE__{
+      title: title,
+      description: json["description"],
+      instructions: json["instructions"],
+      base_servings: json["base_servings"],
+      prep_time_minutes: json["prep_time_minutes"],
+      cook_time_minutes: json["cook_time_minutes"],
+      ingredients: Enum.map(json["ingredients"] || [], &ingredient_from_json/1),
+      tags: json["tags"] || [],
+      source: source_from_json(json["source"]),
+      source_url: json["source_url"],
+      source_recipe_id: json["source_recipe_id"],
+      instruction: json["instruction"],
+      pending_assignment: pending_from_json(json["pending_assignment"])
+    }
+  end
+
+  defp pending_to_json(nil), do: nil
+
+  defp pending_to_json(%{slot_key: slot_key, servings: servings}),
+    do: %{"slot_key" => slot_key, "servings" => servings}
+
+  defp pending_from_json(nil), do: nil
+
+  defp pending_from_json(%{"slot_key" => slot_key, "servings" => servings}),
+    do: %{slot_key: slot_key, servings: servings}
+
+  defp ingredient_to_json(ing) do
+    %{
+      "name" => ing[:name],
+      "quantity" => quantity_to_string(ing[:quantity]),
+      "unit" => ing[:unit]
+    }
+  end
+
+  defp ingredient_from_json(json) do
+    %{name: json["name"], quantity: json["quantity"], unit: json["unit"]}
+  end
+
+  defp quantity_to_string(nil), do: nil
+  defp quantity_to_string(%Decimal{} = d), do: Decimal.to_string(d)
+  defp quantity_to_string(n) when is_number(n), do: to_string(n)
+  defp quantity_to_string(s) when is_binary(s), do: s
+
+  defp source_from_json("web_import"), do: :web_import
+  defp source_from_json("generation"), do: :generation
+end

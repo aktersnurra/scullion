@@ -5,6 +5,7 @@ defmodule Tore.Harness.Artifact.Registry do
     PantryBeliefUpdate,
     PantrySnapshot,
     PlanDiff,
+    RecipeProposal,
     RunBundle,
     RunSummary
   }
@@ -15,6 +16,7 @@ defmodule Tore.Harness.Artifact.Registry do
     "PantryBeliefUpdate" => PantryBeliefUpdate,
     "PantrySnapshot" => PantrySnapshot,
     "PlanDiff" => PlanDiff,
+    "RecipeProposal" => RecipeProposal,
     "RunBundle" => RunBundle,
     "RunSummary" => RunSummary
   }
