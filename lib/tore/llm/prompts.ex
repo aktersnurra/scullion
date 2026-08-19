@@ -229,6 +229,102 @@ defmodule Tore.LLM.Prompts do
     end
   end
 
+  @web_candidates_schema %{
+    type: "object",
+    properties: %{
+      candidates: %{
+        type: "array",
+        items: %{
+          type: "object",
+          properties: %{
+            title: %{type: "string"},
+            url: %{type: "string"}
+          },
+          required: ["title", "url"],
+          additionalProperties: false
+        }
+      }
+    },
+    required: ["candidates"],
+    additionalProperties: false
+  }
+
+  def web_candidates_json_schema do
+    %{
+      type: "json_schema",
+      json_schema: %{name: "web_candidates", strict: true, schema: @web_candidates_schema}
+    }
+  end
+
+  @doc """
+  Discovery only. The model searches the web and hands back candidate recipe
+  pages; it never writes the recipe itself — the chosen URL goes through the
+  existing scraper, so the recipe text always comes from the real page.
+  """
+  def find_recipe_web(query, locale \\ nil) do
+    system = """
+    You find recipe pages on the web. Search for pages matching the user's request.
+
+    Return a JSON object: {"candidates": [{"title": "...", "url": "..."}]}
+    Rules:
+    - return at most 5 candidates, best match first
+    - each url must be a direct link to a single recipe page you actually found in the search results
+    - never return a search-results page, a category listing, or a homepage
+    - the title is the recipe's name as the page states it
+    - prefer pages that show ingredients and steps as text
+    - if nothing suitable was found, return {"candidates": []}
+    - do not write out any recipe content — only titles and urls
+    #{locale_preference_instruction(locale)}
+    Respond with a JSON object only. No prose.
+    """
+
+    {system, query}
+  end
+
+  @doc """
+  Generate a variant of an existing recipe (simpler, vegetarian, scaled to a
+  different number of servings, …). The result is a complete recipe in the
+  Tore schema, surfaced as a proposal — never auto-committed.
+  """
+  def generate_recipe_variant(source_recipe, instruction, locale \\ nil) do
+    system = """
+    You adapt an existing recipe. The user gives you a source recipe and an
+    instruction describing how to change it. Produce the complete adapted recipe.
+
+    Return a JSON object matching this exact structure:
+    #{@recipe_schema}
+    Rules:
+    #{@recipe_rules}
+    - the adapted recipe must stand alone: full ingredients and full steps, not a diff against the source
+    - give it a title that says how it differs from the source
+    - keep every change traceable to the instruction — change nothing the user did not ask for
+    - when the instruction changes servings, scale every quantity accordingly and set base_servings to the requested number
+    #{translation_instruction(locale)}
+    """
+
+    user =
+      Jason.encode!(%{
+        source_recipe: source_recipe,
+        instruction: instruction
+      })
+
+    {system, user}
+  end
+
+  # Search results are better in the household's own language, but the prompt
+  # itself stays English — locale is a parameter, never baked in.
+  defp locale_preference_instruction(nil), do: ""
+
+  defp locale_preference_instruction(locale) do
+    case Map.get(@locale_names, locale) do
+      nil ->
+        ""
+
+      language ->
+        "- prefer recipe pages written in #{language}, but return good pages in any language if there are none"
+    end
+  end
+
   @receipt_json_schema %{
     type: "object",
     required: ["line_items"],
