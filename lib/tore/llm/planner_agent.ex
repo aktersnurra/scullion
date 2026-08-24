@@ -172,7 +172,10 @@ defmodule Tore.LLM.PlannerAgent do
   defp run_and_record(tool, call, rest, state) do
     case Tool.validate_args(tool, call.args) do
       :ok ->
-        case tool.run.(call.args, state.ctx, state.working_plan) do
+        # Handles registered mid-loop live in state.handles, not the ctx captured
+        # at start. Read tools that resolve a ref themselves (generate_recipe_variant)
+        # need the live registry, or a ref from resolve_recipe reads as unknown.
+        case tool.run.(call.args, tool_ctx(state), state.working_plan) do
           # A proposal ends the loop: the run parks in :needs_user for the
           # user to confirm, so there is nothing more for the model to do.
           {:proposal, proposal, pending, next_plan} ->
@@ -211,6 +214,8 @@ defmodule Tore.LLM.PlannerAgent do
         execute_calls(rest, append_tool_result(state, call, %{error: inspect(reason)}))
     end
   end
+
+  defp tool_ctx(state), do: Map.put(state.ctx, :handles, state.handles)
 
   defp register_handles(registry, nil), do: registry
 

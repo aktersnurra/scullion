@@ -6,6 +6,9 @@ defmodule Tore.Recipes do
   @http Application.compile_env(:tore, :http_client)
   @image_gen Application.compile_env(:tore, :image_gen_client)
 
+  # An ingredient name will never contain this, so joined names split cleanly.
+  @fp_sep "\x1f"
+
   @spec create(map()) :: {:ok, Recipe.t()} | {:error, Ecto.Changeset.t()}
   def create(attrs) do
     {tag_names, attrs} = Map.pop(attrs, :tags, [])
@@ -54,6 +57,31 @@ defmodule Tore.Recipes do
   def get!(id) do
     Repo.get!(Recipe, id) |> Repo.preload([:tags, recipe_ingredients: :ingredient])
   end
+
+  @doc """
+  Titles and ingredient names for every recipe, for duplicate detection.
+  Keeps `RecipeProposalVerifier` pure — it compares against this, it does not
+  query.
+  """
+  @spec catalog_fingerprints() :: [%{title: String.t(), ingredient_names: [String.t()]}]
+  def catalog_fingerprints do
+    from(r in Recipe,
+      left_join: ri in RecipeIngredient,
+      on: ri.recipe_id == r.id,
+      left_join: i in Ingredient,
+      on: i.id == ri.ingredient_id,
+      group_by: r.id,
+      select: %{
+        title: r.title,
+        ingredient_names: fragment("group_concat(?, ?)", i.name, ^@fp_sep)
+      }
+    )
+    |> Repo.all()
+    |> Enum.map(fn row -> %{row | ingredient_names: split_names(row.ingredient_names)} end)
+  end
+
+  defp split_names(nil), do: []
+  defp split_names(joined), do: String.split(joined, @fp_sep)
 
   @spec list(keyword()) :: [Recipe.t()]
   def list(opts \\ []) do

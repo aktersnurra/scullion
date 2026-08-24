@@ -7,7 +7,15 @@ defmodule Tore.Harness.Orchestrator do
   alias Tore.AiOperations
   alias Tore.LLM.PlannerAgent
   alias Tore.Planning
-  alias Tore.Harness.Verifier.{CostEntryVerifier, MemoryVerifier, PantryVerifier, PlanVerifier}
+
+  alias Tore.Harness.Verifier.{
+    CostEntryVerifier,
+    MemoryVerifier,
+    PantryVerifier,
+    PlanVerifier,
+    RecipeProposalVerifier
+  }
+
   alias Tore.Harness.Capsules
 
   alias Tore.Harness.{
@@ -18,7 +26,15 @@ defmodule Tore.Harness.Orchestrator do
     UndoPayload
   }
 
-  alias Tore.Harness.Artifact.{CostEntry, MemoryUpdate, PantryBeliefUpdate, PlanDiff, RunBundle}
+  alias Tore.Harness.Artifact.{
+    CostEntry,
+    MemoryUpdate,
+    PantryBeliefUpdate,
+    PlanDiff,
+    RecipeProposal,
+    RunBundle
+  }
+
   alias Tore.{CounterNotes, Recipes, SpendGuard}
 
   alias Tore.Harness.Capsules.{
@@ -640,6 +656,9 @@ defmodule Tore.Harness.Orchestrator do
   defp close(state, %{result: {:question, q}}, _ctx, metadata),
     do: apply_command(state.stream_id, %Commands.RaiseQuestion{question: q}, state, metadata)
 
+  defp close(state, %{result: {:proposal, proposal, pending}}, _ctx, metadata),
+    do: verify_and_surface_proposal(state, proposal, pending, metadata)
+
   defp verify_and_finish(state, loop, ctx, metadata) do
     plan_diff = PlanDiffBuilder.build(loop.tool_trace, ctx)
 
@@ -713,6 +732,62 @@ defmodule Tore.Harness.Orchestrator do
       other ->
         other
     end
+  end
+
+  # SPEC §A.6.1: generated or imported recipe content never auto-commits. When
+  # the verifier passes we park the run in :needs_user so the user reviews the
+  # recipe on an editable card; commit_recipe_proposal/3 does the saving.
+  defp verify_and_surface_proposal(state, %RecipeProposal{} = proposal, pending, metadata) do
+    # The pending slot rides on the artifact: it is only known mid-loop, after
+    # Commands.Open already wrote the run's input, and there is no command for
+    # amending input.
+    proposal = %{proposal | pending_assignment: normalise_pending(pending)}
+
+    with :ok <- RecipeProposalVerifier.verify(proposal, recipe_proposal_ctx()),
+         {:ok, state} <-
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: proposal},
+             state,
+             metadata
+           ) do
+      apply_command(
+        state.stream_id,
+        %Commands.RaiseQuestion{question: "Review this recipe before saving it."},
+        state,
+        metadata
+      )
+    else
+      {:fail, code, repair} ->
+        apply_command(
+          state.stream_id,
+          %Commands.RecordFailure{
+            code: code,
+            user_message: proposal_failure_message(code),
+            repair_action: repair
+          },
+          state,
+          metadata
+        )
+
+      other ->
+        other
+    end
+  end
+
+  defp proposal_failure_message(:near_duplicate),
+    do: "You already have a recipe just like this one."
+
+  defp proposal_failure_message(_code),
+    do: "That recipe came back incomplete — nothing was saved."
+
+  # An empty map means the planner asked for a recipe with no slot in mind.
+  defp normalise_pending(pending) when pending == %{}, do: nil
+  defp normalise_pending(pending), do: pending
+
+  # The verifier is pure, so the catalog it compares against is gathered here.
+  defp recipe_proposal_ctx do
+    %{existing_recipes: Recipes.catalog_fingerprints()}
   end
 
   defp gather_pantry_items(:shelf_photo, %{image_binary: bin}),

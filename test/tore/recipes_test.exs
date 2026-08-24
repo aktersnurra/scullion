@@ -331,4 +331,22 @@ defmodule Tore.RecipesTest do
       assert keys == ["vitlok"]
     end
   end
+
+  describe "catalog_fingerprints/0" do
+    test "returns titles with their ingredient names" do
+      Tore.Storage.Mock.reset()
+
+      {:ok, _} =
+        Recipes.create(
+          recipe_attrs(%{
+            title: "Miso Ramen",
+            base_servings: 4,
+            ingredients: [%{name: "miso paste"}, %{name: "ramen noodles"}]
+          })
+        )
+
+      assert [%{title: "Miso Ramen", ingredient_names: names}] = Recipes.catalog_fingerprints()
+      assert Enum.sort(names) == ["miso paste", "ramen noodles"]
+    end
+  end
 end
