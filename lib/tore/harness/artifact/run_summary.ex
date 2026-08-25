@@ -65,6 +65,8 @@ defmodule Tore.Harness.Artifact.RunSummary do
   defp count_key_atom("superseded"), do: :superseded
   defp count_key_atom("unchanged"), do: :unchanged
   defp count_key_atom("bumped"), do: :bumped
+  # RecipeProposal counts its ingredients rather than plan changes.
+  defp count_key_atom("ingredients"), do: :ingredients
 
   defp text_for(counts, outcome) do
     body =
@@ -89,5 +91,6 @@ defmodule Tore.Harness.Artifact.RunSummary do
   defp change_label(:superseded), do: "superseded"
   defp change_label(:unchanged), do: "unchanged"
   defp change_label(:bumped), do: "bumped"
+  defp change_label(:ingredients), do: "ingredients"
   defp change_label(other), do: to_string(other)
 end

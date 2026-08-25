@@ -485,6 +485,104 @@ defmodule Tore.Harness.Orchestrator do
   end
 
   @doc """
+  Commit a recipe proposal after the user has reviewed (and possibly edited)
+  it on the `:needs_user` card. Re-runs the verifier against the submitted
+  proposal, saves the recipe to the catalog, and — if the run carried a
+  pending slot assignment — assigns it. UI entrypoint; not part of
+  `dispatch/2`.
+  """
+  @spec commit_recipe_proposal(String.t(), RecipeProposal.t(), integer() | nil) ::
+          {:ok, State.t()} | {:error, term()}
+  def commit_recipe_proposal(stream_id, %RecipeProposal{} = proposal, user_id) do
+    {:ok, state} = Run.load(stream_id)
+    metadata = %{household_id: state.household_id}
+
+    with %State.NeedsUser{} <- state,
+         :ok <- RecipeProposalVerifier.verify(proposal, recipe_proposal_ctx()),
+         {:ok, state} <-
+           apply_command(
+             state.stream_id,
+             %Commands.AnswerQuestion{answer: "confirmed"},
+             state,
+             metadata
+           ),
+         {:ok, recipe} <- Recipes.create(recipe_attrs(proposal, user_id)),
+         :ok <- assign_pending_slot(state, proposal, recipe),
+         {:ok, state} <-
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: proposal},
+             state,
+             metadata
+           ),
+         run_summary = RunSummary.from_artifacts([proposal], :applied),
+         {:ok, state} <-
+           apply_command(
+             state.stream_id,
+             %Commands.AddArtifact{artifact: run_summary},
+             state,
+             metadata
+           ) do
+      apply_command(state.stream_id, commit_command(state), state, metadata)
+    else
+      %State.Running{} -> {:error, :not_awaiting_user}
+      %State.Applied{} -> {:error, :already_applied}
+      %State.Failed{} -> {:error, :already_failed}
+      %State.Discarded{} -> {:error, :already_discarded}
+      {:fail, code, repair} -> {:error, {:verifier_failed, code, repair}}
+      other -> {:error, other}
+    end
+  end
+
+  defp recipe_attrs(%RecipeProposal{} = proposal, user_id) do
+    %{
+      title: proposal.title,
+      description: proposal.description,
+      instructions: proposal.instructions,
+      base_servings: proposal.base_servings,
+      prep_time_minutes: proposal.prep_time_minutes,
+      cook_time_minutes: proposal.cook_time_minutes,
+      source_url: proposal.source_url,
+      created_by: user_id,
+      tags: proposal.tags,
+      ingredients: Enum.map(proposal.ingredients, &recipe_ingredient_attrs/1)
+    }
+  end
+
+  defp recipe_ingredient_attrs(ing) do
+    %{name: ing[:name], quantity: to_decimal_quantity(ing[:quantity]), unit: ing[:unit]}
+  end
+
+  defp to_decimal_quantity(nil), do: nil
+  defp to_decimal_quantity(%Decimal{} = d), do: d
+
+  defp to_decimal_quantity(s) when is_binary(s) do
+    case Decimal.parse(s) do
+      {d, _rest} -> d
+      :error -> nil
+    end
+  end
+
+  defp to_decimal_quantity(n) when is_integer(n), do: Decimal.new(n)
+  defp to_decimal_quantity(n) when is_float(n), do: Decimal.from_float(n)
+
+  defp assign_pending_slot(_state, %RecipeProposal{pending_assignment: nil}, _recipe), do: :ok
+
+  defp assign_pending_slot(state, %RecipeProposal{pending_assignment: pending}, recipe) do
+    slot_key = pending[:slot_key] || pending["slot_key"]
+    servings = pending[:servings] || pending["servings"] || recipe.base_servings || 4
+
+    case Planning.assign_recipe(run_input(state, :plan_stream_id), slot_key, recipe.id, servings) do
+      {:error, reason} -> {:error, reason}
+      _ -> :ok
+    end
+  end
+
+  defp run_input(%{input: input}, key) do
+    Map.get(input, key) || Map.get(input, Atom.to_string(key))
+  end
+
+  @doc """
   Discard a `:needs_user` run. Used by the user (`reason: :user_discarded`)
   and by the TTL sweep (`reason: :ttl_expired`). Records a `RunDiscarded`
   event and fire-and-forgets the photo cleanup.
@@ -1023,7 +1121,10 @@ defmodule Tore.Harness.Orchestrator do
       household_id: ctx.household_id,
       run_stream_id: stream_id,
       working_plan: working_plan,
-      handles: scoped_handles(Map.get(ctx, :scoped_slot))
+      handles: scoped_handles(Map.get(ctx, :scoped_slot)),
+      # PlannerAgent appends these to PlannerTools.all/0. Nothing in production
+      # sets it; it is the seam tests use to drive the loop with a stub tool.
+      extra_tools: Map.get(ctx, :extra_tools, [])
     }
   end
 
