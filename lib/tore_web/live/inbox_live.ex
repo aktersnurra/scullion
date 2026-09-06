@@ -142,6 +142,13 @@ defmodule ToreWeb.InboxLive do
     "#{gettext("Pantry update")} — #{items_count(run)} #{gettext("items")}"
   end
 
+  defp label_for(%State.NeedsUser{kind: "planner_command_run", artifacts: artifacts}) do
+    case Enum.find(artifacts, &match?(%Tore.Harness.Artifact.RecipeProposal{}, &1)) do
+      %{title: title} -> "#{gettext("New recipe")}: #{title}"
+      nil -> gettext("Planner")
+    end
+  end
+
   defp label_for(%State.NeedsUser{kind: kind}), do: kind
 
   defp items_count(run) do

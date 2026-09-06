@@ -10,7 +10,7 @@ defmodule ToreWeb.RunReviewLive do
 
   use ToreWeb, :live_view
 
-  alias Tore.Harness.Artifact.{CostEntry, PantryBeliefUpdate}
+  alias Tore.Harness.Artifact.{CostEntry, PantryBeliefUpdate, RecipeProposal}
   alias Tore.Harness.{Orchestrator, Run}
   alias Tore.Harness.Run.State
 
@@ -23,20 +23,8 @@ defmodule ToreWeb.RunReviewLive do
       |> assign(:lightbox?, false)
 
     case Run.load(stream_id) do
-      {:ok, %State.NeedsUser{input: input} = state} ->
-        {cost, pantry} = extract_artifacts(state)
-
-        socket =
-          socket
-          |> assign(:stream_id, stream_id)
-          |> assign(:state, :needs_user)
-          |> assign(:has_photo?, has_image_path?(input))
-          |> assign(:cost, cost)
-          |> assign(:pantry, pantry)
-          |> assign(:form_data, form_data_from(cost))
-          |> assign(:error, nil)
-
-        {:ok, socket}
+      {:ok, %State.NeedsUser{} = state} ->
+        {:ok, mount_needs_user(socket, stream_id, state)}
 
       {:ok, %State.Applied{}} ->
         {:ok, assign(socket, stream_id: stream_id, state: :applied, error: nil)}
@@ -52,6 +40,32 @@ defmodule ToreWeb.RunReviewLive do
          socket
          |> put_flash(:error, "Run not found.")
          |> push_navigate(to: socket.assigns.return_to)}
+    end
+  end
+
+  # A recipe proposal carries no CostEntry, so it cannot go through the
+  # receipt path — form_data_from/1 builds itself from the cost artifact.
+  defp mount_needs_user(socket, stream_id, %State.NeedsUser{} = state) do
+    case extract_recipe_proposal(state) do
+      %RecipeProposal{} = proposal ->
+        socket
+        |> assign(:stream_id, stream_id)
+        |> assign(:state, :recipe_proposal)
+        |> assign(:has_photo?, false)
+        |> assign(:proposal, proposal)
+        |> assign(:error, nil)
+
+      nil ->
+        {cost, pantry} = extract_artifacts(state)
+
+        socket
+        |> assign(:stream_id, stream_id)
+        |> assign(:state, :needs_user)
+        |> assign(:has_photo?, has_image_path?(state.input))
+        |> assign(:cost, cost)
+        |> assign(:pantry, pantry)
+        |> assign(:form_data, form_data_from(cost))
+        |> assign(:error, nil)
     end
   end
 
@@ -100,9 +114,15 @@ defmodule ToreWeb.RunReviewLive do
 
     # Discard is fast (no LLM), but we still fire-and-forget for symmetry with
     # save — the page navigates instantly, the toast confirms it landed.
+    discarded_msg =
+      case socket.assigns.state do
+        :recipe_proposal -> gettext("Recipe discarded.")
+        _ -> gettext("Receipt discarded.")
+      end
+
     Task.Supervisor.start_child(Tore.TaskSupervisor, fn ->
       case Orchestrator.discard_run(stream_id, reason: :user_discarded) do
-        {:ok, _} -> broadcast_toast(user_id, :info, "Receipt discarded.")
+        {:ok, _} -> broadcast_toast(user_id, :info, discarded_msg)
         {:error, reason} -> broadcast_toast(user_id, :error, "Couldn't discard: #{inspect(reason)}.")
       end
     end)
@@ -136,6 +156,36 @@ defmodule ToreWeb.RunReviewLive do
 
     {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
   end
+
+  def handle_event("save_recipe", _params, socket) do
+    proposal = socket.assigns.proposal
+    user_id = socket.assigns.current_user && socket.assigns.current_user.id
+    stream_id = socket.assigns.stream_id
+
+    # Same fire-and-forget shape as the receipt save: the commit re-runs the
+    # verifier and writes the catalog, so bounce the user back now and let the
+    # toast confirm it landed.
+    Task.Supervisor.start_child(Tore.TaskSupervisor, fn ->
+      case Orchestrator.commit_recipe_proposal(stream_id, proposal, user_id) do
+        {:ok, _} ->
+          broadcast_toast(user_id, :info, gettext("Recipe saved."))
+
+        {:error, {:verifier_failed, code, _}} ->
+          broadcast_toast(user_id, :error, verifier_message(code))
+
+        {:error, reason} ->
+          broadcast_toast(user_id, :error, "#{gettext("Couldn't save recipe")}: #{inspect(reason)}.")
+      end
+    end)
+
+    {:noreply, push_navigate(socket, to: socket.assigns.return_to)}
+  end
+
+  defp verifier_message(:near_duplicate),
+    do: gettext("You already have a recipe just like this one.")
+
+  defp verifier_message(:no_ingredients), do: gettext("That recipe has no ingredients.")
+  defp verifier_message(_), do: gettext("That recipe came back incomplete.")
 
   defp broadcast_toast(nil, _kind, _msg), do: :ok
 
@@ -360,6 +410,89 @@ defmodule ToreWeb.RunReviewLive do
     """
   end
 
+  defp render_body(%{state: :recipe_proposal} = assigns) do
+    ~H"""
+    <h2 class="text-xl font-semibold text-[color:var(--text)] mb-1">{@proposal.title}</h2>
+    <p class="text-sm text-[color:var(--muted)] mb-4">
+      {gettext("Save this recipe to your catalog, or discard it.")}
+    </p>
+
+    <.error_banner :if={@error} code={@error} />
+
+    <div class="rounded-2xl border border-[color:var(--border)] bg-[var(--surface)] p-4 space-y-4">
+      <p :if={@proposal.description} class="text-sm text-[color:var(--text)]">
+        {@proposal.description}
+      </p>
+
+      <p class="text-xs text-[color:var(--muted)]">
+        {recipe_meta(@proposal)}
+      </p>
+
+      <section>
+        <h3 class="text-sm font-medium text-[color:var(--text)] mb-2">
+          {gettext("Ingredients")}
+        </h3>
+        <ul class="space-y-1">
+          <li
+            :for={ing <- @proposal.ingredients}
+            class="text-sm text-[color:var(--text)] flex justify-between gap-3"
+          >
+            <span>{ing[:name]}</span>
+            <span class="text-[color:var(--muted)] shrink-0">{ingredient_amount(ing)}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section :if={@proposal.instructions}>
+        <h3 class="text-sm font-medium text-[color:var(--text)] mb-2">{gettext("Method")}</h3>
+        <p class="text-sm text-[color:var(--text)] whitespace-pre-line">
+          {@proposal.instructions}
+        </p>
+      </section>
+
+      <p :if={@proposal.source_url} class="text-xs text-[color:var(--muted)]">
+        {gettext("From")} {@proposal.source_url}
+      </p>
+    </div>
+
+    <%= if @confirming_discard? do %>
+      <div class="flex gap-2 mt-4">
+        <button
+          type="button"
+          phx-click="cancel_discard"
+          class="flex-1 rounded-xl border border-[color:var(--border)] bg-[var(--surface)] text-[color:var(--text)] py-3 font-semibold"
+        >
+          {gettext("Cancel")}
+        </button>
+        <button
+          type="button"
+          phx-click="confirm_discard"
+          class="flex-1 rounded-xl bg-red-600 text-white py-3 font-semibold"
+        >
+          {gettext("Discard")}
+        </button>
+      </div>
+    <% else %>
+      <div class="flex gap-2 mt-4">
+        <button
+          type="button"
+          phx-click="ask_discard"
+          class="shrink-0 rounded-xl border border-[color:var(--border)] bg-[var(--surface)] text-[color:var(--muted)] px-4 py-3 font-semibold"
+        >
+          {gettext("Discard")}
+        </button>
+        <button
+          type="submit"
+          phx-click="save_recipe"
+          class="flex-1 rounded-xl bg-[color:var(--accent)] text-white py-3 font-semibold"
+        >
+          {gettext("Save recipe")}
+        </button>
+      </div>
+    <% end %>
+    """
+  end
+
   defp render_body(%{state: :applied} = assigns) do
     ~H"""
     <p class="text-[color:var(--accent)] font-semibold">{gettext("Receipt already saved.")}</p>
@@ -378,6 +511,22 @@ defmodule ToreWeb.RunReviewLive do
     """
   end
 
+  defp recipe_meta(%RecipeProposal{} = p) do
+    [
+      p.base_servings && "#{p.base_servings} #{gettext("servings")}",
+      p.prep_time_minutes && "#{p.prep_time_minutes} #{gettext("min prep")}",
+      p.cook_time_minutes && "#{p.cook_time_minutes} #{gettext("min cooking")}"
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join(" · ")
+  end
+
+  defp ingredient_amount(ing) do
+    [ing[:quantity], ing[:unit]]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join(" ")
+  end
+
   defp error_banner(assigns) do
     ~H"""
     <div class="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-500">
@@ -391,6 +540,9 @@ defmodule ToreWeb.RunReviewLive do
     pantry = Enum.find(artifacts, &match?(%PantryBeliefUpdate{}, &1))
     {cost, pantry}
   end
+
+  defp extract_recipe_proposal(%State.NeedsUser{artifacts: artifacts}),
+    do: Enum.find(artifacts, &match?(%RecipeProposal{}, &1))
 
   defp form_data_from(%CostEntry{} = c) do
     %{
